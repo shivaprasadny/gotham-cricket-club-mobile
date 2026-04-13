@@ -90,6 +90,12 @@ const LoginScreen = ({ navigation }: Props) => {
           onPress={() => navigation.navigate("Register")}
         />
       </View>
+      <View style={styles.registerButton}>
+  <Button
+    title="Forgot Password?"
+    onPress={() => navigation.navigate("ForgotPassword")}
+  />
+</View>
     </View>
   );
 };

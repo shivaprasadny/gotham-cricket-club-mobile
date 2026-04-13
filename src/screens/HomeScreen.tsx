@@ -30,6 +30,49 @@ const HomeScreen = ({ navigation }: Props) => {
       </View>
 
       <View style={styles.buttonGap}>
+        <Button
+          title="Notifications"
+          onPress={() => navigation.navigate("Notifications")}
+        />
+      </View>
+
+      {(user?.role === "ADMIN" || user?.role === "CAPTAIN") && (
+        <View style={styles.buttonGap}>
+          <Button
+            title="Create Announcement"
+            onPress={() => navigation.navigate("CreateAnnouncement")}
+          />
+        </View>
+      )}
+
+      {(user?.role === "ADMIN" || user?.role === "CAPTAIN") && (
+        <View style={styles.buttonGap}>
+          <Button
+            title="Create Match"
+            onPress={() => navigation.navigate("CreateMatch")}
+          />
+        </View>
+      )}
+
+      {(user?.role === "ADMIN" || user?.role === "CAPTAIN") && (
+        <View style={styles.buttonGap}>
+          <Button
+            title="View Members"
+            onPress={() => navigation.navigate("Members")}
+          />
+        </View>
+      )}
+
+      {user?.role === "ADMIN" && (
+        <View style={styles.buttonGap}>
+          <Button
+            title="Approve Members"
+            onPress={() => navigation.navigate("AdminApproval")}
+          />
+        </View>
+      )}
+
+      <View style={styles.buttonGap}>
         <Button title="Logout" onPress={logout} />
       </View>
     </View>

@@ -1,5 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  registerForPushNotificationsAsync,
+  savePushTokenToBackend,
+} from "../services/pushNotificationService";
 
 type UserType = {
   id: number;
@@ -45,16 +49,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const login = async (newToken: string, newUser: UserType) => {
-    try {
-      setToken(newToken);
-      setUser(newUser);
+  try {
+    setToken(newToken);
+    setUser(newUser);
 
-      await AsyncStorage.setItem("token", newToken);
-      await AsyncStorage.setItem("user", JSON.stringify(newUser));
-    } catch (error) {
-      console.error("Error saving auth data:", error);
+    await AsyncStorage.setItem("token", newToken);
+    await AsyncStorage.setItem("user", JSON.stringify(newUser));
+
+    const pushToken = await registerForPushNotificationsAsync();
+    if (pushToken) {
+      await savePushTokenToBackend(pushToken);
     }
-  };
+  } catch (error) {
+    console.error("Error saving auth or push token data:", error);
+  }
+};
 
   const logout = async () => {
     try {

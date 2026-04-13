@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { getMatches } from "../services/matchService";
+import { useAuth } from "../context/AuthContext";
 
 type Props = {
   navigation: any;
@@ -25,6 +26,8 @@ type Match = {
 };
 
 const MatchesScreen = ({ navigation }: Props) => {
+  const { user } = useAuth();
+
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -58,30 +61,43 @@ const MatchesScreen = ({ navigation }: Props) => {
     }
   };
 
-  const renderItem = ({ item }: { item: Match }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() =>
-        navigation.navigate("Availability", {
-          matchId: item.id,
-          opponentName: item.opponentName,
-          venue: item.venue,
-          matchDate: item.matchDate,
-          matchType: item.matchType,
-        })
-      }
-    >
-      <Text style={styles.title}>{item.opponentName}</Text>
-      <Text style={styles.detail}>Type: {item.matchType}</Text>
-      <Text style={styles.detail}>Venue: {item.venue}</Text>
-      <Text style={styles.detail}>Date: {formatDate(item.matchDate)}</Text>
-      {!!item.notes && <Text style={styles.notes}>Notes: {item.notes}</Text>}
+  const renderItem = ({ item }: { item: Match }) => {
+    const canEdit = user?.role === "ADMIN" || user?.role === "CAPTAIN";
 
-      <View style={styles.buttonBox}>
-        <Text style={styles.buttonText}>Tap to mark availability</Text>
-      </View>
-    </TouchableOpacity>
-  );
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() =>
+          navigation.navigate("MatchDetails", {
+            matchId: item.id,
+            opponentName: item.opponentName,
+            venue: item.venue,
+            matchDate: item.matchDate,
+            matchType: item.matchType,
+          })
+        }
+        onLongPress={() => {
+          if (canEdit) {
+            navigation.navigate("EditMatch", { matchId: item.id });
+          }
+        }}
+      >
+        <Text style={styles.title}>{item.opponentName}</Text>
+        <Text style={styles.detail}>Type: {item.matchType}</Text>
+        <Text style={styles.detail}>Venue: {item.venue}</Text>
+        <Text style={styles.detail}>Date: {formatDate(item.matchDate)}</Text>
+        {!!item.notes && <Text style={styles.notes}>Notes: {item.notes}</Text>}
+
+        <View style={styles.buttonBox}>
+          <Text style={styles.buttonText}>Tap to view details</Text>
+        </View>
+
+        {canEdit && (
+          <Text style={styles.editHint}>Long press to edit match</Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -144,6 +160,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "center",
     fontWeight: "600",
+  },
+  editHint: {
+    marginTop: 10,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#111",
   },
   center: {
     flex: 1,

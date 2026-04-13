@@ -5,9 +5,15 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { getAnnouncements } from "../services/announcementService";
+import { useAuth } from "../context/AuthContext";
+
+type Props = {
+  navigation: any;
+};
 
 type Announcement = {
   id: number;
@@ -17,7 +23,9 @@ type Announcement = {
   createdAt: string;
 };
 
-const AnnouncementsScreen = () => {
+const AnnouncementsScreen = ({ navigation }: Props) => {
+  const { user } = useAuth();
+
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -43,14 +51,30 @@ const AnnouncementsScreen = () => {
     await loadAnnouncements();
   };
 
-  const renderItem = ({ item }: { item: Announcement }) => (
-    <View style={styles.card}>
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.message}>{item.message}</Text>
-      <Text style={styles.meta}>By: {item.createdBy}</Text>
-      <Text style={styles.meta}>{new Date(item.createdAt).toLocaleString()}</Text>
-    </View>
-  );
+  const renderItem = ({ item }: { item: Announcement }) => {
+    const canEdit = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => {
+          if (canEdit) {
+            navigation.navigate("EditAnnouncement", { announcement: item });
+          }
+        }}
+        disabled={!canEdit}
+      >
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.message}>{item.message}</Text>
+        <Text style={styles.meta}>By: {item.createdBy}</Text>
+        <Text style={styles.meta}>
+          {new Date(item.createdAt).toLocaleString()}
+        </Text>
+
+        {canEdit && <Text style={styles.editHint}>Tap to edit</Text>}
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -66,7 +90,9 @@ const AnnouncementsScreen = () => {
       data={announcements}
       keyExtractor={(item) => item.id.toString()}
       renderItem={renderItem}
-      contentContainerStyle={announcements.length === 0 ? styles.center : styles.list}
+      contentContainerStyle={
+        announcements.length === 0 ? styles.center : styles.list
+      }
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -101,6 +127,12 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 12,
     color: "#666",
+  },
+  editHint: {
+    marginTop: 10,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#111",
   },
   center: {
     flex: 1,
