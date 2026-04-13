@@ -8,6 +8,7 @@ import {
   TextInput,
   TouchableOpacity,
   Platform,
+  View,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { createMatch } from "../services/matchService";
@@ -17,6 +18,10 @@ type Props = {
   navigation: any;
 };
 
+type MatchStatus = "UPCOMING" | "COMPLETED" | "CANCELLED";
+
+const STATUS_OPTIONS: MatchStatus[] = ["UPCOMING", "COMPLETED", "CANCELLED"];
+
 const CreateMatchScreen = ({ navigation }: Props) => {
   const [opponentName, setOpponentName] = useState("");
   const [venue, setVenue] = useState("");
@@ -25,12 +30,10 @@ const CreateMatchScreen = ({ navigation }: Props) => {
   const [submitting, setSubmitting] = useState(false);
   const [matchDate, setMatchDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [status, setStatus] = useState<"UPCOMING" | "COMPLETED" | "CANCELLED">(
-    "UPCOMING"
-  );
+  const [status, setStatus] = useState<MatchStatus>("UPCOMING");
 
   const handleCreateMatch = async () => {
-    if (!opponentName || !matchDate || !venue || !matchType) {
+    if (!opponentName.trim() || !matchDate || !venue.trim() || !matchType.trim()) {
       Alert.alert("Error", "Please fill all required fields");
       return;
     }
@@ -39,11 +42,11 @@ const CreateMatchScreen = ({ navigation }: Props) => {
       setSubmitting(true);
 
       const response = await createMatch({
-        opponentName,
+        opponentName: opponentName.trim(),
         matchDate: matchDate.toISOString(),
-        venue,
-        matchType,
-        notes,
+        venue: venue.trim(),
+        matchType: matchType.trim(),
+        notes: notes.trim(),
         status,
       });
 
@@ -64,7 +67,7 @@ const CreateMatchScreen = ({ navigation }: Props) => {
       setNotes("");
       setStatus("UPCOMING");
 
-      navigation.navigate("Matches");
+      navigation.navigate("MainTabs", { screen: "Matches" });
     } catch (error: any) {
       console.log("CREATE MATCH ERROR:", error?.response?.data || error?.message);
       Alert.alert(
@@ -103,7 +106,7 @@ const CreateMatchScreen = ({ navigation }: Props) => {
           value={matchDate || new Date()}
           mode="datetime"
           display={Platform.OS === "ios" ? "inline" : "default"}
-          onChange={(event, selectedDate) => {
+          onChange={(_, selectedDate) => {
             setShowDatePicker(false);
             if (selectedDate) {
               setMatchDate(selectedDate);
@@ -137,13 +140,14 @@ const CreateMatchScreen = ({ navigation }: Props) => {
 
       <Text style={styles.label}>Status</Text>
       <View style={styles.row}>
-        {["UPCOMING", "COMPLETED", "CANCELLED"].map((item) => (
+        {STATUS_OPTIONS.map((item) => (
           <TouchableOpacity
             key={item}
-            style={[styles.statusBtn, status === item && styles.statusBtnSelected]}
-            onPress={() =>
-              setStatus(item as "UPCOMING" | "COMPLETED" | "CANCELLED")
-            }
+            style={[
+              styles.statusBtn,
+              status === item && styles.statusBtnSelected,
+            ]}
+            onPress={() => setStatus(item)}
           >
             <Text
               style={[
@@ -197,8 +201,8 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
-    gap: 8,
     marginBottom: 16,
+    justifyContent: "space-between",
   },
   statusBtn: {
     flex: 1,
@@ -206,6 +210,7 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     paddingVertical: 10,
     borderRadius: 8,
+    marginRight: 8,
   },
   statusBtnSelected: {
     backgroundColor: "#111",

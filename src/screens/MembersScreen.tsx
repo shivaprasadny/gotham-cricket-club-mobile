@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -6,6 +6,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -15,7 +16,6 @@ import {
   getAllMembers,
   updateMemberRole,
 } from "../services/adminService";
-import { addNotification } from "../services/notificationService";
 
 type Member = {
   id?: number;
@@ -26,6 +26,9 @@ type Member = {
   status?: string;
 };
 
+type RoleFilter = "ALL" | "PLAYER" | "CAPTAIN" | "ADMIN";
+type SortType = "NAME" | "ROLE";
+
 const ROLE_OPTIONS: ApprovalRole[] = ["PLAYER", "CAPTAIN", "ADMIN"];
 
 const MembersScreen = () => {
@@ -33,6 +36,9 @@ const MembersScreen = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
+  const [sortBy, setSortBy] = useState<SortType>("NAME");
 
   const loadMembers = async () => {
     try {
@@ -48,7 +54,7 @@ const MembersScreen = () => {
   };
 
   useEffect(() => {
-    loadMembers();
+    void loadMembers();
   }, []);
 
   const onRefresh = async () => {
@@ -56,24 +62,42 @@ const MembersScreen = () => {
     await loadMembers();
   };
 
+  const filteredMembers = useMemo(() => {
+    let result = members.filter((member) => {
+      const matchesSearch = (member.fullName || "")
+        .toLowerCase()
+        .includes(search.toLowerCase());
+
+      const matchesRole =
+        roleFilter === "ALL" ? true : member.role === roleFilter;
+
+      return matchesSearch && matchesRole;
+    });
+
+    if (sortBy === "NAME") {
+      result = [...result].sort((a, b) =>
+        (a.fullName || "").localeCompare(b.fullName || "")
+      );
+    } else {
+      result = [...result].sort((a, b) =>
+        (a.role || "").localeCompare(b.role || "")
+      );
+    }
+
+    return result;
+  }, [members, search, roleFilter, sortBy]);
+
   const handleRoleChange = async (
     memberId: number,
-    role: ApprovalRole,
-    memberName: string
+    role: ApprovalRole
   ) => {
     try {
       const response = await updateMemberRole(memberId, role);
-
-      await addNotification({
-        title: "Role Updated",
-        message: `${memberName}'s role was changed to ${role}.`,
-      });
-
       Alert.alert(
         "Success",
         typeof response === "string" ? response : `Role updated to ${role}`
       );
-      loadMembers();
+      await loadMembers();
     } catch (error: any) {
       Alert.alert(
         "Error",
@@ -82,15 +106,32 @@ const MembersScreen = () => {
     }
   };
 
+  const getRoleChipStyle = (role?: string) => {
+    switch (role) {
+      case "ADMIN":
+        return styles.adminChip;
+      case "CAPTAIN":
+        return styles.captainChip;
+      case "PLAYER":
+        return styles.playerChip;
+      default:
+        return styles.defaultChip;
+    }
+  };
+
   const renderItem = ({ item }: { item: Member }) => {
     const memberId = item.userId ?? item.id ?? 0;
-    const memberName = item.fullName || "Unknown User";
 
     return (
       <View style={styles.card}>
-        <Text style={styles.name}>{memberName}</Text>
+        <View style={styles.rowTop}>
+          <Text style={styles.name}>{item.fullName || "No Name"}</Text>
+          <Text style={[styles.roleChip, getRoleChipStyle(item.role)]}>
+            {item.role || "N/A"}
+          </Text>
+        </View>
+
         <Text>{item.email || "No Email"}</Text>
-        <Text>Role: {item.role || "N/A"}</Text>
         <Text>Status: {item.status || "N/A"}</Text>
 
         {user?.role === "ADMIN" && (
@@ -101,7 +142,7 @@ const MembersScreen = () => {
                 <TouchableOpacity
                   key={role}
                   style={styles.roleButton}
-                  onPress={() => handleRoleChange(memberId, role, memberName)}
+                  onPress={() => handleRoleChange(memberId, role)}
                 >
                   <Text style={styles.roleButtonText}>{role}</Text>
                 </TouchableOpacity>
@@ -124,14 +165,72 @@ const MembersScreen = () => {
 
   return (
     <FlatList
-      data={members}
+      data={filteredMembers}
       keyExtractor={(item, index) => String(item.userId ?? item.id ?? index)}
       renderItem={renderItem}
       contentContainerStyle={
-        members.length === 0 ? styles.center : styles.container
+        filteredMembers.length === 0 ? styles.center : styles.container
       }
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+      ListHeaderComponent={
+        <View style={styles.header}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by player name"
+            value={search}
+            onChangeText={setSearch}
+          />
+
+          <Text style={styles.headerTitle}>Filter by Role</Text>
+          <View style={styles.filterRow}>
+            {(["ALL", "PLAYER", "CAPTAIN", "ADMIN"] as RoleFilter[]).map(
+              (item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={[
+                    styles.filterBtn,
+                    roleFilter === item && styles.filterBtnSelected,
+                  ]}
+                  onPress={() => setRoleFilter(item)}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      roleFilter === item && styles.filterTextSelected,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
+          </View>
+
+          <Text style={styles.headerTitle}>Sort By</Text>
+          <View style={styles.filterRow}>
+            {(["NAME", "ROLE"] as SortType[]).map((item) => (
+              <TouchableOpacity
+                key={item}
+                style={[
+                  styles.filterBtn,
+                  sortBy === item && styles.filterBtnSelected,
+                ]}
+                onPress={() => setSortBy(item)}
+              >
+                <Text
+                  style={[
+                    styles.filterText,
+                    sortBy === item && styles.filterTextSelected,
+                  ]}
+                >
+                  {item}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
       }
       ListEmptyComponent={<Text>No members found</Text>}
     />
@@ -145,16 +244,86 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#fff",
   },
+  header: {
+    marginBottom: 16,
+  },
+  headerTitle: {
+    fontWeight: "700",
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 20,
+  },
+  filterBtnSelected: {
+    backgroundColor: "#111",
+    borderColor: "#111",
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  filterTextSelected: {
+    color: "#fff",
+  },
   card: {
     backgroundColor: "#f7f7f7",
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 12,
+  },
+  rowTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
   },
   name: {
     fontSize: 18,
     fontWeight: "700",
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 8,
+  },
+  roleChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    overflow: "hidden",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  adminChip: {
+    backgroundColor: "#111",
+    color: "#fff",
+  },
+  captainChip: {
+    backgroundColor: "#1d4ed8",
+    color: "#fff",
+  },
+  playerChip: {
+    backgroundColor: "#16a34a",
+    color: "#fff",
+  },
+  defaultChip: {
+    backgroundColor: "#ccc",
+    color: "#111",
   },
   roleLabel: {
     marginTop: 12,

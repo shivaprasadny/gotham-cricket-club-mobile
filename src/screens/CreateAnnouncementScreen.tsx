@@ -8,6 +8,7 @@ import {
   TextInput,
 } from "react-native";
 import { createAnnouncement } from "../services/announcementService";
+import { addNotification } from "../services/notificationService";
 
 type Props = {
   navigation: any;
@@ -19,7 +20,7 @@ const CreateAnnouncementScreen = ({ navigation }: Props) => {
   const [submitting, setSubmitting] = useState(false);
 
   const handleCreate = async () => {
-    if (!title || !message) {
+    if (!title.trim() || !message.trim()) {
       Alert.alert("Error", "Please fill all fields");
       return;
     }
@@ -27,7 +28,15 @@ const CreateAnnouncementScreen = ({ navigation }: Props) => {
     try {
       setSubmitting(true);
 
-      const response = await createAnnouncement({ title, message });
+      const response = await createAnnouncement({
+        title: title.trim(),
+        message: message.trim(),
+      });
+
+      await addNotification({
+        title: "Announcement Created",
+        message: `${title.trim()} was posted successfully.`,
+      });
 
       Alert.alert(
         "Success",
@@ -38,7 +47,8 @@ const CreateAnnouncementScreen = ({ navigation }: Props) => {
 
       setTitle("");
       setMessage("");
-      navigation.navigate("Announcements");
+
+      navigation.navigate("MainTabs", { screen: "Announcements" });
     } catch (error: any) {
       Alert.alert(
         "Error",

@@ -22,7 +22,7 @@ const NotificationsScreen = () => {
   };
 
   useEffect(() => {
-    loadNotifications();
+    void loadNotifications();
   }, []);
 
   const handleClear = async () => {

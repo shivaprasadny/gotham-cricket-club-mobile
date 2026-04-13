@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -8,10 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuth } from "../context/AuthContext";
 import {
   getAvailabilityByMatch,
   getAvailabilitySummary,
 } from "../services/availabilityService";
+import { getSquadByMatch } from "../services/squadService";
 
 type Props = {
   route: any;
@@ -36,23 +38,55 @@ type Summary = {
   totalResponses: number;
 };
 
+type SquadItem = {
+  squadId: number;
+  userId: number;
+  fullName: string;
+  nickname?: string;
+  playerType?: string;
+  jerseyNumber?: number;
+  isPlayingXi: boolean;
+  roleInMatch?: string;
+};
+
 const MatchDetailsScreen = ({ route, navigation }: Props) => {
-  const { matchId, opponentName, venue, matchDate, matchType } = route.params;
+  const { user } = useAuth();
+  const { matchId, opponentName, venue, matchDate, matchType, status } = route.params;
 
   const [availabilityList, setAvailabilityList] = useState<AvailabilityItem[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [squad, setSquad] = useState<SquadItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const isAdminOrCaptain = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+
+  const myAvailability = useMemo(
+    () => availabilityList.find((item) => item.userId === user?.id),
+    [availabilityList, user?.id]
+  );
+
+  const playingXi = useMemo(
+    () => squad.filter((item) => item.isPlayingXi),
+    [squad]
+  );
+
+  const reserves = useMemo(
+    () => squad.filter((item) => !item.isPlayingXi),
+    [squad]
+  );
+
   const loadData = async () => {
     try {
-      const [availabilityData, summaryData] = await Promise.all([
+      const [availabilityData, summaryData, squadData] = await Promise.all([
         getAvailabilityByMatch(matchId),
         getAvailabilitySummary(matchId),
+        getSquadByMatch(matchId),
       ]);
 
       setAvailabilityList(Array.isArray(availabilityData) ? availabilityData : []);
       setSummary(summaryData || null);
+      setSquad(Array.isArray(squadData) ? squadData : []);
     } catch (error: any) {
       console.log(
         "MATCH DETAILS ERROR:",
@@ -65,7 +99,7 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, []);
 
   const onRefresh = async () => {
@@ -81,8 +115,8 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  const getStatusStyle = (status: AvailabilityItem["status"]) => {
-    switch (status) {
+  const getStatusStyle = (value: string) => {
+    switch (value) {
       case "AVAILABLE":
         return styles.available;
       case "NOT_AVAILABLE":
@@ -104,7 +138,6 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
           {item.status}
         </Text>
       </View>
-
       {item.message ? (
         <Text style={styles.playerMessage}>Note: {item.message}</Text>
       ) : null}
@@ -115,7 +148,7 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>Loading match details...</Text>
+        <Text>Loading match details...</Text>
       </View>
     );
   }
@@ -135,10 +168,46 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
             <Text style={styles.matchText}>Type: {matchType}</Text>
             <Text style={styles.matchText}>Venue: {venue}</Text>
             <Text style={styles.matchText}>Date: {formatDate(matchDate)}</Text>
+            <Text style={styles.matchText}>Status: {status || "UPCOMING"}</Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Availability Summary</Text>
+          <View style={styles.actionPanel}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() =>
+                navigation.navigate("Availability", {
+                  matchId,
+                  opponentName,
+                  venue,
+                  matchDate,
+                  matchType,
+                })
+              }
+            >
+              <Text style={styles.primaryButtonText}>Mark My Availability</Text>
+            </TouchableOpacity>
 
+            {isAdminOrCaptain && (
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => navigation.navigate("SquadSelection", { matchId })}
+              >
+                <Text style={styles.primaryButtonText}>Open Squad Selection</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {myAvailability && (
+            <View style={styles.myStatusCard}>
+              <Text style={styles.sectionTitle}>My Availability</Text>
+              <Text style={styles.infoText}>Status: {myAvailability.status}</Text>
+              {myAvailability.message ? (
+                <Text style={styles.infoText}>Message: {myAvailability.message}</Text>
+              ) : null}
+            </View>
+          )}
+
+          <Text style={styles.sectionTitle}>Availability Summary</Text>
           <View style={styles.summaryGrid}>
             <View style={[styles.summaryCard, styles.availableBox]}>
               <Text style={styles.summaryNumber}>
@@ -165,40 +234,38 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
             </View>
           </View>
 
-          <TouchableOpacity
-  style={styles.markButton}
-  onPress={() => navigation.navigate("SquadSelection", { matchId })}
->
-  <Text style={styles.markButtonText}>Open Squad Selection</Text>
-</TouchableOpacity>
-
           <Text style={styles.totalResponses}>
             Total Responses: {summary?.totalResponses ?? 0}
           </Text>
 
-          <TouchableOpacity
-            style={styles.markButton}
-            onPress={() =>
-              navigation.navigate("Availability", {
-                matchId,
-                opponentName,
-                venue,
-                matchDate,
-                matchType,
-              })
-            }
-          >
-            <Text style={styles.markButtonText}>Mark My Availability</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Playing XI</Text>
+          {playingXi.length === 0 ? (
+            <Text style={styles.emptyText}>No playing XI selected yet.</Text>
+          ) : (
+            playingXi.map((item) => (
+              <View key={item.squadId} style={styles.squadCard}>
+                <Text style={styles.playerName}>{item.fullName}</Text>
+                <Text>{item.roleInMatch || "No role set"}</Text>
+              </View>
+            ))
+          )}
+
+          <Text style={styles.sectionTitle}>Reserve Players</Text>
+          {reserves.length === 0 ? (
+            <Text style={styles.emptyText}>No reserve players selected yet.</Text>
+          ) : (
+            reserves.map((item) => (
+              <View key={item.squadId} style={styles.squadCard}>
+                <Text style={styles.playerName}>{item.fullName}</Text>
+                <Text>{item.roleInMatch || "No role set"}</Text>
+              </View>
+            ))
+          )}
 
           <Text style={styles.sectionTitle}>Players Response</Text>
         </View>
       }
-      ListEmptyComponent={
-        <View style={styles.emptyBox}>
-          <Text>No player responses yet.</Text>
-        </View>
-      }
+      ListEmptyComponent={<Text style={styles.emptyText}>No player responses yet.</Text>}
       contentContainerStyle={
         availabilityList.length === 0 ? styles.emptyListContainer : styles.listContainer
       }
@@ -225,7 +292,19 @@ const styles = StyleSheet.create({
     backgroundColor: "#f7f7f7",
     padding: 16,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  actionPanel: {
+    backgroundColor: "#f7f7f7",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  myStatusCard: {
+    backgroundColor: "#eef4ff",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
   },
   matchTitle: {
     fontSize: 22,
@@ -240,6 +319,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     marginBottom: 12,
+    marginTop: 6,
+  },
+  infoText: {
+    fontSize: 15,
+    marginBottom: 6,
   },
   summaryGrid: {
     flexDirection: "row",
@@ -280,16 +364,22 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontWeight: "600",
   },
-  markButton: {
+  primaryButton: {
     backgroundColor: "#111",
     paddingVertical: 14,
     borderRadius: 10,
-    marginBottom: 20,
+    marginBottom: 12,
   },
-  markButtonText: {
+  primaryButtonText: {
     color: "#fff",
     textAlign: "center",
     fontWeight: "700",
+  },
+  squadCard: {
+    backgroundColor: "#f7f7f7",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 8,
   },
   playerCard: {
     backgroundColor: "#f7f7f7",
@@ -341,18 +431,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#ccc",
     color: "#111",
   },
-  emptyBox: {
-    alignItems: "center",
-    marginTop: 20,
+  emptyText: {
+    color: "#666",
+    marginBottom: 12,
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
   },
 });

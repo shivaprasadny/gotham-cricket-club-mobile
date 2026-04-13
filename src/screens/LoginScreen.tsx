@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { loginUser } from "../services/authService";
@@ -15,11 +16,13 @@ type Props = {
 };
 
 const LoginScreen = ({ navigation }: Props) => {
-  const { login } = useAuth();
+  const { login, biometricLogin } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [biometricSubmitting, setBiometricSubmitting] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -39,8 +42,6 @@ const LoginScreen = ({ navigation }: Props) => {
         role: response.role,
         status: response.status,
       });
-
-      // No success alert needed because app will move to Home automatically
     } catch (error: any) {
       console.log("LOGIN ERROR FULL:", error);
       console.log("LOGIN ERROR RESPONSE:", error?.response?.data);
@@ -54,6 +55,23 @@ const LoginScreen = ({ navigation }: Props) => {
       Alert.alert("Error", message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    try {
+      setBiometricSubmitting(true);
+
+      const result = await biometricLogin();
+
+      if (!result.success) {
+        Alert.alert("Biometric Login", result.message || "Login failed");
+      }
+    } catch (error) {
+      console.error("Biometric login error:", error);
+      Alert.alert("Error", "Biometric login failed");
+    } finally {
+      setBiometricSubmitting(false);
     }
   };
 
@@ -73,16 +91,37 @@ const LoginScreen = ({ navigation }: Props) => {
       <TextInput
         style={styles.input}
         placeholder="Password"
-        secureTextEntry
+        secureTextEntry={!showPassword}
         value={password}
         onChangeText={setPassword}
       />
 
+      <TouchableOpacity
+        onPress={() => setShowPassword(!showPassword)}
+        style={styles.showBtn}
+      >
+        <Text style={styles.showText}>
+          {showPassword ? "Hide Password" : "Show Password"}
+        </Text>
+      </TouchableOpacity>
+
       <Button
         title={submitting ? "Logging in..." : "Login"}
         onPress={handleLogin}
-        disabled={submitting}
+        disabled={submitting || biometricSubmitting}
       />
+
+      <View style={styles.registerButton}>
+        <Button
+          title={
+            biometricSubmitting
+              ? "Checking biometrics..."
+              : "Login with Face ID / Fingerprint"
+          }
+          onPress={handleBiometricLogin}
+          disabled={submitting || biometricSubmitting}
+        />
+      </View>
 
       <View style={styles.registerButton}>
         <Button
@@ -90,12 +129,13 @@ const LoginScreen = ({ navigation }: Props) => {
           onPress={() => navigation.navigate("Register")}
         />
       </View>
+
       <View style={styles.registerButton}>
-  <Button
-    title="Forgot Password?"
-    onPress={() => navigation.navigate("ForgotPassword")}
-  />
-</View>
+        <Button
+          title="Forgot Password?"
+          onPress={() => navigation.navigate("ForgotPassword")}
+        />
+      </View>
     </View>
   );
 };
@@ -124,5 +164,12 @@ const styles = StyleSheet.create({
   },
   registerButton: {
     marginTop: 16,
+  },
+  showBtn: {
+    marginBottom: 12,
+  },
+  showText: {
+    color: "#007AFF",
+    fontWeight: "600",
   },
 });

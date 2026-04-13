@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { deleteMatch, getMatchById, updateMatch } from "../services/matchService";
 
@@ -13,6 +15,10 @@ type Props = {
   route: any;
   navigation: any;
 };
+
+type MatchStatus = "UPCOMING" | "COMPLETED" | "CANCELLED";
+
+const STATUS_OPTIONS: MatchStatus[] = ["UPCOMING", "COMPLETED", "CANCELLED"];
 
 const EditMatchScreen = ({ route, navigation }: Props) => {
   const { matchId } = route.params;
@@ -22,35 +28,51 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   const [venue, setVenue] = useState("");
   const [matchType, setMatchType] = useState("");
   const [notes, setNotes] = useState("");
+  const [status, setStatus] = useState<MatchStatus>("UPCOMING");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    loadMatch();
+    void loadMatch();
   }, []);
 
   const loadMatch = async () => {
     try {
       const data = await getMatchById(matchId);
-      setOpponentName(data.opponentName || "");
-      setMatchDate(data.matchDate || "");
-      setVenue(data.venue || "");
-      setMatchType(data.matchType || "");
-      setNotes(data.notes || "");
+
+      setOpponentName(data?.opponentName || "");
+      setMatchDate(data?.matchDate || "");
+      setVenue(data?.venue || "");
+      setMatchType(data?.matchType || "");
+      setNotes(data?.notes || "");
+      setStatus((data?.status as MatchStatus) || "UPCOMING");
     } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.message || "Failed to load match");
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to load match"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleUpdate = async () => {
+    if (!opponentName.trim() || !matchDate.trim() || !venue.trim() || !matchType.trim()) {
+      Alert.alert("Error", "Please fill all required fields");
+      return;
+    }
+
     try {
+      setSaving(true);
+
       const response = await updateMatch(matchId, {
-        opponentName,
-        matchDate,
-        venue,
-        matchType,
-        notes,
+        opponentName: opponentName.trim(),
+        matchDate: matchDate.trim(),
+        venue: venue.trim(),
+        matchType: matchType.trim(),
+        notes: notes.trim(),
+        status,
       });
 
       Alert.alert(
@@ -60,12 +82,19 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
 
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.message || "Failed to update match");
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to update match"
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
     try {
+      setDeleting(true);
+
       const response = await deleteMatch(matchId);
 
       Alert.alert(
@@ -73,29 +102,100 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         typeof response === "string" ? response : "Match deleted successfully"
       );
 
-      navigation.navigate("Matches");
+      navigation.navigate("MainTabs", { screen: "Matches" });
     } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.message || "Failed to delete match");
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to delete match"
+      );
+    } finally {
+      setDeleting(false);
     }
   };
 
   if (loading) {
-    return <Text style={{ textAlign: "center", marginTop: 40 }}>Loading...</Text>;
+    return <Text style={styles.loadingText}>Loading...</Text>;
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Edit Match</Text>
 
-      <TextInput style={styles.input} value={opponentName} onChangeText={setOpponentName} placeholder="Opponent Name" />
-      <TextInput style={styles.input} value={matchDate} onChangeText={setMatchDate} placeholder="Match Date" />
-      <TextInput style={styles.input} value={venue} onChangeText={setVenue} placeholder="Venue" />
-      <TextInput style={styles.input} value={matchType} onChangeText={setMatchType} placeholder="Match Type" />
-      <TextInput style={[styles.input, styles.notesInput]} value={notes} onChangeText={setNotes} placeholder="Notes" multiline numberOfLines={4} />
+      <TextInput
+        style={styles.input}
+        value={opponentName}
+        onChangeText={setOpponentName}
+        placeholder="Opponent Name"
+      />
 
-      <Button title="Update Match" onPress={handleUpdate} />
-      <Text style={{ marginTop: 12 }} />
-      <Button title="Delete Match" onPress={handleDelete} color="#c0392b" />
+      <TextInput
+        style={styles.input}
+        value={matchDate}
+        onChangeText={setMatchDate}
+        placeholder="Match Date"
+      />
+
+      <TextInput
+        style={styles.input}
+        value={venue}
+        onChangeText={setVenue}
+        placeholder="Venue"
+      />
+
+      <TextInput
+        style={styles.input}
+        value={matchType}
+        onChangeText={setMatchType}
+        placeholder="Match Type"
+      />
+
+      <TextInput
+        style={[styles.input, styles.notesInput]}
+        value={notes}
+        onChangeText={setNotes}
+        placeholder="Notes"
+        multiline
+        numberOfLines={4}
+      />
+
+      <Text style={styles.label}>Status</Text>
+      <View style={styles.row}>
+        {STATUS_OPTIONS.map((item, index) => (
+          <TouchableOpacity
+            key={item}
+            style={[
+              styles.statusBtn,
+              status === item && styles.statusBtnSelected,
+              index === STATUS_OPTIONS.length - 1 && styles.lastStatusBtn,
+            ]}
+            onPress={() => setStatus(item)}
+          >
+            <Text
+              style={[
+                styles.statusText,
+                status === item && styles.statusTextSelected,
+              ]}
+            >
+              {item}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Button
+        title={saving ? "Updating..." : "Update Match"}
+        onPress={handleUpdate}
+        disabled={saving || deleting}
+      />
+
+      <View style={styles.spacer} />
+
+      <Button
+        title={deleting ? "Deleting..." : "Delete Match"}
+        onPress={handleDelete}
+        color="#c0392b"
+        disabled={saving || deleting}
+      />
     </ScrollView>
   );
 };
@@ -107,6 +207,10 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#fff",
     flexGrow: 1,
+  },
+  loadingText: {
+    textAlign: "center",
+    marginTop: 40,
   },
   title: {
     fontSize: 26,
@@ -120,9 +224,44 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
     borderRadius: 8,
+    backgroundColor: "#fff",
   },
   notesInput: {
     minHeight: 100,
     textAlignVertical: "top",
+  },
+  label: {
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  statusBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  lastStatusBtn: {
+    marginRight: 0,
+  },
+  statusBtnSelected: {
+    backgroundColor: "#111",
+    borderColor: "#111",
+  },
+  statusText: {
+    textAlign: "center",
+  },
+  statusTextSelected: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  spacer: {
+    marginTop: 12,
   },
 });

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -8,8 +9,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { getAnnouncements } from "../services/announcementService";
 import { useAuth } from "../context/AuthContext";
+import {
+  deleteAnnouncement,
+  getAnnouncements,
+} from "../services/announcementService";
 
 type Props = {
   navigation: any;
@@ -25,15 +29,16 @@ type Announcement = {
 
 const AnnouncementsScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
-
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+
   const loadAnnouncements = async () => {
     try {
       const data = await getAnnouncements();
-      setAnnouncements(data || []);
+      setAnnouncements(Array.isArray(data) ? data : []);
     } catch (error: any) {
       console.log("ANNOUNCEMENTS ERROR:", error?.response?.data || error?.message);
     } finally {
@@ -43,7 +48,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
   };
 
   useEffect(() => {
-    loadAnnouncements();
+    void loadAnnouncements();
   }, []);
 
   const onRefresh = async () => {
@@ -51,36 +56,58 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     await loadAnnouncements();
   };
 
-  const renderItem = ({ item }: { item: Announcement }) => {
-    const canEdit = user?.role === "ADMIN" || user?.role === "CAPTAIN";
-
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => {
-          if (canEdit) {
-            navigation.navigate("EditAnnouncement", { announcement: item });
-          }
-        }}
-        disabled={!canEdit}
-      >
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.message}>{item.message}</Text>
-        <Text style={styles.meta}>By: {item.createdBy}</Text>
-        <Text style={styles.meta}>
-          {new Date(item.createdAt).toLocaleString()}
-        </Text>
-
-        {canEdit && <Text style={styles.editHint}>Tap to edit</Text>}
-      </TouchableOpacity>
-    );
+  const handleDelete = async (id: number) => {
+    try {
+      const response = await deleteAnnouncement(id);
+      Alert.alert(
+        "Success",
+        typeof response === "string"
+          ? response
+          : "Announcement deleted successfully"
+      );
+      await loadAnnouncements();
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to delete announcement"
+      );
+    }
   };
+
+  const renderItem = ({ item }: { item: Announcement }) => (
+    <View style={styles.card}>
+      <Text style={styles.title}>{item.title}</Text>
+      <Text style={styles.message}>{item.message}</Text>
+      <Text style={styles.meta}>By: {item.createdBy}</Text>
+      <Text style={styles.meta}>
+        {new Date(item.createdAt).toLocaleString()}
+      </Text>
+
+      {canManage && (
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() => navigation.navigate("EditAnnouncement", { announcement: item })}
+          >
+            <Text style={styles.actionText}>Edit</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.deleteBtn]}
+            onPress={() => handleDelete(item.id)}
+          >
+            <Text style={styles.actionText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
 
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>Loading announcements...</Text>
+        <Text>Loading announcements...</Text>
       </View>
     );
   }
@@ -90,9 +117,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
       data={announcements}
       keyExtractor={(item) => item.id.toString()}
       renderItem={renderItem}
-      contentContainerStyle={
-        announcements.length === 0 ? styles.center : styles.list
-      }
+      contentContainerStyle={announcements.length === 0 ? styles.center : styles.list}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -111,7 +136,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#f7f7f7",
     padding: 16,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 12,
   },
   title: {
@@ -127,12 +152,28 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 12,
     color: "#666",
+    marginBottom: 2,
   },
-  editHint: {
-    marginTop: 10,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#111",
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  editBtn: {
+    backgroundColor: "#111",
+  },
+  deleteBtn: {
+    backgroundColor: "#c0392b",
+  },
+  actionText: {
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "700",
   },
   center: {
     flex: 1,
@@ -140,8 +181,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#fff",
     padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
   },
 });

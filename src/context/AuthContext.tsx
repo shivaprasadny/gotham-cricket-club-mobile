@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import * as LocalAuthentication from "expo-local-authentication";
 import {
   registerForPushNotificationsAsync,
   savePushTokenToBackend,
@@ -18,6 +19,8 @@ type AuthContextType = {
   token: string | null;
   login: (token: string, user: UserType) => Promise<void>;
   logout: () => Promise<void>;
+  loadUserFromStorage: () => Promise<boolean>;
+  biometricLogin: () => Promise<{ success: boolean; message?: string }>;
   loading: boolean;
 };
 
@@ -29,41 +32,106 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadStoredAuth();
+    void initializeAuth();
   }, []);
 
-  const loadStoredAuth = async () => {
+  const initializeAuth = async () => {
     try {
-      const storedToken = await AsyncStorage.getItem("token");
-      const storedUser = await AsyncStorage.getItem("user");
-
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      }
-    } catch (error) {
-      console.error("Failed to load auth from storage:", error);
+      await loadUserFromStorage();
     } finally {
       setLoading(false);
     }
   };
 
-  const login = async (newToken: string, newUser: UserType) => {
+ const loadUserFromStorage = async (): Promise<boolean> => {
   try {
-    setToken(newToken);
-    setUser(newUser);
+    const storedToken = await AsyncStorage.getItem("token");
+    const storedUser = await AsyncStorage.getItem("user");
 
-    await AsyncStorage.setItem("token", newToken);
-    await AsyncStorage.setItem("user", JSON.stringify(newUser));
+    console.log("STORED TOKEN:", storedToken);
+    console.log("STORED USER:", storedUser);
 
-    const pushToken = await registerForPushNotificationsAsync();
-    if (pushToken) {
-      await savePushTokenToBackend(pushToken);
+    if (storedToken && storedUser) {
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser) as UserType);
+      return true;
     }
+
+    return false;
   } catch (error) {
-    console.error("Error saving auth or push token data:", error);
+    console.error("Failed to load auth from storage:", error);
+    return false;
   }
 };
+  const login = async (newToken: string, newUser: UserType) => {
+    try {
+      setToken(newToken);
+      setUser(newUser);
+
+      await AsyncStorage.setItem("token", newToken);
+      await AsyncStorage.setItem("user", JSON.stringify(newUser));
+
+      const pushToken = await registerForPushNotificationsAsync();
+      if (pushToken) {
+        await savePushTokenToBackend(pushToken);
+      }
+    } catch (error) {
+      console.error("Error saving auth or push token data:", error);
+    }
+  };
+
+  const biometricLogin = async (): Promise<{
+    success: boolean;
+    message?: string;
+  }> => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      if (!hasHardware) {
+        return {
+          success: false,
+          message: "Device does not support biometrics",
+        };
+      }
+
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!isEnrolled) {
+        return {
+          success: false,
+          message: "No biometric found on device",
+        };
+      }
+
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Login with Face ID / Fingerprint",
+        fallbackLabel: "Use Password",
+        disableDeviceFallback: false,
+      });
+
+      if (!result.success) {
+        return {
+          success: false,
+          message: "Biometric authentication failed",
+        };
+      }
+
+      const loaded = await loadUserFromStorage();
+
+      if (!loaded) {
+        return {
+          success: false,
+          message: "No saved login found. Please login with password first.",
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error("BIOMETRIC ERROR:", error);
+      return {
+        success: false,
+        message: "Something went wrong during biometric login",
+      };
+    }
+  };
 
   const logout = async () => {
     try {
@@ -78,7 +146,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        logout,
+        loadUserFromStorage,
+        biometricLogin,
+        loading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
