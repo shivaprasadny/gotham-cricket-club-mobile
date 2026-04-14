@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Button,
@@ -7,11 +7,12 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Platform,
   View,
+  Platform,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { createMatch } from "../services/matchService";
+import { getTeams } from "../services/teamService";
 import { addNotification } from "../services/notificationService";
 
 type Props = {
@@ -20,6 +21,15 @@ type Props = {
 
 type MatchStatus = "UPCOMING" | "COMPLETED" | "CANCELLED";
 
+type Team = {
+  id: number;
+  teamName: string;
+  description?: string;
+  leagueName?: string;
+  captainId?: number;
+  captainName?: string;
+};
+
 const STATUS_OPTIONS: MatchStatus[] = ["UPCOMING", "COMPLETED", "CANCELLED"];
 
 const CreateMatchScreen = ({ navigation }: Props) => {
@@ -27,14 +37,34 @@ const CreateMatchScreen = ({ navigation }: Props) => {
   const [venue, setVenue] = useState("");
   const [matchType, setMatchType] = useState("");
   const [notes, setNotes] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [matchDate, setMatchDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [status, setStatus] = useState<MatchStatus>("UPCOMING");
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    void loadTeams();
+  }, []);
+
+  const loadTeams = async () => {
+    try {
+      const data = await getTeams();
+      setTeams(Array.isArray(data) ? data : []);
+    } catch (error: any) {
+      Alert.alert("Error", "Failed to load teams");
+    }
+  };
 
   const handleCreateMatch = async () => {
     if (!opponentName.trim() || !matchDate || !venue.trim() || !matchType.trim()) {
       Alert.alert("Error", "Please fill all required fields");
+      return;
+    }
+
+    if (!selectedTeamId) {
+      Alert.alert("Error", "Please select a team");
       return;
     }
 
@@ -48,11 +78,12 @@ const CreateMatchScreen = ({ navigation }: Props) => {
         matchType: matchType.trim(),
         notes: notes.trim(),
         status,
+        teamId: selectedTeamId,
       });
 
       await addNotification({
         title: "Match Created",
-        message: `${opponentName} match was created successfully.`,
+        message: `${opponentName.trim()} match created successfully.`,
       });
 
       Alert.alert(
@@ -60,16 +91,8 @@ const CreateMatchScreen = ({ navigation }: Props) => {
         typeof response === "string" ? response : "Match created successfully"
       );
 
-      setOpponentName("");
-      setMatchDate(null);
-      setVenue("");
-      setMatchType("");
-      setNotes("");
-      setStatus("UPCOMING");
-
       navigation.navigate("MainTabs", { screen: "Matches" });
     } catch (error: any) {
-      console.log("CREATE MATCH ERROR:", error?.response?.data || error?.message);
       Alert.alert(
         "Error",
         error?.response?.data?.message || "Failed to create match"
@@ -91,13 +114,12 @@ const CreateMatchScreen = ({ navigation }: Props) => {
       />
 
       <Text style={styles.label}>Match Date</Text>
-
       <TouchableOpacity
         style={styles.input}
         onPress={() => setShowDatePicker(true)}
       >
         <Text>
-          {matchDate ? matchDate.toLocaleString() : "Select Match Date & Time"}
+          {matchDate ? matchDate.toLocaleString() : "Select Date & Time"}
         </Text>
       </TouchableOpacity>
 
@@ -106,7 +128,7 @@ const CreateMatchScreen = ({ navigation }: Props) => {
           value={matchDate || new Date()}
           mode="datetime"
           display={Platform.OS === "ios" ? "inline" : "default"}
-          onChange={(_, selectedDate) => {
+          onChange={(event, selectedDate) => {
             setShowDatePicker(false);
             if (selectedDate) {
               setMatchDate(selectedDate);
@@ -132,20 +154,53 @@ const CreateMatchScreen = ({ navigation }: Props) => {
       <TextInput
         style={[styles.input, styles.notesInput]}
         placeholder="Notes"
-        multiline
-        numberOfLines={4}
         value={notes}
         onChangeText={setNotes}
+        multiline
+        numberOfLines={4}
       />
+
+      <Text style={styles.label}>Select Team</Text>
+      {teams.length === 0 ? (
+        <Text style={styles.helperText}>No teams found. Create a team first.</Text>
+      ) : (
+        <View style={styles.teamList}>
+          {teams.map((team) => {
+            const selected = selectedTeamId === team.id;
+
+            return (
+              <TouchableOpacity
+                key={team.id}
+                style={[
+                  styles.teamBtn,
+                  selected && styles.teamBtnSelected,
+                ]}
+                onPress={() => setSelectedTeamId(team.id)}
+              >
+                <Text
+                  style={[
+                    styles.teamBtnText,
+                    selected && styles.teamBtnTextSelected,
+                  ]}
+                >
+                  {team.teamName}
+                </Text>
+                
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       <Text style={styles.label}>Status</Text>
       <View style={styles.row}>
-        {STATUS_OPTIONS.map((item) => (
+        {STATUS_OPTIONS.map((item, index) => (
           <TouchableOpacity
             key={item}
             style={[
               styles.statusBtn,
               status === item && styles.statusBtnSelected,
+              index === STATUS_OPTIONS.length - 1 && styles.lastStatusBtn,
             ]}
             onPress={() => setStatus(item)}
           >
@@ -181,28 +236,61 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "700",
-    marginBottom: 24,
     textAlign: "center",
-  },
-  label: {
-    fontWeight: "600",
-    marginBottom: 8,
+    marginBottom: 20,
   },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
     padding: 12,
-    marginBottom: 12,
     borderRadius: 8,
+    marginBottom: 12,
+    backgroundColor: "#fff",
   },
   notesInput: {
     minHeight: 100,
     textAlignVertical: "top",
   },
+  label: {
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  helperText: {
+    color: "#666",
+    marginBottom: 12,
+  },
+  teamList: {
+    marginBottom: 16,
+  },
+  teamBtn: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: "#fff",
+  },
+  teamBtnSelected: {
+    backgroundColor: "#111",
+    borderColor: "#111",
+  },
+  teamBtnText: {
+    textAlign: "center",
+    fontWeight: "700",
+  },
+  teamLeagueText: {
+    textAlign: "center",
+    marginTop: 4,
+    fontSize: 12,
+    color: "#666",
+  },
+  teamBtnTextSelected: {
+    color: "#fff",
+  },
   row: {
     flexDirection: "row",
-    marginBottom: 16,
     justifyContent: "space-between",
+    marginBottom: 16,
   },
   statusBtn: {
     flex: 1,
@@ -211,6 +299,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     marginRight: 8,
+  },
+  lastStatusBtn: {
+    marginRight: 0,
   },
   statusBtnSelected: {
     backgroundColor: "#111",

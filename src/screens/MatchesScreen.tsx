@@ -25,6 +25,9 @@ type Match = {
   notes?: string;
   createdBy?: string;
   status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
+  teamId?: number | null;
+  teamName?: string | null;
+  myAvailability?: "AVAILABLE" | "NOT_AVAILABLE" | "MAYBE" | "INJURED";
 };
 
 type MatchFilter = "ALL" | "UPCOMING" | "COMPLETED" | "CANCELLED";
@@ -43,7 +46,10 @@ const MatchesScreen = ({ navigation }: Props) => {
       const data = await getMatches();
       setMatches(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      console.log("MATCHES ERROR:", error?.response?.data || error?.message);
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to load matches"
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -73,15 +79,10 @@ const MatchesScreen = ({ navigation }: Props) => {
       );
       await loadMatches();
     } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.message || "Failed to delete match");
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleString();
-    } catch {
-      return dateString;
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to delete match"
+      );
     }
   };
 
@@ -96,16 +97,45 @@ const MatchesScreen = ({ navigation }: Props) => {
             matchDate: item.matchDate,
             matchType: item.matchType,
             status: item.status,
+            teamId: item.teamId,
+            teamName: item.teamName,
           })
         }
       >
         <Text style={styles.title}>{item.opponentName}</Text>
-        <Text style={styles.status}>Status: {item.status || "UPCOMING"}</Text>
-        <Text style={styles.detail}>Type: {item.matchType}</Text>
         <Text style={styles.detail}>Venue: {item.venue}</Text>
-        <Text style={styles.detail}>Date: {formatDate(item.matchDate)}</Text>
-        {!!item.notes && <Text style={styles.notes}>Notes: {item.notes}</Text>}
+        <Text style={styles.detail}>Type: {item.matchType}</Text>
+        <Text style={styles.detail}>
+          Date: {new Date(item.matchDate).toLocaleString()}
+        </Text>
+        <Text style={styles.detail}>
+          Team: {item.teamName ? item.teamName : "No team assigned"}
+        </Text>
+        <Text style={styles.detail}>Status: {item.status || "UPCOMING"}</Text>
       </TouchableOpacity>
+
+      {item.myAvailability ? (
+        <View style={styles.availabilityDone}>
+          <Text style={styles.availabilityDoneText}>
+            Availability Marked ✅ ({item.myAvailability})
+          </Text>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.availabilityBtn}
+          onPress={() =>
+            navigation.navigate("Availability", {
+              matchId: item.id,
+              opponentName: item.opponentName,
+              matchDate: item.matchDate,
+              venue: item.venue,
+              matchType: item.matchType,
+            })
+          }
+        >
+          <Text style={styles.availabilityText}>Mark Availability</Text>
+        </TouchableOpacity>
+      )}
 
       {canManage && (
         <View style={styles.actionRow}>
@@ -116,12 +146,25 @@ const MatchesScreen = ({ navigation }: Props) => {
             <Text style={styles.actionText}>Edit</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.deleteBtn]}
-            onPress={() => handleDelete(item.id)}
-          >
-            <Text style={styles.actionText}>Delete</Text>
-          </TouchableOpacity>
+         <TouchableOpacity
+  style={[styles.actionBtn, styles.deleteBtn]}
+  onPress={() =>
+    Alert.alert(
+      "Delete Match",
+      "Are you sure you want to delete this match?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => handleDelete(item.id),
+        },
+      ]
+    )
+  }
+>
+  <Text style={styles.actionText}>Delete</Text>
+</TouchableOpacity>
         </View>
       )}
     </View>
@@ -141,7 +184,9 @@ const MatchesScreen = ({ navigation }: Props) => {
       data={filteredMatches}
       keyExtractor={(item) => item.id.toString()}
       renderItem={renderItem}
-      contentContainerStyle={filteredMatches.length === 0 ? styles.center : styles.list}
+      contentContainerStyle={
+        filteredMatches.length === 0 ? styles.center : styles.list
+      }
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -217,19 +262,31 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 8,
   },
-  status: {
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
   detail: {
     fontSize: 15,
     marginBottom: 4,
   },
-  notes: {
-    fontSize: 14,
-    marginTop: 8,
-    color: "#444",
+  availabilityBtn: {
+    backgroundColor: "#16a34a",
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  availabilityText: {
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "700",
+  },
+  availabilityDone: {
+    backgroundColor: "#e6f9ed",
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  availabilityDoneText: {
+    textAlign: "center",
+    color: "#15803d",
+    fontWeight: "700",
   },
   actionRow: {
     flexDirection: "row",

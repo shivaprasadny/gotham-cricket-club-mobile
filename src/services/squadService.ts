@@ -21,4 +21,3 @@ export const removeSquadMember = async (matchId: number, userId: number) => {
   const response = await api.delete(`/matches/${matchId}/squad/${userId}`);
   return response.data;
 };
-

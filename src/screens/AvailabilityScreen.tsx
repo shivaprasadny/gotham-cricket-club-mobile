@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+
 import {
   Alert,
   Button,
@@ -10,6 +10,8 @@ import {
   View,
 } from "react-native";
 import { markAvailability } from "../services/availabilityService";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useState } from "react";
 
 type Props = {
   route: any;
@@ -30,6 +32,7 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
     useState<"AVAILABLE" | "MAYBE" | "NOT_AVAILABLE" | "INJURED">("AVAILABLE");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const handleSubmit = async () => {
     try {
@@ -66,6 +69,8 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
       return dateString;
     }
   };
+
+
 
   return (
     <ScrollView contentContainerStyle={styles.container}>

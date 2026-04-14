@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { deleteMatch, getMatchById, updateMatch } from "../services/matchService";
+import { getTeams } from "../services/teamService";
 
 type Props = {
   route: any;
@@ -17,6 +18,11 @@ type Props = {
 };
 
 type MatchStatus = "UPCOMING" | "COMPLETED" | "CANCELLED";
+
+type Team = {
+  id: number;
+  teamName: string;
+};
 
 const STATUS_OPTIONS: MatchStatus[] = ["UPCOMING", "COMPLETED", "CANCELLED"];
 
@@ -29,29 +35,35 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   const [matchType, setMatchType] = useState("");
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<MatchStatus>("UPCOMING");
+
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    void loadMatch();
+    void loadData();
   }, []);
 
-  const loadMatch = async () => {
+  const loadData = async () => {
     try {
-      const data = await getMatchById(matchId);
+      const [matchData, teamData] = await Promise.all([
+        getMatchById(matchId),
+        getTeams(),
+      ]);
 
-      setOpponentName(data?.opponentName || "");
-      setMatchDate(data?.matchDate || "");
-      setVenue(data?.venue || "");
-      setMatchType(data?.matchType || "");
-      setNotes(data?.notes || "");
-      setStatus((data?.status as MatchStatus) || "UPCOMING");
+      setTeams(Array.isArray(teamData) ? teamData : []);
+      setOpponentName(matchData?.opponentName || "");
+      setMatchDate(matchData?.matchDate || "");
+      setVenue(matchData?.venue || "");
+      setMatchType(matchData?.matchType || "");
+      setNotes(matchData?.notes || "");
+      setStatus((matchData?.status as MatchStatus) || "UPCOMING");
+      setSelectedTeamId(matchData?.teamId || null);
     } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to load match"
-      );
+      Alert.alert("Error", error?.response?.data?.message || "Failed to load match");
     } finally {
       setLoading(false);
     }
@@ -60,6 +72,11 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   const handleUpdate = async () => {
     if (!opponentName.trim() || !matchDate.trim() || !venue.trim() || !matchType.trim()) {
       Alert.alert("Error", "Please fill all required fields");
+      return;
+    }
+
+    if (!selectedTeamId) {
+      Alert.alert("Error", "Please select a team");
       return;
     }
 
@@ -73,6 +90,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         matchType: matchType.trim(),
         notes: notes.trim(),
         status,
+        teamId: selectedTeamId,
       });
 
       Alert.alert(
@@ -82,10 +100,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
 
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to update match"
-      );
+      Alert.alert("Error", error?.response?.data?.message || "Failed to update match");
     } finally {
       setSaving(false);
     }
@@ -104,10 +119,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
 
       navigation.navigate("MainTabs", { screen: "Matches" });
     } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to delete match"
-      );
+      Alert.alert("Error", error?.response?.data?.message || "Failed to delete match");
     } finally {
       setDeleting(false);
     }
@@ -158,6 +170,28 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         numberOfLines={4}
       />
 
+      <Text style={styles.label}>Assign Team</Text>
+      {teams.length === 0 ? (
+        <Text style={styles.helperText}>No teams found. Create a team first.</Text>
+      ) : (
+        <View style={styles.teamList}>
+          {teams.map((team) => {
+            const selected = selectedTeamId === team.id;
+            return (
+              <TouchableOpacity
+                key={team.id}
+                style={[styles.teamBtn, selected && styles.teamBtnSelected]}
+                onPress={() => setSelectedTeamId(team.id)}
+              >
+                <Text style={[styles.teamBtnText, selected && styles.teamBtnTextSelected]}>
+                  {team.teamName}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
       <Text style={styles.label}>Status</Text>
       <View style={styles.row}>
         {STATUS_OPTIONS.map((item, index) => (
@@ -170,12 +204,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
             ]}
             onPress={() => setStatus(item)}
           >
-            <Text
-              style={[
-                styles.statusText,
-                status === item && styles.statusTextSelected,
-              ]}
-            >
+            <Text style={[styles.statusText, status === item && styles.statusTextSelected]}>
               {item}
             </Text>
           </TouchableOpacity>
@@ -233,6 +262,32 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: "600",
     marginBottom: 8,
+  },
+  helperText: {
+    color: "#666",
+    marginBottom: 12,
+  },
+  teamList: {
+    marginBottom: 16,
+  },
+  teamBtn: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: "#fff",
+  },
+  teamBtnSelected: {
+    backgroundColor: "#111",
+    borderColor: "#111",
+  },
+  teamBtnText: {
+    textAlign: "center",
+    fontWeight: "700",
+  },
+  teamBtnTextSelected: {
+    color: "#fff",
   },
   row: {
     flexDirection: "row",

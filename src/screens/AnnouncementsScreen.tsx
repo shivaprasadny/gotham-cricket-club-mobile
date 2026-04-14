@@ -10,10 +10,8 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
-import {
-  deleteAnnouncement,
-  getAnnouncements,
-} from "../services/announcementService";
+import { getAnnouncements, deleteAnnouncement } from "../services/announcementService";
+import * as Clipboard from "expo-clipboard";
 
 type Props = {
   navigation: any;
@@ -29,79 +27,108 @@ type Announcement = {
 
 const AnnouncementsScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
+
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  useEffect(() => {
+    loadAnnouncements();
+  }, []);
 
   const loadAnnouncements = async () => {
     try {
       const data = await getAnnouncements();
-      setAnnouncements(Array.isArray(data) ? data : []);
+      setAnnouncements(data || []);
     } catch (error: any) {
-      console.log("ANNOUNCEMENTS ERROR:", error?.response?.data || error?.message);
+      Alert.alert("Error", "Failed to load announcements");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    void loadAnnouncements();
-  }, []);
-
   const onRefresh = async () => {
     setRefreshing(true);
     await loadAnnouncements();
   };
 
-  const handleDelete = async (id: number) => {
+  // ✅ COPY FUNCTION
+  const handleCopy = async (item: Announcement) => {
     try {
-      const response = await deleteAnnouncement(id);
-      Alert.alert(
-        "Success",
-        typeof response === "string"
-          ? response
-          : "Announcement deleted successfully"
-      );
-      await loadAnnouncements();
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to delete announcement"
-      );
+      const text =
+        `${item.title}\n\n${item.message}\n\n` +
+        `Shared by ${item.createdBy}\n` +
+        `${new Date(item.createdAt).toLocaleString()}`;
+
+      await Clipboard.setStringAsync(text);
+      Alert.alert("Copied", "Announcement copied to clipboard");
+    } catch (error) {
+      Alert.alert("Error", "Failed to copy announcement");
     }
   };
 
-  const renderItem = ({ item }: { item: Announcement }) => (
-    <View style={styles.card}>
-      <Text style={styles.title}>{item.title}</Text>
-      <Text style={styles.message}>{item.message}</Text>
-      <Text style={styles.meta}>By: {item.createdBy}</Text>
-      <Text style={styles.meta}>
-        {new Date(item.createdAt).toLocaleString()}
-      </Text>
+  // ✅ DELETE FUNCTION
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteAnnouncement(id);
+      Alert.alert("Success", "Announcement deleted");
+      loadAnnouncements();
+    } catch (error: any) {
+      Alert.alert("Error", "Failed to delete announcement");
+    }
+  };
 
-      {canManage && (
+  const renderItem = ({ item }: { item: Announcement }) => {
+    const canEdit = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+
+    return (
+      <View style={styles.card}>
+        {/* CONTENT */}
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.message}>{item.message}</Text>
+
+        <Text style={styles.meta}>By: {item.createdBy}</Text>
+        <Text style={styles.meta}>
+          {new Date(item.createdAt).toLocaleString()}
+        </Text>
+
+        {/* ACTION BUTTONS */}
         <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.editBtn]}
-            onPress={() => navigation.navigate("EditAnnouncement", { announcement: item })}
-          >
-            <Text style={styles.actionText}>Edit</Text>
-          </TouchableOpacity>
+          {canEdit && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.editBtn]}
+              onPress={() =>
+                navigation.navigate("EditAnnouncement", {
+                  announcement: item,
+                })
+              }
+            >
+              <Text style={styles.actionText}>Edit</Text>
+            </TouchableOpacity>
+          )}
 
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.deleteBtn]}
-            onPress={() => handleDelete(item.id)}
-          >
-            <Text style={styles.actionText}>Delete</Text>
-          </TouchableOpacity>
+         {(user?.role === "ADMIN" || user?.role === "CAPTAIN") && (
+  <TouchableOpacity
+    style={[styles.actionBtn, styles.copyBtn]}
+    onPress={() => handleCopy(item)}
+  >
+    <Text style={styles.actionText}>Copy</Text>
+  </TouchableOpacity>
+)}
+
+          {canEdit && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.deleteBtn]}
+              onPress={() => handleDelete(item.id)}
+            >
+              <Text style={styles.actionText}>Delete</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      )}
-    </View>
-  );
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -117,7 +144,9 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
       data={announcements}
       keyExtractor={(item) => item.id.toString()}
       renderItem={renderItem}
-      contentContainerStyle={announcements.length === 0 ? styles.center : styles.list}
+      contentContainerStyle={
+        announcements.length === 0 ? styles.center : styles.list
+      }
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -127,7 +156,6 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
 };
 
 export default AnnouncementsScreen;
-
 const styles = StyleSheet.create({
   list: {
     padding: 16,
@@ -152,8 +180,8 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 12,
     color: "#666",
-    marginBottom: 2,
   },
+
   actionRow: {
     flexDirection: "row",
     gap: 10,
@@ -167,6 +195,9 @@ const styles = StyleSheet.create({
   editBtn: {
     backgroundColor: "#111",
   },
+  copyBtn: {
+    backgroundColor: "#2563eb",
+  },
   deleteBtn: {
     backgroundColor: "#c0392b",
   },
@@ -175,6 +206,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
   },
+
   center: {
     flex: 1,
     justifyContent: "center",

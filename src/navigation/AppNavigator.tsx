@@ -24,6 +24,7 @@ import CreateTeamScreen from "../screens/CreateTeamScreen";
 import EditTeamScreen from "../screens/EditTeamScreen";
 
 
+
 const Stack = createNativeStackNavigator();
 
 const AppNavigator = () => {
@@ -64,11 +65,8 @@ const AppNavigator = () => {
           <Stack.Screen name="Availability" component={AvailabilityScreen} />
           <Stack.Screen name="CreateTeam" component={CreateTeamScreen} />
 <Stack.Screen name="EditTeam" component={EditTeamScreen} />
-
-          <Stack.Screen
-            name="SquadSelection"
-            component={SquadSelectionScreen}
-          />
+<Stack.Screen name="SquadSelection" component={SquadSelectionScreen} />
+         
           <Stack.Screen
             name="Notifications"
             component={NotificationsScreen}

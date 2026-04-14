@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +14,8 @@ import {
   getAvailabilitySummary,
 } from "../services/availabilityService";
 import { getSquadByMatch } from "../services/squadService";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
 type Props = {
   route: any;
@@ -51,7 +53,17 @@ type SquadItem = {
 
 const MatchDetailsScreen = ({ route, navigation }: Props) => {
   const { user } = useAuth();
-  const { matchId, opponentName, venue, matchDate, matchType, status } = route.params;
+
+  const {
+    matchId,
+    opponentName,
+    venue,
+    matchDate,
+    matchType,
+    status,
+    teamId,
+    teamName,
+  } = route.params;
 
   const [availabilityList, setAvailabilityList] = useState<AvailabilityItem[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -98,10 +110,11 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  useEffect(() => {
+useFocusEffect(
+  useCallback(() => {
     void loadData();
-  }, []);
-
+  }, [matchId])
+);
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
@@ -168,6 +181,9 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
             <Text style={styles.matchText}>Type: {matchType}</Text>
             <Text style={styles.matchText}>Venue: {venue}</Text>
             <Text style={styles.matchText}>Date: {formatDate(matchDate)}</Text>
+            <Text style={styles.matchText}>
+              Team: {teamName ? teamName : "No team assigned"}
+            </Text>
             <Text style={styles.matchText}>Status: {status || "UPCOMING"}</Text>
           </View>
 
@@ -187,14 +203,30 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
               <Text style={styles.primaryButtonText}>Mark My Availability</Text>
             </TouchableOpacity>
 
-            {isAdminOrCaptain && (
+            {isAdminOrCaptain && !!teamId ? (
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => navigation.navigate("SquadSelection", { matchId })}
+                onPress={() =>
+                  navigation.navigate("SquadSelection", {
+                    matchId,
+                    teamId,
+                    opponentName,
+                    matchDate,
+                    venue,
+                    matchType,
+                    teamName,
+                  })
+                }
               >
                 <Text style={styles.primaryButtonText}>Open Squad Selection</Text>
               </TouchableOpacity>
-            )}
+            ) : null}
+
+            {isAdminOrCaptain && !teamId ? (
+              <Text style={styles.warningText}>
+                Please assign a team to this match first to use squad selection.
+              </Text>
+            ) : null}
           </View>
 
           {myAvailability && (
@@ -265,9 +297,13 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
           <Text style={styles.sectionTitle}>Players Response</Text>
         </View>
       }
-      ListEmptyComponent={<Text style={styles.emptyText}>No player responses yet.</Text>}
+      ListEmptyComponent={
+        <Text style={styles.emptyText}>No player responses yet.</Text>
+      }
       contentContainerStyle={
-        availabilityList.length === 0 ? styles.emptyListContainer : styles.listContainer
+        availabilityList.length === 0
+          ? styles.emptyListContainer
+          : styles.listContainer
       }
     />
   );
@@ -434,6 +470,11 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#666",
     marginBottom: 12,
+  },
+  warningText: {
+    color: "red",
+    marginTop: 4,
+    fontWeight: "600",
   },
   center: {
     flex: 1,

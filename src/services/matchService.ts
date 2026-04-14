@@ -19,6 +19,7 @@ export const createMatch = async (payload: {
   matchType: string;
   notes?: string;
   status?: MatchStatus;
+  teamId?: number | null;
 }) => {
   const response = await api.post("/matches", payload);
   return response.data;
@@ -32,7 +33,8 @@ export const updateMatch = async (
     venue: string;
     matchType: string;
     notes?: string;
-    status?: MatchStatus;
+    status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
+    teamId?: number | null;
   }
 ) => {
   const response = await api.put(`/matches/${matchId}`, payload);

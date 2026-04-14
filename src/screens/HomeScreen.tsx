@@ -13,12 +13,6 @@ const HomeScreen = ({ navigation }: Props) => {
   const isCaptain = user?.role === "CAPTAIN";
   const isPlayer = user?.role === "PLAYER";
 
-  navigation.navigate("MainTabs", { screen: "Matches" });
-navigation.navigate("MainTabs", { screen: "Announcements" });
-navigation.navigate("MainTabs", { screen: "Profile" });
-navigation.navigate("MainTabs", { screen: "Members" });
-navigation.navigate("MainTabs", { screen: "Teams" });
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Welcome {user?.fullName}</Text>
@@ -27,31 +21,61 @@ navigation.navigate("MainTabs", { screen: "Teams" });
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
 
+        <View style={styles.buttonGap}>
+          <Button
+            title="Matches"
+            onPress={() => navigation.navigate("Matches")}
+          />
+        </View>
+
+        <View style={styles.buttonGap}>
+          <Button
+            title="Announcements"
+            onPress={() => navigation.navigate("Announcements")}
+          />
+        </View>
+
+        <View style={styles.buttonGap}>
+          <Button
+            title="Profile"
+            onPress={() => navigation.navigate("Profile")}
+          />
+        </View>
+
         {(isAdmin || isCaptain) && (
-          <>
-            <View style={styles.buttonGap}>
-              <Button
-                title="Create Match"
-                onPress={() => navigation.navigate("CreateMatch")}
-              />
-            </View>
+          <View style={styles.buttonGap}>
+            <Button
+              title="Members"
+              onPress={() => navigation.navigate("Members")}
+            />
+          </View>
+        )}
 
-            <View style={styles.buttonGap}>
-              <Button
-                title="Create Announcement"
-                onPress={() => navigation.navigate("CreateAnnouncement")}
-              />
-            </View>
+        {(isAdmin || isCaptain) && (
+          <View style={styles.buttonGap}>
+            <Button
+              title="Teams"
+              onPress={() => navigation.navigate("Teams")}
+            />
+          </View>
+        )}
 
-            <View style={styles.buttonGap}>
-              <Button
-                title="View Members"
-                onPress={() =>
-                  navigation.navigate("MainTabs", { screen: "Members" })
-                }
-              />
-            </View>
-          </>
+        {(isAdmin || isCaptain) && (
+          <View style={styles.buttonGap}>
+            <Button
+              title="Create Match"
+              onPress={() => navigation.navigate("CreateMatch")}
+            />
+          </View>
+        )}
+
+        {(isAdmin || isCaptain) && (
+          <View style={styles.buttonGap}>
+            <Button
+              title="Create Announcement"
+              onPress={() => navigation.navigate("CreateAnnouncement")}
+            />
+          </View>
         )}
 
         {isAdmin && (
@@ -59,17 +83,6 @@ navigation.navigate("MainTabs", { screen: "Teams" });
             <Button
               title="Approve Members"
               onPress={() => navigation.navigate("AdminApproval")}
-            />
-          </View>
-        )}
-
-        {isPlayer && (
-          <View style={styles.buttonGap}>
-            <Button
-              title="Go to Matches"
-              onPress={() =>
-                navigation.navigate("MainTabs", { screen: "Matches" })
-              }
             />
           </View>
         )}
