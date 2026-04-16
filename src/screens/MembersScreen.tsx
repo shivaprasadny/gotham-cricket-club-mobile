@@ -16,6 +16,7 @@ import {
   getAllMembers,
   updateMemberRole,
 } from "../services/adminService";
+import { deactivateMember,activateMember } from "../services/adminService";
 
 type Member = {
   id?: number;
@@ -106,6 +107,69 @@ const MembersScreen = () => {
     }
   };
 
+
+
+  const handleDeactivateMember = (memberId: number, fullName: string) => {
+  Alert.alert(
+    "Deactivate Member",
+    `Are you sure you want to deactivate ${fullName}?`,
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Deactivate",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const response = await deactivateMember(memberId);
+            Alert.alert(
+              "Success",
+              typeof response === "string"
+                ? response
+                : "Member deactivated successfully"
+            );
+            loadMembers();
+          } catch (error: any) {
+            Alert.alert(
+              "Error",
+              error?.response?.data?.message || "Failed to deactivate member"
+            );
+          }
+        },
+      },
+    ]
+  );
+};
+
+const handleActivateMember = (memberId: number, fullName: string) => {
+  Alert.alert(
+    "Activate Member",
+    `Activate ${fullName}?`,
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Activate",
+        onPress: async () => {
+          try {
+            const response = await activateMember(memberId);
+            Alert.alert(
+              "Success",
+              typeof response === "string"
+                ? response
+                : "Member activated successfully"
+            );
+            loadMembers();
+          } catch (error: any) {
+            Alert.alert(
+              "Error",
+              error?.response?.data?.message || "Failed to activate member"
+            );
+          }
+        },
+      },
+    ]
+  );
+};
+
   const getRoleChipStyle = (role?: string) => {
     switch (role) {
       case "ADMIN":
@@ -125,32 +189,76 @@ const MembersScreen = () => {
     return (
       <View style={styles.card}>
         <View style={styles.rowTop}>
-          <Text style={styles.name}>{item.fullName || "No Name"}</Text>
-          <Text style={[styles.roleChip, getRoleChipStyle(item.role)]}>
-            {item.role || "N/A"}
-          </Text>
-        </View>
+  <View style={{ flex: 1 }}>
+    <Text
+      style={[
+        styles.name,
+        { color: item.status === "INACTIVE" ? "#9ca3af" : "#fff" },
+      ]}
+    >
+      {item.fullName || "No Name"}
+    </Text>
+
+    {item.status === "INACTIVE" && (
+      <Text style={styles.inactiveText}>INACTIVE 🚫</Text>
+    )}
+  </View>
+
+  <Text style={[styles.roleChip, getRoleChipStyle(item.role)]}>
+    {item.role === "ADMIN"
+      ? "ADMIN 👑"
+      : item.role === "CAPTAIN"
+      ? "CAPTAIN 🧢"
+      : "PLAYER 🏏"}
+  </Text>
+</View>
 
         <Text>{item.email || "No Email"}</Text>
         <Text>Status: {item.status || "N/A"}</Text>
 
-        {user?.role === "ADMIN" && (
-          <>
-            <Text style={styles.roleLabel}>Change Role:</Text>
-            <View style={styles.roleRow}>
-              {ROLE_OPTIONS.map((role) => (
-                <TouchableOpacity
-                  key={role}
-                  style={styles.roleButton}
-                  onPress={() => handleRoleChange(memberId, role)}
-                >
-                  <Text style={styles.roleButtonText}>{role}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
+       {user?.role === "ADMIN" && (
+  <>
+    <Text style={styles.roleLabel}>Change Role:</Text>
+
+    <View style={styles.roleRow}>
+      {ROLE_OPTIONS.map((role) => (
+        <TouchableOpacity
+          key={role}
+          style={styles.roleButton}
+          onPress={() => handleRoleChange(memberId, role)}
+        >
+          <Text style={styles.roleButtonText}>{role}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+
+    {/* Deactivate button */}
+    {item.status === "APPROVED" && (
+      <TouchableOpacity
+        style={styles.deactivateBtn}
+        onPress={() =>
+          handleDeactivateMember(memberId, item.fullName || "this member")
+        }
+      >
+        <Text style={styles.deactivateBtnText}>Deactivate</Text>
+      </TouchableOpacity>
+    )}
+
+    {/* Activate button */}
+    {item.status === "INACTIVE" && (
+      <TouchableOpacity
+        style={styles.activateBtn}
+        onPress={() =>
+          handleActivateMember(memberId, item.fullName || "this member")
+        }
+      >
+        <Text style={styles.activateBtnText}>Activate</Text>
+      </TouchableOpacity>
+    )}
+  </>
+)}
       </View>
+      
     );
   };
 
@@ -354,4 +462,33 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
   },
+  deactivateBtn: {
+  marginTop: 12,
+  backgroundColor: "#c0392b",
+  paddingVertical: 10,
+  borderRadius: 8,
+},
+deactivateBtnText: {
+  color: "#fff",
+  textAlign: "center",
+  fontWeight: "700",
+},
+activateBtn: {
+  marginTop: 10,
+  backgroundColor: "#27ae60",
+  paddingVertical: 10,
+  borderRadius: 8,
+},
+activateBtnText: {
+  color: "#fff",
+  textAlign: "center",
+  fontWeight: "700",
+},
+inactiveText: {
+  color: "#9ca3af",
+  fontSize: 12,
+  marginTop: 4,
+  fontWeight: "600",
+},
+  
 });

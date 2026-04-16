@@ -1,9 +1,6 @@
 import api from "../api/axiosConfig";
 
-export const getAnnouncements = async () => {
-  const response = await api.get("/announcements");
-  return response.data;
-};
+
 
 export const createAnnouncement = async (payload: {
   title: string;
@@ -23,5 +20,29 @@ export const updateAnnouncement = async (
 
 export const deleteAnnouncement = async (id: number) => {
   const response = await api.delete(`/announcements/${id}`);
+  return response.data;
+};
+
+// Get all announcements
+export const getAnnouncements = async () => {
+  const response = await api.get("/announcements");
+  return response.data;
+};
+
+// Get pinned announcement only
+export const getPinnedAnnouncement = async () => {
+  const response = await api.get("/announcements/pinned");
+  return response.data;
+};
+
+// Pin one announcement
+export const pinAnnouncement = async (announcementId: number) => {
+  const response = await api.put(`/announcements/${announcementId}/pin`);
+  return response.data;
+};
+
+// Unpin one announcement
+export const unpinAnnouncement = async (announcementId: number) => {
+  const response = await api.put(`/announcements/${announcementId}/unpin`);
   return response.data;
 };

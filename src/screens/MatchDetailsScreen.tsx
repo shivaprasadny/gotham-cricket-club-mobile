@@ -77,6 +77,8 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
     () => availabilityList.find((item) => item.userId === user?.id),
     [availabilityList, user?.id]
   );
+  const isAvailabilityLocked =
+  matchDate && new Date(matchDate).getTime() < new Date().getTime();
 
   const playingXi = useMemo(
     () => squad.filter((item) => item.isPlayingXi),
@@ -188,20 +190,26 @@ useFocusEffect(
           </View>
 
           <View style={styles.actionPanel}>
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={() =>
-                navigation.navigate("Availability", {
-                  matchId,
-                  opponentName,
-                  venue,
-                  matchDate,
-                  matchType,
-                })
-              }
-            >
-              <Text style={styles.primaryButtonText}>Mark My Availability</Text>
-            </TouchableOpacity>
+           {isAvailabilityLocked ? (
+  <View style={styles.lockedBtn}>
+    <Text style={styles.lockedBtnText}>Availability Locked</Text>
+  </View>
+) : (
+  <TouchableOpacity
+    style={styles.primaryButton}
+    onPress={() =>
+      navigation.navigate("Availability", {
+        matchId,
+        opponentName,
+        venue,
+        matchDate,
+        matchType,
+      })
+    }
+  >
+    <Text style={styles.primaryButtonText}>Mark My Availability</Text>
+  </TouchableOpacity>
+)}
 
             {isAdminOrCaptain && !!teamId ? (
               <TouchableOpacity
@@ -481,4 +489,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  lockedBtn: {
+  backgroundColor: "#777",
+  paddingVertical: 14,
+  borderRadius: 10,
+  marginBottom: 12,
+},
+lockedBtnText: {
+  color: "#fff",
+  textAlign: "center",
+  fontWeight: "700",
+},
 });

@@ -9,9 +9,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+// Get all club members from admin service
 import { getAllMembers } from "../services/adminService";
+
+// Get player availability for this match
 import { getAvailabilityByMatch } from "../services/availabilityService";
+
+// Post squad announcement
 import { createAnnouncement } from "../services/announcementService";
+
+// Squad APIs
 import {
   addOrUpdateSquadMember,
   getSquadByMatch,
@@ -22,6 +30,7 @@ type Props = {
   route: any;
 };
 
+// Club player shape from members API
 type ClubPlayer = {
   id?: number;
   userId?: number;
@@ -31,6 +40,7 @@ type ClubPlayer = {
   playerType?: string;
 };
 
+// Availability row shape
 type AvailabilityItem = {
   id: number;
   matchId: number;
@@ -40,6 +50,7 @@ type AvailabilityItem = {
   message?: string;
 };
 
+// Squad row shape
 type SquadItem = {
   squadId: number;
   userId: number;
@@ -51,6 +62,7 @@ type SquadItem = {
   roleInMatch?: string;
 };
 
+// Combined player row for UI
 type PlayerRow = {
   userId: number;
   fullName: string;
@@ -64,9 +76,11 @@ type PlayerRow = {
   availabilityMessage?: string;
 };
 
+// Sort options
 type SortType = "STATUS" | "NAME";
 
 const SquadSelectionScreen = ({ route }: Props) => {
+  // Match info passed from MatchDetails screen
   const {
     matchId,
     opponentName,
@@ -76,21 +90,40 @@ const SquadSelectionScreen = ({ route }: Props) => {
     matchType,
   } = route.params || {};
 
+  // All club players
   const [players, setPlayers] = useState<ClubPlayer[]>([]);
+
+  // Availability records for this match
   const [availability, setAvailability] = useState<AvailabilityItem[]>([]);
+
+  // Current squad for this match
   const [squad, setSquad] = useState<SquadItem[]>([]);
+
+  // Loading state
   const [loading, setLoading] = useState(true);
+
+  // Announcement loading state
   const [announcing, setAnnouncing] = useState(false);
 
+  // Search text for player list
   const [search, setSearch] = useState("");
+
+  // Sort players by status or name
   const [sortBy, setSortBy] = useState<SortType>("STATUS");
+
+  // Temporary input per player for role in match
+  // Example:
+  // { 12: "CAPTAIN", 15: "WICKETKEEPER" }
   const [roleInputs, setRoleInputs] = useState<Record<number, string>>({});
+
+  // Optional custom message for squad announcement
   const [customMessage, setCustomMessage] = useState("");
 
   useEffect(() => {
     void loadData();
   }, []);
 
+  // Load all data needed for squad screen
   const loadData = async () => {
     try {
       setLoading(true);
@@ -114,6 +147,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
+  // Get one player's availability status for this match
   const getAvailabilityStatus = (
     userId: number
   ): PlayerRow["availabilityStatus"] => {
@@ -121,11 +155,14 @@ const SquadSelectionScreen = ({ route }: Props) => {
     return found?.status || "NO_RESPONSE";
   };
 
+  // Get one player's availability message/note
   const getAvailabilityMessage = (userId: number) => {
     const found = availability.find((a) => a.userId === userId);
     return found?.message;
   };
 
+  // Priority for status sorting
+  // Lower number = appears first
   const getPriority = (status: PlayerRow["availabilityStatus"]) => {
     switch (status) {
       case "AVAILABLE":
@@ -143,9 +180,13 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
+  
+
+  // Convert raw players into UI-ready rows
   const allClubPlayers: PlayerRow[] = useMemo(() => {
     return players
       .map((p) => {
+        // Some APIs return id, some return userId
         const normalizedUserId = p.userId ?? p.id ?? 0;
 
         return {
@@ -159,6 +200,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
       .filter((p) => p.userId !== 0);
   }, [players, availability]);
 
+  // Apply search + sorting
   const filteredAndSortedPlayers = useMemo(() => {
     let result = allClubPlayers.filter((p) =>
       p.fullName.toLowerCase().includes(search.toLowerCase())
@@ -171,6 +213,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
 
         if (statusCompare !== 0) return statusCompare;
 
+        // If same status, sort by name
         return a.fullName.localeCompare(b.fullName);
       });
     } else {
@@ -180,16 +223,20 @@ const SquadSelectionScreen = ({ route }: Props) => {
     return result;
   }, [allClubPlayers, search, sortBy]);
 
+  // Find one player's squad entry
   const getSquadEntry = (userId: number) => {
     return squad.find((s) => s.userId === userId);
   };
 
+  // Check if player is already selected
   const isSelected = (userId: number) => {
     return squad.some((s) => s.userId === userId);
   };
 
+  // Add or update player in squad
   const handleAdd = async (userId: number, isPlayingXi: boolean) => {
     try {
+      // Use current role input for player if available
       const roleInMatch = roleInputs[userId]?.trim() || undefined;
 
       const response = await addOrUpdateSquadMember(matchId, {
@@ -212,6 +259,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
+  // Remove player from squad
   const handleRemove = async (userId: number) => {
     try {
       const response = await removeSquadMember(matchId, userId);
@@ -230,16 +278,65 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
+  // Playing XI players
   const playingXi = useMemo(
     () => squad.filter((s) => s.isPlayingXi),
     [squad]
   );
 
+  // Reserve players
   const reserves = useMemo(
     () => squad.filter((s) => !s.isPlayingXi),
     [squad]
   );
 
+  // Playing XI count
+  const playingXiCount = useMemo(() => playingXi.length, [playingXi]);
+
+  // Special role checks
+  const captain = useMemo(
+    () => playingXi.find((p) => p.roleInMatch === "CAPTAIN"),
+    [playingXi]
+  );
+
+  const viceCaptain = useMemo(
+    () => playingXi.find((p) => p.roleInMatch === "VICE_CAPTAIN"),
+    [playingXi]
+  );
+
+  const wicketKeeper = useMemo(
+    () => playingXi.find((p) => p.roleInMatch === "WICKETKEEPER"),
+    [playingXi]
+  );
+
+  // Build warning messages for invalid or incomplete squad
+  const squadWarnings = useMemo(() => {
+    const warnings: string[] = [];
+
+    if (playingXiCount < 11) {
+      warnings.push(`Need ${11 - playingXiCount} more player(s) in Playing XI`);
+    }
+
+    if (playingXiCount > 11) {
+      warnings.push(`Playing XI has ${playingXiCount} players. Maximum is 11`);
+    }
+
+    if (!captain) {
+      warnings.push("No captain selected");
+    }
+
+    if (!viceCaptain) {
+      warnings.push("No vice-captain selected");
+    }
+
+    if (!wicketKeeper) {
+      warnings.push("No wicketkeeper selected");
+    }
+
+    return warnings;
+  }, [playingXiCount, captain, viceCaptain, wicketKeeper]);
+
+  // Pick badge color based on availability
   const getAvailabilityStyle = (status: PlayerRow["availabilityStatus"]) => {
     switch (status) {
       case "AVAILABLE":
@@ -257,6 +354,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
+  // Format date for announcement
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Not set";
     try {
@@ -266,34 +364,50 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
+  // Announce squad to announcement board
   const handleAnnounceSquad = async () => {
     try {
       setAnnouncing(true);
 
+      // Build Playing XI text with tags
       const playingXiText =
         playingXi.length > 0
           ? playingXi
-              .map(
-                (p, index) =>
-                  `${index + 1}. ${p.fullName}${
-                    p.roleInMatch ? ` - ${p.roleInMatch}` : ""
-                  }`
-              )
+              .map((p, index) => {
+                const tag =
+                  p.roleInMatch === "CAPTAIN"
+                    ? " (C)"
+                    : p.roleInMatch === "VICE_CAPTAIN"
+                    ? " (VC)"
+                    : p.roleInMatch === "WICKETKEEPER"
+                    ? " (WK)"
+                    : "";
+
+                return `${index + 1}. ${p.fullName}${tag}`;
+              })
               .join("\n")
           : "No Playing XI selected";
 
+      // Build reserve text with tags
       const reservesText =
         reserves.length > 0
           ? reserves
-              .map(
-                (p, index) =>
-                  `${index + 1}. ${p.fullName}${
-                    p.roleInMatch ? ` - ${p.roleInMatch}` : ""
-                  }`
-              )
+              .map((p, index) => {
+                const tag =
+                  p.roleInMatch === "CAPTAIN"
+                    ? " (C)"
+                    : p.roleInMatch === "VICE_CAPTAIN"
+                    ? " (VC)"
+                    : p.roleInMatch === "WICKETKEEPER"
+                    ? " (WK)"
+                    : "";
+
+                return `${index + 1}. ${p.fullName}${tag}`;
+              })
               .join("\n")
           : "No reserve players";
 
+      // Better title for announcement
       const title =
         teamName && opponentName
           ? `${teamName} vs ${opponentName}`
@@ -301,6 +415,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
           ? `Match vs ${opponentName}`
           : "Squad Announcement";
 
+      // Full announcement body
       const message =
         `${customMessage.trim() ? customMessage.trim() + "\n\n" : ""}` +
         `Team: ${teamName || "No team assigned"}\n` +
@@ -332,6 +447,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
+  // Loading screen
   if (loading) {
     return (
       <View style={styles.center}>
@@ -350,19 +466,28 @@ const SquadSelectionScreen = ({ route }: Props) => {
         <View>
           <Text style={styles.title}>Squad Selection</Text>
 
+          {/* Playing XI summary */}
           <View style={styles.summaryCard}>
-            <Text style={styles.sectionTitle}>Playing XI</Text>
+            <Text style={styles.sectionTitle}>Playing XI ({playingXiCount}/11)</Text>
             {playingXi.length === 0 ? (
               <Text style={styles.summaryEmpty}>No players selected yet</Text>
             ) : (
               playingXi.map((p) => (
                 <Text key={p.squadId} style={styles.summaryName}>
                   • {p.fullName}
+                  {p.roleInMatch === "CAPTAIN"
+                    ? " (C)"
+                    : p.roleInMatch === "VICE_CAPTAIN"
+                    ? " (VC)"
+                    : p.roleInMatch === "WICKETKEEPER"
+                    ? " (WK)"
+                    : ""}
                 </Text>
               ))
             )}
           </View>
 
+          {/* Reserve summary */}
           <View style={styles.summaryCard}>
             <Text style={styles.sectionTitle}>Reserve</Text>
             {reserves.length === 0 ? (
@@ -371,11 +496,32 @@ const SquadSelectionScreen = ({ route }: Props) => {
               reserves.map((p) => (
                 <Text key={p.squadId} style={styles.summaryName}>
                   • {p.fullName}
+                  {p.roleInMatch === "CAPTAIN"
+                    ? " (C)"
+                    : p.roleInMatch === "VICE_CAPTAIN"
+                    ? " (VC)"
+                    : p.roleInMatch === "WICKETKEEPER"
+                    ? " (WK)"
+                    : ""}
                 </Text>
               ))
             )}
           </View>
 
+          {/* Squad warnings */}
+          {squadWarnings.length > 0 && (
+            <View style={styles.warningCard}>
+              <Text style={styles.warningTitle}>Squad Warnings</Text>
+
+              {squadWarnings.map((warning, index) => (
+                <Text key={index} style={styles.warningText}>
+                  ⚠ {warning}
+                </Text>
+              ))}
+            </View>
+          )}
+
+          {/* Search player by name */}
           <TextInput
             style={styles.searchInput}
             placeholder="Search player name..."
@@ -383,6 +529,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
             onChangeText={setSearch}
           />
 
+          {/* Sort options */}
           <View style={styles.sortRow}>
             <TouchableOpacity
               style={[
@@ -419,6 +566,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
             </TouchableOpacity>
           </View>
 
+          {/* Optional custom message for squad announcement */}
           <Text style={styles.sectionTitle}>Announcement Message</Text>
           <TextInput
             style={styles.customMessageInput}
@@ -428,6 +576,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
             multiline
           />
 
+          {/* Announce squad button */}
           <TouchableOpacity
             style={styles.announceBtn}
             onPress={handleAnnounceSquad}
@@ -445,6 +594,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
 
         return (
           <View style={styles.card}>
+            {/* Top line: player name + type + availability badge */}
             <View style={styles.topRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.fullName}</Text>
@@ -460,21 +610,63 @@ const SquadSelectionScreen = ({ route }: Props) => {
               </Text>
             </View>
 
+            {/* Optional player note */}
             {item.availabilityMessage ? (
               <Text style={styles.noteText}>Note: {item.availabilityMessage}</Text>
             ) : null}
 
             {!selected ? (
               <>
+                {/* Quick role buttons for captain / vice-captain / wicketkeeper */}
+                <View style={styles.specialRoleRow}>
+                  <TouchableOpacity
+                    style={styles.specialRoleBtn}
+                    onPress={() =>
+                      setRoleInputs((prev) => ({
+                        ...prev,
+                        [item.userId]: "CAPTAIN",
+                      }))
+                    }
+                  >
+                    <Text style={styles.specialRoleBtnText}>C</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.specialRoleBtn}
+                    onPress={() =>
+                      setRoleInputs((prev) => ({
+                        ...prev,
+                        [item.userId]: "VICE_CAPTAIN",
+                      }))
+                    }
+                  >
+                    <Text style={styles.specialRoleBtnText}>VC</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.specialRoleBtn}
+                    onPress={() =>
+                      setRoleInputs((prev) => ({
+                        ...prev,
+                        [item.userId]: "WICKETKEEPER",
+                      }))
+                    }
+                  >
+                    <Text style={styles.specialRoleBtnText}>WK</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Free text role input */}
                 <TextInput
                   style={styles.roleInput}
-                  placeholder="Role in match (optional)"
+                  placeholder="Role in match (CAPTAIN / VICE_CAPTAIN / WICKETKEEPER)"
                   value={roleInputs[item.userId] || ""}
                   onChangeText={(text) =>
                     setRoleInputs((prev) => ({ ...prev, [item.userId]: text }))
                   }
                 />
 
+                {/* Add to Playing XI */}
                 <TouchableOpacity
                   style={styles.btn}
                   onPress={() => handleAdd(item.userId, true)}
@@ -482,6 +674,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
                   <Text style={styles.btnText}>Add to Playing XI</Text>
                 </TouchableOpacity>
 
+                {/* Add to Reserve */}
                 <TouchableOpacity
                   style={styles.btn2}
                   onPress={() => handleAdd(item.userId, false)}
@@ -491,16 +684,27 @@ const SquadSelectionScreen = ({ route }: Props) => {
               </>
             ) : (
               <>
+                {/* Selected state */}
                 <Text style={styles.selectedText}>
                   {squadEntry?.isPlayingXi ? "Playing XI ✅" : "Reserve 🟡"}
                 </Text>
 
+                {/* Role badge if special role exists */}
                 {squadEntry?.roleInMatch ? (
-                  <Text style={styles.roleText}>
-                    Role: {squadEntry.roleInMatch}
-                  </Text>
+                  <View style={styles.roleBadge}>
+                    <Text style={styles.roleBadgeText}>
+                      {squadEntry.roleInMatch === "CAPTAIN"
+                        ? "C"
+                        : squadEntry.roleInMatch === "VICE_CAPTAIN"
+                        ? "VC"
+                        : squadEntry.roleInMatch === "WICKETKEEPER"
+                        ? "WK"
+                        : squadEntry.roleInMatch}
+                    </Text>
+                  </View>
                 ) : null}
 
+                {/* Remove from squad */}
                 <TouchableOpacity
                   style={styles.removeBtn}
                   onPress={() => handleRemove(item.userId)}
@@ -547,6 +751,24 @@ const styles = StyleSheet.create({
   },
   summaryName: {
     fontSize: 14,
+    marginBottom: 4,
+  },
+  warningCard: {
+    backgroundColor: "#fff4e5",
+    borderWidth: 1,
+    borderColor: "#f59e0b",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  warningTitle: {
+    color: "#92400e",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  warningText: {
+    color: "#92400e",
     marginBottom: 4,
   },
   searchInput: {
@@ -656,6 +878,23 @@ const styles = StyleSheet.create({
     color: "#444",
     fontSize: 13,
   },
+  specialRoleRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  specialRoleBtn: {
+    backgroundColor: "#6A2C91",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  specialRoleBtnText: {
+    color: "#fff",
+    fontWeight: "700",
+    textAlign: "center",
+  },
   roleInput: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -691,8 +930,18 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontWeight: "700",
   },
-  roleText: {
-    marginTop: 6,
+  roleBadge: {
+    backgroundColor: "#F4B400",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  roleBadgeText: {
+    color: "#000",
+    fontWeight: "700",
+    fontSize: 12,
   },
   empty: {
     textAlign: "center",

@@ -10,36 +10,49 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
-import { getAnnouncements, deleteAnnouncement } from "../services/announcementService";
+import {
+  deleteAnnouncement,
+  getAnnouncements,
+  pinAnnouncement,
+  unpinAnnouncement,
+} from "../services/announcementService";
 import * as Clipboard from "expo-clipboard";
 
 type Props = {
   navigation: any;
 };
 
+// Announcement shape
 type Announcement = {
   id: number;
   title: string;
   message: string;
   createdBy: string;
   createdAt: string;
+  pinned?: boolean;
 };
 
 const AnnouncementsScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
 
+  // List of announcements
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+
+  // Loading states
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+
   useEffect(() => {
-    loadAnnouncements();
+    void loadAnnouncements();
   }, []);
 
+  // Load all announcements from backend
   const loadAnnouncements = async () => {
     try {
       const data = await getAnnouncements();
-      setAnnouncements(data || []);
+      setAnnouncements(Array.isArray(data) ? data : []);
     } catch (error: any) {
       Alert.alert("Error", "Failed to load announcements");
     } finally {
@@ -48,12 +61,13 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Pull to refresh
   const onRefresh = async () => {
     setRefreshing(true);
     await loadAnnouncements();
   };
 
-  // ✅ COPY FUNCTION
+  // Copy announcement to clipboard
   const handleCopy = async (item: Announcement) => {
     try {
       const text =
@@ -68,73 +82,128 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     }
   };
 
-  // ✅ DELETE FUNCTION
+  // Delete announcement
   const handleDelete = async (id: number) => {
-    try {
-      await deleteAnnouncement(id);
-      Alert.alert("Success", "Announcement deleted");
-      loadAnnouncements();
-    } catch (error: any) {
-      Alert.alert("Error", "Failed to delete announcement");
-    }
-  };
-
-  const renderItem = ({ item }: { item: Announcement }) => {
-    const canEdit = user?.role === "ADMIN" || user?.role === "CAPTAIN";
-
-    return (
-      <View style={styles.card}>
-        {/* CONTENT */}
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.message}>{item.message}</Text>
-
-        <Text style={styles.meta}>By: {item.createdBy}</Text>
-        <Text style={styles.meta}>
-          {new Date(item.createdAt).toLocaleString()}
-        </Text>
-
-        {/* ACTION BUTTONS */}
-        <View style={styles.actionRow}>
-          {canEdit && (
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.editBtn]}
-              onPress={() =>
-                navigation.navigate("EditAnnouncement", {
-                  announcement: item,
-                })
-              }
-            >
-              <Text style={styles.actionText}>Edit</Text>
-            </TouchableOpacity>
-          )}
-
-         {(user?.role === "ADMIN" || user?.role === "CAPTAIN") && (
-  <TouchableOpacity
-    style={[styles.actionBtn, styles.copyBtn]}
-    onPress={() => handleCopy(item)}
-  >
-    <Text style={styles.actionText}>Copy</Text>
-  </TouchableOpacity>
-)}
-
-          {canEdit && (
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.deleteBtn]}
-              onPress={() => handleDelete(item.id)}
-            >
-              <Text style={styles.actionText}>Delete</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+    Alert.alert(
+      "Delete Announcement",
+      "Are you sure you want to delete this announcement?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteAnnouncement(id);
+              Alert.alert("Success", "Announcement deleted");
+              await loadAnnouncements();
+            } catch (error: any) {
+              Alert.alert("Error", "Failed to delete announcement");
+            }
+          },
+        },
+      ]
     );
   };
 
+  // Pin announcement to show on home
+  const handlePin = async (item: Announcement) => {
+    try {
+      const response = await pinAnnouncement(item.id);
+      Alert.alert(
+        "Success",
+        typeof response === "string"
+          ? response
+          : "Announcement pinned successfully"
+      );
+      await loadAnnouncements();
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to pin announcement"
+      );
+    }
+  };
+
+  // Unpin announcement from home
+  const handleUnpin = async (item: Announcement) => {
+    try {
+      const response = await unpinAnnouncement(item.id);
+      Alert.alert(
+        "Success",
+        typeof response === "string"
+          ? response
+          : "Announcement unpinned successfully"
+      );
+      await loadAnnouncements();
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to unpin announcement"
+      );
+    }
+  };
+
+  // Render one announcement card
+  const renderItem = ({ item }: { item: Announcement }) => (
+    <View style={styles.card}>
+      <Text style={styles.title}>
+        {item.title} {item.pinned ? "📌" : ""}
+      </Text>
+
+      <Text style={styles.message}>{item.message}</Text>
+
+      <Text style={styles.meta}>By: {item.createdBy}</Text>
+      <Text style={styles.meta}>
+        {new Date(item.createdAt).toLocaleString()}
+      </Text>
+
+      {canManage && (
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() =>
+              navigation.navigate("EditAnnouncement", {
+                announcement: item,
+              })
+            }
+          >
+            <Text style={styles.actionText}>Edit</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.copyBtn]}
+            onPress={() => handleCopy(item)}
+          >
+            <Text style={styles.actionText}>Copy</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, item.pinned ? styles.unpinBtn : styles.pinBtn]}
+            onPress={() => (item.pinned ? handleUnpin(item) : handlePin(item))}
+          >
+            <Text style={styles.actionText}>
+              {item.pinned ? "Unpin" : "Pin"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.deleteBtn]}
+            onPress={() => handleDelete(item.id)}
+          >
+            <Text style={styles.actionText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  // Loading UI
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
-        <Text>Loading announcements...</Text>
+        <Text style={styles.loadingText}>Loading announcements...</Text>
       </View>
     );
   }
@@ -150,46 +219,75 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
-      ListEmptyComponent={<Text>No announcements available.</Text>}
+      ListHeaderComponent={
+        <View>
+          {canManage && (
+            <TouchableOpacity
+              style={styles.createBtn}
+              onPress={() => navigation.navigate("CreateAnnouncement")}
+            >
+              <Text style={styles.createBtnText}>+ Create Announcement</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      }
+      ListEmptyComponent={
+        <Text style={styles.emptyText}>No announcements available.</Text>
+      }
     />
   );
 };
 
 export default AnnouncementsScreen;
+
 const styles = StyleSheet.create({
   list: {
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#4B1D6B",
+  },
+  createBtn: {
+    backgroundColor: "#F4B400",
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  createBtnText: {
+    textAlign: "center",
+    fontWeight: "700",
+    color: "#000",
   },
   card: {
-    backgroundColor: "#f7f7f7",
+    backgroundColor: "#5A257A",
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 12,
   },
   title: {
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 8,
+    color: "#fff",
   },
   message: {
     fontSize: 15,
     marginBottom: 10,
     lineHeight: 22,
+    color: "#ddd",
   },
   meta: {
     fontSize: 12,
-    color: "#666",
+    color: "#ccc",
   },
-
   actionRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
     marginTop: 12,
   },
   actionBtn: {
-    flex: 1,
+    minWidth: "22%",
     paddingVertical: 10,
+    paddingHorizontal: 10,
     borderRadius: 8,
   },
   editBtn: {
@@ -197,6 +295,12 @@ const styles = StyleSheet.create({
   },
   copyBtn: {
     backgroundColor: "#2563eb",
+  },
+  pinBtn: {
+    backgroundColor: "#8e44ad",
+  },
+  unpinBtn: {
+    backgroundColor: "#6b7280",
   },
   deleteBtn: {
     backgroundColor: "#c0392b",
@@ -206,12 +310,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
   },
-
+  loadingText: {
+    color: "#fff",
+    marginTop: 10,
+  },
+  emptyText: {
+    color: "#fff",
+  },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#4B1D6B",
     padding: 20,
   },
 });

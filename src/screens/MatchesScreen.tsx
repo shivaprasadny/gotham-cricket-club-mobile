@@ -1,4 +1,4 @@
-
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,8 +11,6 @@ import {
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { deleteMatch, getMatches } from "../services/matchService";
-import React, { useCallback, useMemo, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
 
 type Props = {
   navigation: any;
@@ -32,16 +30,23 @@ type Match = {
   myAvailability?: "AVAILABLE" | "NOT_AVAILABLE" | "MAYBE" | "INJURED";
 };
 
-type MatchFilter = "ALL" | "UPCOMING" | "COMPLETED" | "CANCELLED";
+type MatchFilter = "UPCOMING" | "PAST" | "ALL" | "CANCELLED";
 
 const MatchesScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<MatchFilter>("ALL");
+
+  // default filter = UPCOMING
+  const [filter, setFilter] = useState<MatchFilter>("UPCOMING");
 
   const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  
+  
+  
+
+
 
   const loadMatches = async () => {
     try {
@@ -58,39 +63,90 @@ const MatchesScreen = ({ navigation }: Props) => {
     }
   };
 
-useFocusEffect(
-  useCallback(() => {
+  useEffect(() => {
     void loadMatches();
-  }, [])
-);
+  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMatches();
   };
 
+
+  // Return text color for availability state
+const getAvailabilityColor = (status?: string) => {
+  switch (status) {
+    case "AVAILABLE":
+      return { color: "#22c55e" };
+    case "NOT_AVAILABLE":
+      return { color: "#ef4444" };
+    case "MAYBE":
+      return { color: "#facc15" };
+    case "INJURED":
+      return { color: "#9ca3af" };
+    default:
+      return { color: "#15803d" };
+  }
+};
+
   const filteredMatches = useMemo(() => {
-    if (filter === "ALL") return matches;
-    return matches.filter((m) => (m.status || "UPCOMING") === filter);
+    const now = new Date();
+
+    return matches.filter((match) => {
+      const matchDate = new Date(match.matchDate);
+      const isPast = matchDate < now;
+      const isCancelled = match.status === "CANCELLED";
+
+      if (filter === "UPCOMING") {
+        return !isPast && !isCancelled;
+      }
+
+      if (filter === "PAST") {
+        return isPast && !isCancelled;
+      }
+
+      if (filter === "CANCELLED") {
+        return isCancelled;
+      }
+
+      return true; // ALL
+    });
   }, [matches, filter]);
 
   const handleDelete = async (id: number) => {
-    try {
-      const response = await deleteMatch(id);
-      Alert.alert(
-        "Success",
-        typeof response === "string" ? response : "Match deleted successfully"
-      );
-      await loadMatches();
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to delete match"
-      );
-    }
+    Alert.alert("Delete Match", "Are you sure you want to delete this match?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const response = await deleteMatch(id);
+            Alert.alert(
+              "Success",
+              typeof response === "string"
+                ? response
+                : "Match deleted successfully"
+            );
+            await loadMatches();
+          } catch (error: any) {
+            Alert.alert(
+              "Error",
+              error?.response?.data?.message || "Failed to delete match"
+            );
+          }
+        },
+      },
+    ]);
   };
 
-  const renderItem = ({ item }: { item: Match }) => (
+  const renderItem = ({ item }: { item: Match }) => {
+
+  // 🔒 Check if match is in the past
+  const isAvailabilityLocked =
+    new Date(item.matchDate).getTime() < new Date().getTime();
+
+  return (
     <View style={styles.card}>
       <TouchableOpacity
         onPress={() =>
@@ -118,10 +174,22 @@ useFocusEffect(
         <Text style={styles.detail}>Status: {item.status || "UPCOMING"}</Text>
       </TouchableOpacity>
 
+      {/* 🔽 Availability section */}
       {item.myAvailability ? (
         <View style={styles.availabilityDone}>
-          <Text style={styles.availabilityDoneText}>
-            Availability Marked ✅ ({item.myAvailability})
+         <Text
+  style={[
+    styles.availabilityDoneText,
+    getAvailabilityColor(item.myAvailability),
+  ]}
+>
+  Availability Marked ✅ ({item.myAvailability})
+</Text>
+        </View>
+      ) : isAvailabilityLocked ? (
+        <View style={styles.availabilityLocked}>
+          <Text style={styles.availabilityLockedText}>
+            Availability Locked
           </Text>
         </View>
       ) : (
@@ -141,47 +209,29 @@ useFocusEffect(
         </TouchableOpacity>
       )}
 
+      {/* 🔽 Admin actions */}
       {canManage && (
         <View style={styles.actionRow}>
           <TouchableOpacity
             style={[styles.actionBtn, styles.editBtn]}
-            onPress={() => navigation.navigate("EditMatch", { matchId: item.id })}
+            onPress={() =>
+              navigation.navigate("EditMatch", { matchId: item.id })
+            }
           >
             <Text style={styles.actionText}>Edit</Text>
           </TouchableOpacity>
 
-         <TouchableOpacity
-  style={[styles.actionBtn, styles.deleteBtn]}
-  onPress={() =>
-    Alert.alert(
-      "Delete Match",
-      "Are you sure you want to delete this match?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => handleDelete(item.id),
-        },
-      ]
-    )
-  }
->
-  <Text style={styles.actionText}>Delete</Text>
-</TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.deleteBtn]}
+            onPress={() => handleDelete(item.id)}
+          >
+            <Text style={styles.actionText}>Delete</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
   );
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" />
-        <Text>Loading matches...</Text>
-      </View>
-    );
-  }
+};
 
   return (
     <FlatList
@@ -195,31 +245,52 @@ useFocusEffect(
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
       ListHeaderComponent={
-        <View style={styles.filterRow}>
-          {(["ALL", "UPCOMING", "COMPLETED", "CANCELLED"] as MatchFilter[]).map(
-            (item) => (
-              <TouchableOpacity
-                key={item}
-                style={[
-                  styles.filterBtn,
-                  filter === item && styles.filterBtnSelected,
-                ]}
-                onPress={() => setFilter(item)}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    filter === item && styles.filterTextSelected,
-                  ]}
-                >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            )
+        <View>
+          {canManage && (
+            <TouchableOpacity
+              style={styles.createBtn}
+              onPress={() => navigation.navigate("CreateMatch")}
+            >
+              <Text style={styles.createBtnText}>+ Create Match</Text>
+            </TouchableOpacity>
           )}
+
+          <View style={styles.filterRow}>
+            {(["UPCOMING", "PAST", "ALL", "CANCELLED"] as MatchFilter[]).map(
+              (item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={[
+                    styles.filterBtn,
+                    filter === item && styles.filterBtnSelected,
+                  ]}
+                  onPress={() => setFilter(item)}
+                >
+                  <Text
+                    style={[
+                      styles.filterText,
+                      filter === item && styles.filterTextSelected,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
+          </View>
         </View>
       }
-      ListEmptyComponent={<Text>No matches found.</Text>}
+      ListEmptyComponent={
+        <Text style={styles.emptyText}>
+          {filter === "UPCOMING"
+            ? "No upcoming matches found."
+            : filter === "PAST"
+            ? "No past matches found."
+            : filter === "CANCELLED"
+            ? "No cancelled matches found."
+            : "No matches found."}
+        </Text>
+      }
     />
   );
 };
@@ -229,7 +300,7 @@ export default MatchesScreen;
 const styles = StyleSheet.create({
   list: {
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#4B1D6B",
   },
   filterRow: {
     flexDirection: "row",
@@ -241,34 +312,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#b89ad1",
     borderRadius: 20,
+    backgroundColor: "#5A257A",
   },
   filterBtnSelected: {
-    backgroundColor: "#111",
-    borderColor: "#111",
+    backgroundColor: "#F4B400",
+    borderColor: "#F4B400",
   },
   filterText: {
     fontSize: 12,
     fontWeight: "600",
-  },
-  filterTextSelected: {
     color: "#fff",
   },
+  filterTextSelected: {
+    color: "#000",
+  },
+  createBtn: {
+    backgroundColor: "#F4B400",
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  createBtnText: {
+    textAlign: "center",
+    fontWeight: "700",
+    color: "#000",
+  },
   card: {
-    backgroundColor: "#f7f7f7",
+    backgroundColor: "#5A257A",
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     marginBottom: 12,
   },
   title: {
     fontSize: 20,
     fontWeight: "700",
     marginBottom: 8,
+    color: "#fff",
   },
   detail: {
     fontSize: 15,
     marginBottom: 4,
+    color: "#ddd",
   },
   availabilityBtn: {
     backgroundColor: "#16a34a",
@@ -313,11 +399,29 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
   },
+  loadingText: {
+    color: "#fff",
+    marginTop: 10,
+  },
+  emptyText: {
+    color: "#fff",
+  },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: "#4B1D6B",
     padding: 20,
   },
+  availabilityLocked: {
+  backgroundColor: "#6b7280",
+  paddingVertical: 10,
+  borderRadius: 8,
+  marginTop: 10,
+},
+availabilityLockedText: {
+  color: "#fff",
+  textAlign: "center",
+  fontWeight: "700",
+},
 });

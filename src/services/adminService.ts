@@ -32,3 +32,11 @@ export const updateMemberRole = async (
   const response = await api.put(`/admin/members/${userId}/role`, { role });
   return response.data;
 };
+export const deactivateMember = async (userId: number) => {
+  const response = await api.put(`/admin/members/${userId}/deactivate`);
+  return response.data;
+};
+export const activateMember = async (userId: number) => {
+  const response = await api.put(`/admin/members/${userId}/activate`);
+  return response.data;
+};

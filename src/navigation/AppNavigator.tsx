@@ -22,6 +22,12 @@ import EditTeamScreen from "../screens/EditTeamScreen";
 import SplashScreen from "../screens/SplashScreen";
 
 import MainTabNavigator from "./MainTabNavigator";
+import EventsScreen from "../screens/EventsScreen";
+import CreateEventScreen from "../screens/CreateEventScreen";
+import EventDetailsScreen from "../screens/EventDetailsScreen";
+import LeaguesScreen from "../screens/LeaguesScreen";
+import CreateLeagueScreen from "../screens/CreateLeagueScreen";
+import LeagueDetailsScreen from "../screens/LeagueDetailsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -64,6 +70,12 @@ const AppNavigator = () => {
           <Stack.Screen name="CreateTeam" component={CreateTeamScreen} />
           <Stack.Screen name="EditTeam" component={EditTeamScreen} />
           <Stack.Screen name="SquadSelection" component={SquadSelectionScreen} />
+          <Stack.Screen name="Events" component={EventsScreen} />
+          <Stack.Screen name="Leagues" component={LeaguesScreen} />
+<Stack.Screen name="CreateLeague" component={CreateLeagueScreen} />
+<Stack.Screen name="LeagueDetails" component={LeagueDetailsScreen} />
+<Stack.Screen name="CreateEvent" component={CreateEventScreen} />
+<Stack.Screen name="EventDetails" component={EventDetailsScreen} />
           <Stack.Screen
             name="Splash"
             component={SplashScreen}
