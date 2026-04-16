@@ -2,27 +2,28 @@ import React, { useState } from "react";
 import {
   Alert,
   Button,
+  Image,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
+  TouchableOpacity,
 } from "react-native";
 import { loginUser } from "../services/authService";
 import { useAuth } from "../context/AuthContext";
+
 
 type Props = {
   navigation: any;
 };
 
 const LoginScreen = ({ navigation }: Props) => {
-  const { login, biometricLogin } = useAuth();
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [biometricSubmitting, setBiometricSubmitting] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -43,10 +44,6 @@ const LoginScreen = ({ navigation }: Props) => {
         status: response.status,
       });
     } catch (error: any) {
-      console.log("LOGIN ERROR FULL:", error);
-      console.log("LOGIN ERROR RESPONSE:", error?.response?.data);
-      console.log("LOGIN ERROR MESSAGE:", error?.message);
-
       const message =
         error?.response?.data?.message ||
         error?.message ||
@@ -58,30 +55,20 @@ const LoginScreen = ({ navigation }: Props) => {
     }
   };
 
-  const handleBiometricLogin = async () => {
-    try {
-      setBiometricSubmitting(true);
-
-      const result = await biometricLogin();
-
-      if (!result.success) {
-        Alert.alert("Biometric Login", result.message || "Login failed");
-      }
-    } catch (error) {
-      console.error("Biometric login error:", error);
-      Alert.alert("Error", "Biometric login failed");
-    } finally {
-      setBiometricSubmitting(false);
-    }
-  };
-
   return (
     <View style={styles.container}>
+      <Image
+        source={require("../../assets/logo.png")}
+        style={styles.logo}
+      />
+
       <Text style={styles.title}>Gotham Cricket Club</Text>
+      <Text style={styles.subtitle}>Play hard. Stay united.</Text>
 
       <TextInput
         style={styles.input}
         placeholder="Email"
+        placeholderTextColor="#ddd"
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
@@ -91,6 +78,7 @@ const LoginScreen = ({ navigation }: Props) => {
       <TextInput
         style={styles.input}
         placeholder="Password"
+        placeholderTextColor="#ddd"
         secureTextEntry={!showPassword}
         value={password}
         onChangeText={setPassword}
@@ -105,21 +93,12 @@ const LoginScreen = ({ navigation }: Props) => {
         </Text>
       </TouchableOpacity>
 
-      <Button
-        title={submitting ? "Logging in..." : "Login"}
-        onPress={handleLogin}
-        disabled={submitting || biometricSubmitting}
-      />
-
-      <View style={styles.registerButton}>
+      <View style={styles.buttonWrap}>
         <Button
-          title={
-            biometricSubmitting
-              ? "Checking biometrics..."
-              : "Login with Face ID / Fingerprint"
-          }
-          onPress={handleBiometricLogin}
-          disabled={submitting || biometricSubmitting}
+          title={submitting ? "Logging in..." : "Login"}
+          onPress={handleLogin}
+          disabled={submitting}
+          color="#F4B400"
         />
       </View>
 
@@ -127,6 +106,7 @@ const LoginScreen = ({ navigation }: Props) => {
         <Button
           title="Go to Register"
           onPress={() => navigation.navigate("Register")}
+          color="#F4B400"
         />
       </View>
 
@@ -134,6 +114,7 @@ const LoginScreen = ({ navigation }: Props) => {
         <Button
           title="Forgot Password?"
           onPress={() => navigation.navigate("ForgotPassword")}
+          color="#F4B400"
         />
       </View>
     </View>
@@ -147,29 +128,48 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#4B1D6B",
+  },
+  logo: {
+    width: 150,
+    height: 150,
+    resizeMode: "contain",
+    alignSelf: "center",
+    marginBottom: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "700",
-    marginBottom: 24,
+    marginBottom: 8,
     textAlign: "center",
+    color: "#fff",
+  },
+  subtitle: {
+    fontSize: 15,
+    textAlign: "center",
+    color: "#F4B400",
+    marginBottom: 24,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#7b4fa1",
+    backgroundColor: "#5A257A",
+    color: "#fff",
     padding: 12,
     marginBottom: 12,
     borderRadius: 8,
   },
   registerButton: {
-    marginTop: 16,
+    marginTop: 14,
+  },
+  buttonWrap: {
+    marginTop: 8,
   },
   showBtn: {
     marginBottom: 12,
   },
   showText: {
-    color: "#007AFF",
+    color: "#F4B400",
     fontWeight: "600",
   },
 });

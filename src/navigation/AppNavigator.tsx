@@ -7,8 +7,6 @@ import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 
-import MainTabNavigator from "./MainTabNavigator";
-
 import AdminApprovalScreen from "../screens/AdminApprovalScreen";
 import CreateMatchScreen from "../screens/CreateMatchScreen";
 import CreateAnnouncementScreen from "../screens/CreateAnnouncementScreen";
@@ -18,12 +16,12 @@ import MatchDetailsScreen from "../screens/MatchDetailsScreen";
 import AvailabilityScreen from "../screens/AvailabilityScreen";
 import SquadSelectionScreen from "../screens/SquadSelectionScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
-import TeamsScreen from "../screens/TeamsScreen";
 import TeamDetailsScreen from "../screens/TeamDetailsScreen";
 import CreateTeamScreen from "../screens/CreateTeamScreen";
 import EditTeamScreen from "../screens/EditTeamScreen";
+import SplashScreen from "../screens/SplashScreen";
 
-
+import MainTabNavigator from "./MainTabNavigator";
 
 const Stack = createNativeStackNavigator();
 
@@ -45,10 +43,10 @@ const AppNavigator = () => {
       ) : (
         <Stack.Navigator>
           <Stack.Screen
-            name="MainTabs"
-            component={MainTabNavigator}
-            options={{ headerShown: false }}
-          />
+  name="MainTabs"
+  component={MainTabNavigator}
+  options={{ headerShown: false }}
+/>
           <Stack.Screen name="AdminApproval" component={AdminApprovalScreen} />
           <Stack.Screen name="CreateMatch" component={CreateMatchScreen} />
           <Stack.Screen
@@ -64,9 +62,13 @@ const AppNavigator = () => {
           <Stack.Screen name="MatchDetails" component={MatchDetailsScreen} />
           <Stack.Screen name="Availability" component={AvailabilityScreen} />
           <Stack.Screen name="CreateTeam" component={CreateTeamScreen} />
-<Stack.Screen name="EditTeam" component={EditTeamScreen} />
-<Stack.Screen name="SquadSelection" component={SquadSelectionScreen} />
-         
+          <Stack.Screen name="EditTeam" component={EditTeamScreen} />
+          <Stack.Screen name="SquadSelection" component={SquadSelectionScreen} />
+          <Stack.Screen
+            name="Splash"
+            component={SplashScreen}
+            options={{ headerShown: false }}
+          />
           <Stack.Screen
             name="Notifications"
             component={NotificationsScreen}

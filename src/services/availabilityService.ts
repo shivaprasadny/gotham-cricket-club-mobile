@@ -18,3 +18,22 @@ export const getAvailabilitySummary = async (matchId: number) => {
   const response = await api.get(`/availability/match/${matchId}/summary`);
   return response.data;
 };
+
+
+
+
+
+
+export const getMyAvailabilityByMatch = async (matchId: number) => {
+  const response = await api.get(`/availability/match/${matchId}/me`);
+  return response.data;
+};
+
+export const saveAvailability = async (payload: {
+  matchId: number;
+  status: string;
+  note?: string;
+}) => {
+  const response = await api.post("/availability", payload);
+  return response.data;
+};

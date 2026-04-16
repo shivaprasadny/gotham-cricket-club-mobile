@@ -8,6 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Image
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { getAllMembers } from "../services/adminService";
@@ -141,9 +142,15 @@ const TeamDetailsScreen = ({ route }: Props) => {
         <View>
           <View style={styles.headerCard}>
             <Text style={styles.teamName}>{team?.teamName}</Text>
-            <Text>{team?.description || "No description"}</Text>
-            <Text>League: {team?.leagueName || "Not set"}</Text>
-            <Text>Captain: {team?.captainName || "Not assigned"}</Text>
+            <View style={styles.headerCard}>
+  <Image
+    source={require("../../assets/logo.png")}
+    style={styles.teamLogo}
+  />
+  <Text style={styles.teamName}>{team?.teamName}</Text>
+  <Text>{team?.description || "No description"}</Text>
+  <Text>Captain: {team?.captainName || "Not assigned"}</Text>
+</View>
           </View>
 
           <Text style={styles.sectionTitle}>Team Members</Text>
@@ -266,4 +273,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  teamLogo: {
+  width: 60,
+  height: 60,
+  resizeMode: "contain",
+  alignSelf: "center",
+  marginBottom: 10,
+},
 });

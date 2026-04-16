@@ -8,10 +8,13 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Image
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { deleteTeam, getTeams } from "../services/teamService";
 import { useFocusEffect } from "@react-navigation/native";
+
+
 
 
 type Props = {
@@ -76,6 +79,14 @@ const TeamsScreen = ({ navigation }: Props) => {
       <TouchableOpacity
         onPress={() => navigation.navigate("TeamDetails", { teamId: item.id })}
       >
+
+
+<Image
+    source={require("../../assets/logo.png")}
+    style={styles.teamLogo}
+  />
+
+
         <Text style={styles.title}>{item.teamName}</Text>
         <Text>{item.description || "No description"}</Text>
         <Text>League: {item.leagueName || "Not set"}</Text>
@@ -190,4 +201,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
   },
+  teamLogo: {
+  width: 60,
+  height: 60,
+  resizeMode: "contain",
+  alignSelf: "center",
+  marginBottom: 10,
+},
 });

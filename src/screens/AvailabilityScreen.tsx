@@ -1,7 +1,7 @@
-
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  Button,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,30 +9,60 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { markAvailability } from "../services/availabilityService";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useState } from "react";
+import {
+  AvailabilityStatus,
+  getMyAvailabilityByMatch,
+  markAvailability,
+} from "../services/availabilityService";
 
 type Props = {
   route: any;
   navigation: any;
 };
 
-const STATUS_OPTIONS = [
+const STATUS_OPTIONS: AvailabilityStatus[] = [
   "AVAILABLE",
   "MAYBE",
   "NOT_AVAILABLE",
   "INJURED",
-] as const;
+];
 
 const AvailabilityScreen = ({ route, navigation }: Props) => {
   const { matchId, opponentName, venue, matchDate, matchType } = route.params;
 
   const [selectedStatus, setSelectedStatus] =
-    useState<"AVAILABLE" | "MAYBE" | "NOT_AVAILABLE" | "INJURED">("AVAILABLE");
+    useState<AvailabilityStatus>("AVAILABLE");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const loadMyAvailability = async () => {
+    try {
+      setLoading(true);
+
+      const data = await getMyAvailabilityByMatch(matchId);
+
+      if (data) {
+        setSelectedStatus(data.status ?? "AVAILABLE");
+        setMessage(data.message ?? "");
+      } else {
+        setSelectedStatus("AVAILABLE");
+        setMessage("");
+      }
+    } catch (error) {
+      setSelectedStatus("AVAILABLE");
+      setMessage("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadMyAvailability();
+    }, [matchId])
+  );
 
   const handleSubmit = async () => {
     try {
@@ -46,7 +76,9 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
 
       Alert.alert(
         "Success",
-        typeof response === "string" ? response : "Availability saved successfully"
+        typeof response === "string"
+          ? response
+          : "Availability saved successfully"
       );
 
       navigation.goBack();
@@ -70,7 +102,29 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
     }
   };
 
+  const getStatusLabel = (status: AvailabilityStatus) => {
+    switch (status) {
+      case "AVAILABLE":
+        return "Available";
+      case "MAYBE":
+        return "Maybe";
+      case "NOT_AVAILABLE":
+        return "Not Available";
+      case "INJURED":
+        return "Injured";
+      default:
+        return status;
+    }
+  };
 
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.loaderText}>Loading your availability...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -93,6 +147,7 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
             selectedStatus === status && styles.selectedStatusButton,
           ]}
           onPress={() => setSelectedStatus(status)}
+          disabled={submitting}
         >
           <Text
             style={[
@@ -100,7 +155,7 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
               selectedStatus === status && styles.selectedStatusButtonText,
             ]}
           >
-            {status}
+            {getStatusLabel(status)}
           </Text>
         </TouchableOpacity>
       ))}
@@ -113,13 +168,18 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
         numberOfLines={4}
         value={message}
         onChangeText={setMessage}
+        editable={!submitting}
       />
 
-      <Button
-        title={submitting ? "Saving..." : "Save Availability"}
+      <TouchableOpacity
+        style={[styles.saveButton, submitting && styles.disabledButton]}
         onPress={handleSubmit}
         disabled={submitting}
-      />
+      >
+        <Text style={styles.saveButtonText}>
+          {submitting ? "Saving..." : "Save Availability"}
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -131,6 +191,18 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#fff",
     flexGrow: 1,
+  },
+  loaderContainer: {
+    flex: 1,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loaderText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: "#444",
   },
   title: {
     fontSize: 26,
@@ -185,5 +257,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlignVertical: "top",
     minHeight: 110,
+  },
+  saveButton: {
+    backgroundColor: "#111",
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  disabledButton: {
+    opacity: 0.7,
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
   },
 });

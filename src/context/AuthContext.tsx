@@ -64,22 +64,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }
 };
   const login = async (newToken: string, newUser: UserType) => {
-    try {
-      setToken(newToken);
-      setUser(newUser);
+  try {
+    setToken(newToken);
+    setUser(newUser);
 
-      await AsyncStorage.setItem("token", newToken);
-      await AsyncStorage.setItem("user", JSON.stringify(newUser));
+    await AsyncStorage.setItem("token", newToken);
+    await AsyncStorage.setItem("user", JSON.stringify(newUser));
 
-      const pushToken = await registerForPushNotificationsAsync();
-      if (pushToken) {
-        await savePushTokenToBackend(pushToken);
-      }
-    } catch (error) {
-      console.error("Error saving auth or push token data:", error);
-    }
-  };
+    // TEMP: disable push notifications (Expo Go issue)
+    // const pushToken = await registerForPushNotificationsAsync();
+    // if (pushToken) {
+    //   await savePushTokenToBackend(pushToken);
+    // }
 
+  } catch (error) {
+    console.error("Error saving auth data:", error);
+  }
+};
   const biometricLogin = async (): Promise<{
     success: boolean;
     message?: string;
