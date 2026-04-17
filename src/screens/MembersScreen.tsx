@@ -193,7 +193,7 @@ const handleActivateMember = (memberId: number, fullName: string) => {
     <Text
       style={[
         styles.name,
-        { color: item.status === "INACTIVE" ? "#9ca3af" : "#fff" },
+        { color: item.status === "INACTIVE" ? "#9ca3af" : "#111" },
       ]}
     >
       {item.fullName || "No Name"}
@@ -408,6 +408,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     flex: 1,
     marginRight: 8,
+    color: "#fff",
   },
   roleChip: {
     paddingHorizontal: 10,
@@ -485,7 +486,7 @@ activateBtnText: {
   fontWeight: "700",
 },
 inactiveText: {
-  color: "#9ca3af",
+  color: "#030914",
   fontSize: 12,
   marginTop: 4,
   fontWeight: "600",

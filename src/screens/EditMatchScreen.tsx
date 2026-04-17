@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Button,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,222 +9,456 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { deleteMatch, getMatchById, updateMatch } from "../services/matchService";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { getMatchById, updateMatch } from "../services/matchService";
 import { getTeams } from "../services/teamService";
+import { getLeagues } from "../services/leagueService";
 
 type Props = {
   route: any;
   navigation: any;
 };
 
-type MatchStatus = "UPCOMING" | "COMPLETED" | "CANCELLED";
-
 type Team = {
   id: number;
   teamName: string;
 };
 
-const STATUS_OPTIONS: MatchStatus[] = ["UPCOMING", "COMPLETED", "CANCELLED"];
+type League = {
+  id: number;
+  name: string;
+  season: string;
+  active: boolean;
+};
+
+type MatchStatus = "UPCOMING" | "COMPLETED" | "CANCELLED";
 
 const EditMatchScreen = ({ route, navigation }: Props) => {
   const { matchId } = route.params;
 
-  const [opponentName, setOpponentName] = useState("");
-  const [matchDate, setMatchDate] = useState("");
+  // Dropdown data
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [leagues, setLeagues] = useState<League[]>([]);
+
+  // Form fields
+  const [homeTeamId, setHomeTeamId] = useState<number | null>(null);
+  const [awayTeamId, setAwayTeamId] = useState<number | null>(null);
+  const [externalOpponentName, setExternalOpponentName] = useState("");
+  const [leagueId, setLeagueId] = useState<number | null>(null);
   const [venue, setVenue] = useState("");
-  const [matchType, setMatchType] = useState("");
   const [notes, setNotes] = useState("");
+  const [matchDate, setMatchDate] = useState<Date | null>(null);
+  const [matchType, setMatchType] = useState("League");
   const [status, setStatus] = useState<MatchStatus>("UPCOMING");
 
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  // Opponent mode
+  const [opponentMode, setOpponentMode] = useState<"EXTERNAL" | "CLUB">(
+    "EXTERNAL"
+  );
 
+  // Loading states
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Date picker visibility
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
-    void loadData();
+    void loadScreenData();
   }, []);
 
-  const loadData = async () => {
+  // Load teams, leagues, and current match data
+  const loadScreenData = async () => {
     try {
-      const [matchData, teamData] = await Promise.all([
-        getMatchById(matchId),
+      const [teamData, leagueData, matchData] = await Promise.all([
         getTeams(),
+        getLeagues(),
+        getMatchById(matchId),
       ]);
 
       setTeams(Array.isArray(teamData) ? teamData : []);
-      setOpponentName(matchData?.opponentName || "");
-      setMatchDate(matchData?.matchDate || "");
+      setLeagues(Array.isArray(leagueData) ? leagueData : []);
+
+      // Fill form from match data
+      setHomeTeamId(matchData?.homeTeamId ?? null);
+      setAwayTeamId(matchData?.awayTeamId ?? null);
+      setExternalOpponentName(matchData?.externalOpponentName || "");
+      setLeagueId(matchData?.leagueId ?? null);
       setVenue(matchData?.venue || "");
-      setMatchType(matchData?.matchType || "");
       setNotes(matchData?.notes || "");
-      setStatus((matchData?.status as MatchStatus) || "UPCOMING");
-      setSelectedTeamId(matchData?.teamId || null);
+      setMatchDate(matchData?.matchDate ? new Date(matchData.matchDate) : null);
+      setMatchType(matchData?.matchType || "League");
+      setStatus(matchData?.status || "UPCOMING");
+
+      // Decide opponent mode based on current match
+      if (matchData?.awayTeamId) {
+        setOpponentMode("CLUB");
+      } else {
+        setOpponentMode("EXTERNAL");
+      }
     } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.message || "Failed to load match");
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to load match"
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdate = async () => {
-    if (!opponentName.trim() || !matchDate.trim() || !venue.trim() || !matchType.trim()) {
-      Alert.alert("Error", "Please fill all required fields");
+  // Save updated match
+  const handleUpdateMatch = async () => {
+    if (!homeTeamId) {
+      Alert.alert("Error", "Please select a home team");
       return;
     }
 
-    if (!selectedTeamId) {
-      Alert.alert("Error", "Please select a team");
+    if (!matchDate) {
+      Alert.alert("Error", "Please select match date and time");
       return;
+    }
+
+    if (!venue.trim()) {
+      Alert.alert("Error", "Please enter venue");
+      return;
+    }
+
+    if (!matchType.trim()) {
+      Alert.alert("Error", "Please select match type");
+      return;
+    }
+
+    if (opponentMode === "CLUB") {
+      if (!awayTeamId) {
+        Alert.alert("Error", "Please select away team");
+        return;
+      }
+
+      if (homeTeamId === awayTeamId) {
+        Alert.alert("Error", "Home team and away team cannot be the same");
+        return;
+      }
+    }
+
+    if (opponentMode === "EXTERNAL") {
+      if (!externalOpponentName.trim()) {
+        Alert.alert("Error", "Please enter outside opponent name");
+        return;
+      }
     }
 
     try {
-      setSaving(true);
+      setSubmitting(true);
 
-      const response = await updateMatch(matchId, {
-        opponentName: opponentName.trim(),
-        matchDate: matchDate.trim(),
+      const payload = {
+        homeTeamId,
+        awayTeamId: opponentMode === "CLUB" ? awayTeamId : null,
+        externalOpponentName:
+          opponentMode === "EXTERNAL" ? externalOpponentName.trim() : "",
+        leagueId,
+        matchDate: matchDate.toISOString(),
         venue: venue.trim(),
         matchType: matchType.trim(),
         notes: notes.trim(),
         status,
-        teamId: selectedTeamId,
-      });
+      };
+
+      const response = await updateMatch(matchId, payload);
 
       Alert.alert(
         "Success",
-        typeof response === "string" ? response : "Match updated successfully"
+        typeof response === "string"
+          ? response
+          : "Match updated successfully"
       );
 
       navigation.goBack();
     } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.message || "Failed to update match");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      setDeleting(true);
-
-      const response = await deleteMatch(matchId);
-
       Alert.alert(
-        "Success",
-        typeof response === "string" ? response : "Match deleted successfully"
+        "Error",
+        error?.response?.data?.message || "Failed to update match"
       );
-
-      navigation.navigate("MainTabs", { screen: "Matches" });
-    } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.message || "Failed to delete match");
     } finally {
-      setDeleting(false);
+      setSubmitting(false);
     }
   };
 
   if (loading) {
-    return <Text style={styles.loadingText}>Loading...</Text>;
+    return (
+      <View style={styles.center}>
+        <Text>Loading match...</Text>
+      </View>
+    );
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Edit Match</Text>
 
-      <TextInput
-        style={styles.input}
-        value={opponentName}
-        onChangeText={setOpponentName}
-        placeholder="Opponent Name"
-      />
-
-      <TextInput
-        style={styles.input}
-        value={matchDate}
-        onChangeText={setMatchDate}
-        placeholder="Match Date"
-      />
-
-      <TextInput
-        style={styles.input}
-        value={venue}
-        onChangeText={setVenue}
-        placeholder="Venue"
-      />
-
-      <TextInput
-        style={styles.input}
-        value={matchType}
-        onChangeText={setMatchType}
-        placeholder="Match Type"
-      />
-
-      <TextInput
-        style={[styles.input, styles.notesInput]}
-        value={notes}
-        onChangeText={setNotes}
-        placeholder="Notes"
-        multiline
-        numberOfLines={4}
-      />
-
-      <Text style={styles.label}>Assign Team</Text>
-      {teams.length === 0 ? (
-        <Text style={styles.helperText}>No teams found. Create a team first.</Text>
-      ) : (
-        <View style={styles.teamList}>
-          {teams.map((team) => {
-            const selected = selectedTeamId === team.id;
-            return (
-              <TouchableOpacity
-                key={team.id}
-                style={[styles.teamBtn, selected && styles.teamBtnSelected]}
-                onPress={() => setSelectedTeamId(team.id)}
+      {/* Match type */}
+      <Text style={styles.label}>Match Type</Text>
+      <View style={styles.rowWrap}>
+        {["League", "Friendly", "Practice", "Intra Club", "Tournament"].map(
+          (item) => (
+            <TouchableOpacity
+              key={item}
+              style={[
+                styles.chipBtn,
+                matchType === item && styles.chipBtnSelected,
+              ]}
+              onPress={() => setMatchType(item)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  matchType === item && styles.chipTextSelected,
+                ]}
               >
-                <Text style={[styles.teamBtnText, selected && styles.teamBtnTextSelected]}>
-                  {team.teamName}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-
-      <Text style={styles.label}>Status</Text>
-      <View style={styles.row}>
-        {STATUS_OPTIONS.map((item, index) => (
-          <TouchableOpacity
-            key={item}
-            style={[
-              styles.statusBtn,
-              status === item && styles.statusBtnSelected,
-              index === STATUS_OPTIONS.length - 1 && styles.lastStatusBtn,
-            ]}
-            onPress={() => setStatus(item)}
-          >
-            <Text style={[styles.statusText, status === item && styles.statusTextSelected]}>
-              {item}
-            </Text>
-          </TouchableOpacity>
-        ))}
+                {item}
+              </Text>
+            </TouchableOpacity>
+          )
+        )}
       </View>
 
-      <Button
-        title={saving ? "Updating..." : "Update Match"}
-        onPress={handleUpdate}
-        disabled={saving || deleting}
+      {/* League */}
+      <Text style={styles.label}>League (Optional)</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.rowWrap}>
+          <TouchableOpacity
+            style={[
+              styles.chipBtn,
+              leagueId === null && styles.chipBtnSelected,
+            ]}
+            onPress={() => setLeagueId(null)}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                leagueId === null && styles.chipTextSelected,
+              ]}
+            >
+              None
+            </Text>
+          </TouchableOpacity>
+
+          {leagues.map((league) => (
+            <TouchableOpacity
+              key={league.id}
+              style={[
+                styles.chipBtn,
+                leagueId === league.id && styles.chipBtnSelected,
+              ]}
+              onPress={() => setLeagueId(league.id)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  leagueId === league.id && styles.chipTextSelected,
+                ]}
+              >
+                {league.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Home team */}
+      <Text style={styles.label}>Home Team</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.rowWrap}>
+          {teams.map((team) => (
+            <TouchableOpacity
+              key={team.id}
+              style={[
+                styles.chipBtn,
+                homeTeamId === team.id && styles.chipBtnSelected,
+              ]}
+              onPress={() => setHomeTeamId(team.id)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  homeTeamId === team.id && styles.chipTextSelected,
+                ]}
+              >
+                {team.teamName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Opponent mode */}
+      <Text style={styles.label}>Opponent Setup</Text>
+      <View style={styles.rowWrap}>
+        <TouchableOpacity
+          style={[
+            styles.chipBtn,
+            opponentMode === "EXTERNAL" && styles.chipBtnSelected,
+          ]}
+          onPress={() => {
+            setOpponentMode("EXTERNAL");
+            setAwayTeamId(null);
+          }}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              opponentMode === "EXTERNAL" && styles.chipTextSelected,
+            ]}
+          >
+            Outside Opponent
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.chipBtn,
+            opponentMode === "CLUB" && styles.chipBtnSelected,
+          ]}
+          onPress={() => {
+            setOpponentMode("CLUB");
+            setExternalOpponentName("");
+          }}
+        >
+          <Text
+            style={[
+              styles.chipText,
+              opponentMode === "CLUB" && styles.chipTextSelected,
+            ]}
+          >
+            Club vs Club
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Outside opponent */}
+      {opponentMode === "EXTERNAL" && (
+        <>
+          <Text style={styles.label}>Outside Opponent Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter outside opponent name"
+            value={externalOpponentName}
+            onChangeText={setExternalOpponentName}
+          />
+        </>
+      )}
+
+      {/* Away team */}
+      {opponentMode === "CLUB" && (
+        <>
+          <Text style={styles.label}>Away Team</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View style={styles.rowWrap}>
+              {teams
+                .filter((team) => team.id !== homeTeamId)
+                .map((team) => (
+                  <TouchableOpacity
+                    key={team.id}
+                    style={[
+                      styles.chipBtn,
+                      awayTeamId === team.id && styles.chipBtnSelected,
+                    ]}
+                    onPress={() => setAwayTeamId(team.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        awayTeamId === team.id && styles.chipTextSelected,
+                      ]}
+                    >
+                      {team.teamName}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+            </View>
+          </ScrollView>
+        </>
+      )}
+
+      {/* Match date */}
+      <Text style={styles.label}>Match Date & Time</Text>
+      <TouchableOpacity
+        style={styles.input}
+        onPress={() => setShowDatePicker(true)}
+      >
+        <Text>
+          {matchDate ? matchDate.toLocaleString() : "Select match date & time"}
+        </Text>
+      </TouchableOpacity>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={matchDate || new Date()}
+          mode="datetime"
+          display={Platform.OS === "ios" ? "inline" : "default"}
+          onChange={(event, selectedDate) => {
+            setShowDatePicker(false);
+            if (selectedDate) {
+              setMatchDate(selectedDate);
+            }
+          }}
+        />
+      )}
+
+      {/* Venue */}
+      <Text style={styles.label}>Venue</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter venue"
+        value={venue}
+        onChangeText={setVenue}
       />
 
-      <View style={styles.spacer} />
-
-      <Button
-        title={deleting ? "Deleting..." : "Delete Match"}
-        onPress={handleDelete}
-        color="#c0392b"
-        disabled={saving || deleting}
+      {/* Notes */}
+      <Text style={styles.label}>Notes</Text>
+      <TextInput
+        style={[styles.input, styles.notesInput]}
+        placeholder="Optional notes"
+        value={notes}
+        onChangeText={setNotes}
+        multiline
       />
+
+      {/* Status */}
+      <Text style={styles.label}>Status</Text>
+      <View style={styles.rowWrap}>
+        {(["UPCOMING", "COMPLETED", "CANCELLED"] as MatchStatus[]).map(
+          (item) => (
+            <TouchableOpacity
+              key={item}
+              style={[
+                styles.chipBtn,
+                status === item && styles.chipBtnSelected,
+              ]}
+              onPress={() => setStatus(item)}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  status === item && styles.chipTextSelected,
+                ]}
+              >
+                {item}
+              </Text>
+            </TouchableOpacity>
+          )
+        )}
+      </View>
+
+      {/* Submit */}
+      <TouchableOpacity
+        style={styles.submitBtn}
+        onPress={handleUpdateMatch}
+        disabled={submitting}
+      >
+        <Text style={styles.submitBtnText}>
+          {submitting ? "Updating..." : "Update Match"}
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -237,15 +471,18 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     flexGrow: 1,
   },
-  loadingText: {
-    textAlign: "center",
-    marginTop: 40,
-  },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: "700",
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: "center",
+  },
+  label: {
+    fontWeight: "600",
+    fontSize: 15,
+    marginBottom: 8,
+    marginTop: 6,
+    color: "#333",
   },
   input: {
     borderWidth: 1,
@@ -259,64 +496,45 @@ const styles = StyleSheet.create({
     minHeight: 100,
     textAlignVertical: "top",
   },
-  label: {
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  helperText: {
-    color: "#666",
+  rowWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     marginBottom: 12,
   },
-  teamList: {
-    marginBottom: 16,
-  },
-  teamBtn: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: "#fff",
-  },
-  teamBtnSelected: {
-    backgroundColor: "#111",
-    borderColor: "#111",
-  },
-  teamBtnText: {
-    textAlign: "center",
-    fontWeight: "700",
-  },
-  teamBtnTextSelected: {
-    color: "#fff",
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  statusBtn: {
-    flex: 1,
+  chipBtn: {
     borderWidth: 1,
     borderColor: "#ccc",
     paddingVertical: 10,
-    borderRadius: 8,
-    marginRight: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: "#f9f9f9",
   },
-  lastStatusBtn: {
-    marginRight: 0,
+  chipBtnSelected: {
+    backgroundColor: "#4B1D6B",
+    borderColor: "#4B1D6B",
   },
-  statusBtnSelected: {
-    backgroundColor: "#111",
-    borderColor: "#111",
+  chipText: {
+    fontWeight: "600",
+    color: "#333",
   },
-  statusText: {
-    textAlign: "center",
-  },
-  statusTextSelected: {
+  chipTextSelected: {
     color: "#fff",
+  },
+  submitBtn: {
+    backgroundColor: "#111",
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  submitBtnText: {
+    color: "#fff",
+    textAlign: "center",
     fontWeight: "700",
   },
-  spacer: {
-    marginTop: 12,
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

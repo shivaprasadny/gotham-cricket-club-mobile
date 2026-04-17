@@ -18,15 +18,19 @@ type Props = {
 
 type Match = {
   id: number;
-  opponentName: string;
+  homeTeamId?: number | null;
+  homeTeamName?: string | null;
+  awayTeamId?: number | null;
+  awayTeamName?: string | null;
+  externalOpponentName?: string | null;
+  leagueId?: number | null;
+  leagueName?: string | null;
   matchDate: string;
   venue: string;
   matchType: string;
   notes?: string;
   createdBy?: string;
   status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
-  teamId?: number | null;
-  teamName?: string | null;
   myAvailability?: "AVAILABLE" | "NOT_AVAILABLE" | "MAYBE" | "INJURED";
 };
 
@@ -34,20 +38,20 @@ type MatchFilter = "UPCOMING" | "PAST" | "ALL" | "CANCELLED";
 
 const MatchesScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
+
+  // All matches from backend
   const [matches, setMatches] = useState<Match[]>([]);
+
+  // Loading states
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // default filter = UPCOMING
+  // Default filter = upcoming only
   const [filter, setFilter] = useState<MatchFilter>("UPCOMING");
 
   const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
-  
-  
-  
 
-
-
+  // Load matches from backend
   const loadMatches = async () => {
     try {
       const data = await getMatches();
@@ -67,28 +71,24 @@ const MatchesScreen = ({ navigation }: Props) => {
     void loadMatches();
   }, []);
 
+  // Pull to refresh
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMatches();
   };
 
+  // Build readable match title
+  const getMatchTitle = (item: Match) => {
+    if (item.awayTeamName) {
+      return `${item.homeTeamName || "Team"} vs ${item.awayTeamName}`;
+    }
 
-  // Return text color for availability state
-const getAvailabilityColor = (status?: string) => {
-  switch (status) {
-    case "AVAILABLE":
-      return { color: "#22c55e" };
-    case "NOT_AVAILABLE":
-      return { color: "#ef4444" };
-    case "MAYBE":
-      return { color: "#facc15" };
-    case "INJURED":
-      return { color: "#9ca3af" };
-    default:
-      return { color: "#15803d" };
-  }
-};
+    return `${item.homeTeamName || "Team"} vs ${
+      item.externalOpponentName || "Opponent"
+    }`;
+  };
 
+  // Filter matches by date and cancelled state
   const filteredMatches = useMemo(() => {
     const now = new Date();
 
@@ -109,10 +109,27 @@ const getAvailabilityColor = (status?: string) => {
         return isCancelled;
       }
 
-      return true; // ALL
+      return true;
     });
   }, [matches, filter]);
 
+  // Color availability text
+  const getAvailabilityColor = (status?: string) => {
+    switch (status) {
+      case "AVAILABLE":
+        return { color: "#22c55e" };
+      case "NOT_AVAILABLE":
+        return { color: "#ef4444" };
+      case "MAYBE":
+        return { color: "#facc15" };
+      case "INJURED":
+        return { color: "#9ca3af" };
+      default:
+        return { color: "#15803d" };
+    }
+  };
+
+  // Delete match
   const handleDelete = async (id: number) => {
     Alert.alert("Delete Match", "Are you sure you want to delete this match?", [
       { text: "Cancel", style: "cancel" },
@@ -140,98 +157,97 @@ const getAvailabilityColor = (status?: string) => {
     ]);
   };
 
+  // Render one match card
   const renderItem = ({ item }: { item: Match }) => {
+    const isAvailabilityLocked =
+      new Date(item.matchDate).getTime() < new Date().getTime();
 
-  // 🔒 Check if match is in the past
-  const isAvailabilityLocked =
-    new Date(item.matchDate).getTime() < new Date().getTime();
-
-  return (
-    <View style={styles.card}>
-      <TouchableOpacity
-        onPress={() =>
-          navigation.navigate("MatchDetails", {
-            matchId: item.id,
-            opponentName: item.opponentName,
-            venue: item.venue,
-            matchDate: item.matchDate,
-            matchType: item.matchType,
-            status: item.status,
-            teamId: item.teamId,
-            teamName: item.teamName,
-          })
-        }
-      >
-        <Text style={styles.title}>{item.opponentName}</Text>
-        <Text style={styles.detail}>Venue: {item.venue}</Text>
-        <Text style={styles.detail}>Type: {item.matchType}</Text>
-        <Text style={styles.detail}>
-          Date: {new Date(item.matchDate).toLocaleString()}
-        </Text>
-        <Text style={styles.detail}>
-          Team: {item.teamName ? item.teamName : "No team assigned"}
-        </Text>
-        <Text style={styles.detail}>Status: {item.status || "UPCOMING"}</Text>
-      </TouchableOpacity>
-
-      {/* 🔽 Availability section */}
-      {item.myAvailability ? (
-        <View style={styles.availabilityDone}>
-         <Text
-  style={[
-    styles.availabilityDoneText,
-    getAvailabilityColor(item.myAvailability),
-  ]}
->
-  Availability Marked ✅ ({item.myAvailability})
-</Text>
-        </View>
-      ) : isAvailabilityLocked ? (
-        <View style={styles.availabilityLocked}>
-          <Text style={styles.availabilityLockedText}>
-            Availability Locked
-          </Text>
-        </View>
-      ) : (
+    return (
+      <View style={styles.card}>
         <TouchableOpacity
-          style={styles.availabilityBtn}
           onPress={() =>
-            navigation.navigate("Availability", {
+            navigation.navigate("MatchDetails", {
               matchId: item.id,
-              opponentName: item.opponentName,
-              matchDate: item.matchDate,
-              venue: item.venue,
-              matchType: item.matchType,
             })
           }
         >
-          <Text style={styles.availabilityText}>Mark Availability</Text>
-        </TouchableOpacity>
-      )}
+          <Text style={styles.title}>{getMatchTitle(item)}</Text>
 
-      {/* 🔽 Admin actions */}
-      {canManage && (
-        <View style={styles.actionRow}>
+          {item.leagueName ? (
+            <Text style={styles.detail}>League: {item.leagueName}</Text>
+          ) : null}
+
+          <Text style={styles.detail}>Type: {item.matchType}</Text>
+          <Text style={styles.detail}>Venue: {item.venue}</Text>
+          <Text style={styles.detail}>
+            Date: {new Date(item.matchDate).toLocaleString()}
+          </Text>
+          <Text style={styles.detail}>Status: {item.status || "UPCOMING"}</Text>
+        </TouchableOpacity>
+
+        {item.myAvailability ? (
+          <View style={styles.availabilityDone}>
+            <Text
+              style={[
+                styles.availabilityDoneText,
+                getAvailabilityColor(item.myAvailability),
+              ]}
+            >
+              Availability Marked ✅ ({item.myAvailability})
+            </Text>
+          </View>
+        ) : isAvailabilityLocked ? (
+          <View style={styles.availabilityLocked}>
+            <Text style={styles.availabilityLockedText}>
+              Availability Locked
+            </Text>
+          </View>
+        ) : (
           <TouchableOpacity
-            style={[styles.actionBtn, styles.editBtn]}
+            style={styles.availabilityBtn}
             onPress={() =>
-              navigation.navigate("EditMatch", { matchId: item.id })
+              navigation.navigate("Availability", {
+                matchId: item.id,
+                opponentName: item.awayTeamName || item.externalOpponentName,
+                matchDate: item.matchDate,
+                venue: item.venue,
+                matchType: item.matchType,
+              })
             }
           >
-            <Text style={styles.actionText}>Edit</Text>
+            <Text style={styles.availabilityText}>Mark Availability</Text>
           </TouchableOpacity>
+        )}
 
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.deleteBtn]}
-            onPress={() => handleDelete(item.id)}
-          >
-            <Text style={styles.actionText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-};
+        {canManage && (
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.editBtn]}
+              onPress={() => navigation.navigate("EditMatch", { matchId: item.id })}
+            >
+              <Text style={styles.actionText}>Edit</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.deleteBtn]}
+              onPress={() => handleDelete(item.id)}
+            >
+              <Text style={styles.actionText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.loadingText}>Loading matches...</Text>
+      </View>
+    );
+  }
 
   return (
     <FlatList
@@ -375,7 +391,17 @@ const styles = StyleSheet.create({
   },
   availabilityDoneText: {
     textAlign: "center",
-    color: "#15803d",
+    fontWeight: "700",
+  },
+  availabilityLocked: {
+    backgroundColor: "#6b7280",
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  availabilityLockedText: {
+    color: "#fff",
+    textAlign: "center",
     fontWeight: "700",
   },
   actionRow: {
@@ -413,15 +439,4 @@ const styles = StyleSheet.create({
     backgroundColor: "#4B1D6B",
     padding: 20,
   },
-  availabilityLocked: {
-  backgroundColor: "#6b7280",
-  paddingVertical: 10,
-  borderRadius: 8,
-  marginTop: 10,
-},
-availabilityLockedText: {
-  color: "#fff",
-  textAlign: "center",
-  fontWeight: "700",
-},
 });

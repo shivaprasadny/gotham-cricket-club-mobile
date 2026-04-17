@@ -1,110 +1,84 @@
-
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
+  Alert,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useAuth } from "../context/AuthContext";
-import {
-  getAvailabilityByMatch,
-  getAvailabilitySummary,
-} from "../services/availabilityService";
-import { getSquadByMatch } from "../services/squadService";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { getMatchById } from "../services/matchService";
+import { getAvailabilityByMatch } from "../services/availabilityService";
 
 type Props = {
   route: any;
   navigation: any;
 };
 
+type MatchDetails = {
+  id: number;
+  homeTeamId?: number | null;
+  homeTeamName?: string | null;
+  awayTeamId?: number | null;
+  awayTeamName?: string | null;
+  externalOpponentName?: string | null;
+  leagueId?: number | null;
+  leagueName?: string | null;
+  matchDate: string;
+  venue: string;
+  matchType: string;
+  notes?: string;
+  createdBy?: string;
+  status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
+  myAvailability?: "AVAILABLE" | "NOT_AVAILABLE" | "MAYBE" | "INJURED";
+};
+
 type AvailabilityItem = {
   id: number;
-  matchId: number;
   userId: number;
   fullName: string;
   status: "AVAILABLE" | "NOT_AVAILABLE" | "MAYBE" | "INJURED";
   message?: string;
 };
 
-type Summary = {
-  matchId: number;
-  availableCount: number;
-  maybeCount: number;
-  notAvailableCount: number;
-  injuredCount: number;
-  totalResponses: number;
-};
-
-type SquadItem = {
-  squadId: number;
-  userId: number;
-  fullName: string;
-  nickname?: string;
-  playerType?: string;
-  jerseyNumber?: number;
-  isPlayingXi: boolean;
-  roleInMatch?: string;
-};
-
 const MatchDetailsScreen = ({ route, navigation }: Props) => {
+  const { matchId } = route.params;
   const { user } = useAuth();
 
-  const {
-    matchId,
-    opponentName,
-    venue,
-    matchDate,
-    matchType,
-    status,
-    teamId,
-    teamName,
-  } = route.params;
-
-  const [availabilityList, setAvailabilityList] = useState<AvailabilityItem[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [squad, setSquad] = useState<SquadItem[]>([]);
+  const [match, setMatch] = useState<MatchDetails | null>(null);
+  const [responses, setResponses] = useState<AvailabilityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const isAdminOrCaptain = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  const isAdminOrCaptain =
+    user?.role === "ADMIN" || user?.role === "CAPTAIN";
 
-  const myAvailability = useMemo(
-    () => availabilityList.find((item) => item.userId === user?.id),
-    [availabilityList, user?.id]
-  );
-  const isAvailabilityLocked =
-  matchDate && new Date(matchDate).getTime() < new Date().getTime();
-
-  const playingXi = useMemo(
-    () => squad.filter((item) => item.isPlayingXi),
-    [squad]
-  );
-
-  const reserves = useMemo(
-    () => squad.filter((item) => !item.isPlayingXi),
-    [squad]
+  // Load fresh data whenever screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      void loadData();
+    }, [matchId])
   );
 
   const loadData = async () => {
     try {
-      const [availabilityData, summaryData, squadData] = await Promise.all([
+      setLoading(true);
+
+      const [matchData, availabilityData] = await Promise.all([
+        getMatchById(matchId),
         getAvailabilityByMatch(matchId),
-        getAvailabilitySummary(matchId),
-        getSquadByMatch(matchId),
       ]);
 
-      setAvailabilityList(Array.isArray(availabilityData) ? availabilityData : []);
-      setSummary(summaryData || null);
-      setSquad(Array.isArray(squadData) ? squadData : []);
+      setMatch(matchData || null);
+      setResponses(Array.isArray(availabilityData) ? availabilityData : []);
     } catch (error: any) {
-      console.log(
-        "MATCH DETAILS ERROR:",
-        error?.response?.data || error?.message || error
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to load match details"
       );
     } finally {
       setLoading(false);
@@ -112,52 +86,35 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
     }
   };
 
-useFocusEffect(
-  useCallback(() => {
-    void loadData();
-  }, [matchId])
-);
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
   };
 
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleString();
-    } catch {
-      return dateString;
+  // Build display title for match
+  const getMatchTitle = () => {
+    if (!match) return "Match";
+
+    if (match.awayTeamName) {
+      return `${match.homeTeamName || "Team"} vs ${match.awayTeamName}`;
     }
+
+    return `${match.homeTeamName || "Team"} vs ${
+      match.externalOpponentName || "Opponent"
+    }`;
   };
 
-  const getStatusStyle = (value: string) => {
-    switch (value) {
-      case "AVAILABLE":
-        return styles.available;
-      case "NOT_AVAILABLE":
-        return styles.notAvailable;
-      case "MAYBE":
-        return styles.maybe;
-      case "INJURED":
-        return styles.injured;
-      default:
-        return styles.defaultStatus;
-    }
-  };
+  const isAvailabilityLocked =
+    match?.matchDate &&
+    new Date(match.matchDate).getTime() < new Date().getTime();
 
-  const renderAvailabilityItem = ({ item }: { item: AvailabilityItem }) => (
-    <View style={styles.playerCard}>
-      <View style={styles.playerHeader}>
-        <Text style={styles.playerName}>{item.fullName}</Text>
-        <Text style={[styles.statusBadge, getStatusStyle(item.status)]}>
-          {item.status}
-        </Text>
-      </View>
-      {item.message ? (
-        <Text style={styles.playerMessage}>Note: {item.message}</Text>
-      ) : null}
-    </View>
-  );
+  // Count availability statuses
+  const availableCount = responses.filter((r) => r.status === "AVAILABLE").length;
+  const maybeCount = responses.filter((r) => r.status === "MAYBE").length;
+  const notAvailableCount = responses.filter(
+    (r) => r.status === "NOT_AVAILABLE"
+  ).length;
+  const injuredCount = responses.filter((r) => r.status === "INJURED").length;
 
   if (loading) {
     return (
@@ -168,245 +125,192 @@ useFocusEffect(
     );
   }
 
+  if (!match) {
+    return (
+      <View style={styles.center}>
+        <Text>Match not found.</Text>
+      </View>
+    );
+  }
+
   return (
-    <FlatList
-      data={availabilityList}
-      keyExtractor={(item) => item.id.toString()}
-      renderItem={renderAvailabilityItem}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
-      ListHeaderComponent={
-        <View style={styles.headerContainer}>
-          <View style={styles.matchCard}>
-            <Text style={styles.matchTitle}>{opponentName}</Text>
-            <Text style={styles.matchText}>Type: {matchType}</Text>
-            <Text style={styles.matchText}>Venue: {venue}</Text>
-            <Text style={styles.matchText}>Date: {formatDate(matchDate)}</Text>
-            <Text style={styles.matchText}>
-              Team: {teamName ? teamName : "No team assigned"}
-            </Text>
-            <Text style={styles.matchText}>Status: {status || "UPCOMING"}</Text>
-          </View>
+    >
+      {/* Match info card */}
+      <View style={styles.card}>
+        <Text style={styles.title}>{getMatchTitle()}</Text>
 
-          <View style={styles.actionPanel}>
-           {isAvailabilityLocked ? (
-  <View style={styles.lockedBtn}>
-    <Text style={styles.lockedBtnText}>Availability Locked</Text>
+        {match.leagueName ? (
+          <Text style={styles.detail}>League: {match.leagueName}</Text>
+        ) : null}
+
+        <Text style={styles.detail}>Type: {match.matchType}</Text>
+        <Text style={styles.detail}>Venue: {match.venue}</Text>
+        <Text style={styles.detail}>
+          Date: {new Date(match.matchDate).toLocaleString()}
+        </Text>
+        <Text style={styles.detail}>Status: {match.status || "UPCOMING"}</Text>
+
+        {match.notes ? (
+          <Text style={styles.detail}>Notes: {match.notes}</Text>
+        ) : null}
+      </View>
+
+      {/* Action card */}
+      <View style={styles.card}>
+  <View style={styles.myStatusCard}>
+    <Text style={styles.myStatusLabel}>My Availability</Text>
+
+    <Text
+      style={[
+        styles.myStatusValue,
+        match.myAvailability === "AVAILABLE"
+          ? styles.statusAvailable
+          : match.myAvailability === "NOT_AVAILABLE"
+          ? styles.statusNotAvailable
+          : match.myAvailability === "MAYBE"
+          ? styles.statusMaybe
+          : match.myAvailability === "INJURED"
+          ? styles.statusInjured
+          : styles.statusDefault,
+      ]}
+    >
+    {match.myAvailability === "AVAILABLE" && "AVAILABLE ✅"}
+{match.myAvailability === "NOT_AVAILABLE" && "NOT AVAILABLE ❌"}
+{match.myAvailability === "MAYBE" && "MAYBE 🤔"}
+{match.myAvailability === "INJURED" && "INJURED 🚑"}
+{!match.myAvailability && "Not marked"}
+    </Text>
   </View>
-) : (
-  <TouchableOpacity
-    style={styles.primaryButton}
-    onPress={() =>
-      navigation.navigate("Availability", {
-        matchId,
-        opponentName,
-        venue,
-        matchDate,
-        matchType,
-      })
-    }
-  >
-    <Text style={styles.primaryButtonText}>Mark My Availability</Text>
-  </TouchableOpacity>
-)}
 
-            {isAdminOrCaptain && !!teamId ? (
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() =>
-                  navigation.navigate("SquadSelection", {
-                    matchId,
-                    teamId,
-                    opponentName,
-                    matchDate,
-                    venue,
-                    matchType,
-                    teamName,
-                  })
-                }
-              >
-                <Text style={styles.primaryButtonText}>Open Squad Selection</Text>
-              </TouchableOpacity>
-            ) : null}
+  {!isAvailabilityLocked ? (
+    <TouchableOpacity
+      style={styles.primaryButton}
+      onPress={() =>
+        navigation.navigate("Availability", {
+          matchId: match.id,
+          opponentName:
+            match.awayTeamName || match.externalOpponentName || "Opponent",
+          venue: match.venue,
+          matchDate: match.matchDate,
+          matchType: match.matchType,
+        })
+      }
+    >
+      <Text style={styles.primaryButtonText}>Mark My Availability</Text>
+    </TouchableOpacity>
+  ) : (
+    <View style={styles.lockedBtn}>
+      <Text style={styles.lockedBtnText}>Availability Locked</Text>
+    </View>
+  )}
 
-            {isAdminOrCaptain && !teamId ? (
-              <Text style={styles.warningText}>
-                Please assign a team to this match first to use squad selection.
-              </Text>
-            ) : null}
-          </View>
+  {isAdminOrCaptain && (
+    <TouchableOpacity
+      style={styles.primaryButton}
+      onPress={() =>
+        navigation.navigate("SquadSelection", {
+          matchId: match.id,
+          opponentName:
+            match.awayTeamName || match.externalOpponentName || "Opponent",
+          teamName: match.homeTeamName || "No team assigned",
+          matchDate: match.matchDate,
+          venue: match.venue,
+          matchType: match.matchType,
+        })
+      }
+    >
+      <Text style={styles.primaryButtonText}>Open Squad Selection</Text>
+    </TouchableOpacity>
+  )}
+</View>
 
-          {myAvailability && (
-            <View style={styles.myStatusCard}>
-              <Text style={styles.sectionTitle}>My Availability</Text>
-              <Text style={styles.infoText}>Status: {myAvailability.status}</Text>
-              {myAvailability.message ? (
-                <Text style={styles.infoText}>Message: {myAvailability.message}</Text>
-              ) : null}
-            </View>
-          )}
+      {/* Availability summary */}
+      <Text style={styles.sectionTitle}>Availability Summary</Text>
 
-          <Text style={styles.sectionTitle}>Availability Summary</Text>
-          <View style={styles.summaryGrid}>
-            <View style={[styles.summaryCard, styles.availableBox]}>
-              <Text style={styles.summaryNumber}>
-                {summary?.availableCount ?? 0}
-              </Text>
-              <Text style={styles.summaryLabel}>Available</Text>
-            </View>
-
-            <View style={[styles.summaryCard, styles.maybeBox]}>
-              <Text style={styles.summaryNumber}>{summary?.maybeCount ?? 0}</Text>
-              <Text style={styles.summaryLabel}>Maybe</Text>
-            </View>
-
-            <View style={[styles.summaryCard, styles.notAvailableBox]}>
-              <Text style={styles.summaryNumber}>
-                {summary?.notAvailableCount ?? 0}
-              </Text>
-              <Text style={styles.summaryLabel}>Not Available</Text>
-            </View>
-
-            <View style={[styles.summaryCard, styles.injuredBox]}>
-              <Text style={styles.summaryNumber}>{summary?.injuredCount ?? 0}</Text>
-              <Text style={styles.summaryLabel}>Injured</Text>
-            </View>
-          </View>
-
-          <Text style={styles.totalResponses}>
-            Total Responses: {summary?.totalResponses ?? 0}
-          </Text>
-
-          <Text style={styles.sectionTitle}>Playing XI</Text>
-          {playingXi.length === 0 ? (
-            <Text style={styles.emptyText}>No playing XI selected yet.</Text>
-          ) : (
-            playingXi.map((item) => (
-              <View key={item.squadId} style={styles.squadCard}>
-                <Text style={styles.playerName}>{item.fullName}</Text>
-                <Text>{item.roleInMatch || "No role set"}</Text>
-              </View>
-            ))
-          )}
-
-          <Text style={styles.sectionTitle}>Reserve Players</Text>
-          {reserves.length === 0 ? (
-            <Text style={styles.emptyText}>No reserve players selected yet.</Text>
-          ) : (
-            reserves.map((item) => (
-              <View key={item.squadId} style={styles.squadCard}>
-                <Text style={styles.playerName}>{item.fullName}</Text>
-                <Text>{item.roleInMatch || "No role set"}</Text>
-              </View>
-            ))
-          )}
-
-          <Text style={styles.sectionTitle}>Players Response</Text>
+      <View style={styles.summaryGrid}>
+        <View style={[styles.summaryBox, styles.availableBox]}>
+          <Text style={styles.summaryCount}>{availableCount}</Text>
+          <Text style={styles.summaryLabel}>Available</Text>
         </View>
-      }
-      ListEmptyComponent={
-        <Text style={styles.emptyText}>No player responses yet.</Text>
-      }
-      contentContainerStyle={
-        availabilityList.length === 0
-          ? styles.emptyListContainer
-          : styles.listContainer
-      }
-    />
+
+        <View style={[styles.summaryBox, styles.maybeBox]}>
+          <Text style={styles.summaryCount}>{maybeCount}</Text>
+          <Text style={styles.summaryLabel}>Maybe</Text>
+        </View>
+
+        <View style={[styles.summaryBox, styles.notAvailableBox]}>
+          <Text style={styles.summaryCount}>{notAvailableCount}</Text>
+          <Text style={styles.summaryLabel}>Not Available</Text>
+        </View>
+
+        <View style={[styles.summaryBox, styles.injuredBox]}>
+          <Text style={styles.summaryCount}>{injuredCount}</Text>
+          <Text style={styles.summaryLabel}>Injured</Text>
+        </View>
+      </View>
+
+      <Text style={styles.totalResponses}>
+        Total Responses: {responses.length}
+      </Text>
+
+      {/* Availability list */}
+      <Text style={styles.sectionTitle}>Player Responses</Text>
+
+      {responses.length === 0 ? (
+        <View style={styles.card}>
+          <Text>No responses yet.</Text>
+        </View>
+      ) : (
+        responses.map((item) => (
+          <View key={item.id} style={styles.responseCard}>
+            <Text style={styles.responseName}>{item.fullName}</Text>
+            <Text style={styles.responseStatus}>Status: {item.status}</Text>
+            {item.message ? (
+              <Text style={styles.responseMessage}>Note: {item.message}</Text>
+            ) : null}
+          </View>
+        ))
+      )}
+    </ScrollView>
   );
 };
 
 export default MatchDetailsScreen;
 
 const styles = StyleSheet.create({
-  listContainer: {
-    padding: 16,
+  container: {
+    flex: 1,
     backgroundColor: "#fff",
   },
-  emptyListContainer: {
-    flexGrow: 1,
+  content: {
     padding: 16,
-    backgroundColor: "#fff",
   },
-  headerContainer: {
-    marginBottom: 16,
-  },
-  matchCard: {
-    backgroundColor: "#f7f7f7",
+  card: {
+    backgroundColor: "#f5f5f5",
     padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    borderRadius: 14,
+    marginBottom: 14,
   },
-  actionPanel: {
-    backgroundColor: "#f7f7f7",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  myStatusCard: {
-    backgroundColor: "#eef4ff",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  matchTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 8,
-  },
-  matchText: {
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 12,
-    marginTop: 6,
-  },
-  infoText: {
-    fontSize: 15,
-    marginBottom: 6,
-  },
-  summaryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 10,
-    marginBottom: 12,
-  },
-  summaryCard: {
-    width: "47%",
-    padding: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  summaryNumber: {
+  title: {
     fontSize: 24,
     fontWeight: "700",
+    marginBottom: 10,
+  },
+  detail: {
+    fontSize: 16,
     marginBottom: 6,
   },
-  summaryLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  availableBox: {
-    backgroundColor: "#d4edda",
-  },
-  maybeBox: {
-    backgroundColor: "#fff3cd",
-  },
-  notAvailableBox: {
-    backgroundColor: "#f8d7da",
-  },
-  injuredBox: {
-    backgroundColor: "#e2d9f3",
-  },
-  totalResponses: {
-    fontSize: 15,
-    marginBottom: 16,
-    fontWeight: "600",
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 12,
+    marginTop: 8,
   },
   primaryButton: {
     backgroundColor: "#111",
@@ -419,85 +323,121 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
   },
-  squadCard: {
-    backgroundColor: "#f7f7f7",
-    padding: 12,
+  lockedBtn: {
+    backgroundColor: "#777",
+    paddingVertical: 14,
     borderRadius: 10,
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  playerCard: {
+  lockedBtnText: {
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "700",
+  },
+  currentStatusText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#b91c1c",
+  },
+  summaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  summaryBox: {
+    width: "48%",
+    padding: 18,
+    borderRadius: 14,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  availableBox: {
+    backgroundColor: "#d9fbe3",
+  },
+  maybeBox: {
+    backgroundColor: "#fff4cc",
+  },
+  notAvailableBox: {
+    backgroundColor: "#ffdada",
+  },
+  injuredBox: {
+    backgroundColor: "#ece2ff",
+  },
+  summaryCount: {
+    fontSize: 28,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  summaryLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  totalResponses: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 14,
+  },
+  responseCard: {
     backgroundColor: "#f7f7f7",
     padding: 14,
     borderRadius: 10,
     marginBottom: 10,
   },
-  playerHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  playerName: {
+  responseName: {
+    fontWeight: "700",
     fontSize: 16,
-    fontWeight: "700",
-    flex: 1,
-    marginRight: 10,
+    marginBottom: 4,
   },
-  playerMessage: {
-    marginTop: 8,
+  responseStatus: {
+    marginBottom: 4,
+  },
+  responseMessage: {
     color: "#444",
-    fontSize: 14,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    overflow: "hidden",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  available: {
-    backgroundColor: "#28a745",
-    color: "#fff",
-  },
-  notAvailable: {
-    backgroundColor: "#dc3545",
-    color: "#fff",
-  },
-  maybe: {
-    backgroundColor: "#ffc107",
-    color: "#111",
-  },
-  injured: {
-    backgroundColor: "#6f42c1",
-    color: "#fff",
-  },
-  defaultStatus: {
-    backgroundColor: "#ccc",
-    color: "#111",
-  },
-  emptyText: {
-    color: "#666",
-    marginBottom: 12,
-  },
-  warningText: {
-    color: "red",
-    marginTop: 4,
-    fontWeight: "600",
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  lockedBtn: {
-  backgroundColor: "#777",
-  paddingVertical: 14,
+  myStatusCard: {
+  backgroundColor: "#fff",
+  borderWidth: 1,
+  borderColor: "#e5e7eb",
+  padding: 12,
   borderRadius: 10,
   marginBottom: 12,
 },
-lockedBtnText: {
-  color: "#fff",
-  textAlign: "center",
+
+myStatusLabel: {
+  fontSize: 13,
+  color: "#6b7280",
+  marginBottom: 6,
+  fontWeight: "600",
+},
+
+myStatusValue: {
+  fontSize: 18,
   fontWeight: "700",
+},
+
+statusAvailable: {
+  color: "#16a34a",
+},
+
+statusNotAvailable: {
+  color: "#dc2626",
+},
+
+statusMaybe: {
+  color: "#d97706",
+},
+
+statusInjured: {
+  color: "#7c3aed",
+},
+
+statusDefault: {
+  color: "#111827",
 },
 });
