@@ -1,164 +1,262 @@
-
 import React, { useState } from "react";
 import {
   Alert,
-  Button,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
+  forgotPassword,
   requestPasswordResetCode,
-  resetPassword,
 } from "../services/authService";
 
-const ForgotPasswordScreen = () => {
+type Props = {
+  navigation: any;
+};
+
+const ForgotPasswordScreen = ({ navigation }: Props) => {
+  // Form fields
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [generatedCode, setGeneratedCode] = useState("");
-  const [step, setStep] = useState<1 | 2>(1);
-  const [loading, setLoading] = useState(false);
 
-  const handleRequestCode = async () => {
-    if (!email) {
+  // Loading state
+  const [sendingCode, setSendingCode] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  // Request reset code
+  const handleSendCode = async () => {
+    if (!email.trim()) {
       Alert.alert("Error", "Please enter your email");
       return;
     }
 
     try {
-      setLoading(true);
-      const response = await requestPasswordResetCode(email);
+      setSendingCode(true);
 
-      setGeneratedCode(response.resetCode || "");
-      setStep(2);
+      const response = await requestPasswordResetCode(email.trim());
 
       Alert.alert(
-        "Reset Code Generated",
-        `Testing code: ${response.resetCode}`
+        "Success",
+        typeof response === "string"
+          ? response
+          : "Reset code sent successfully"
       );
     } catch (error: any) {
       Alert.alert(
         "Error",
-        error?.response?.data?.message || "Failed to request reset code"
+        error?.response?.data?.message || "Failed to send reset code"
       );
     } finally {
-      setLoading(false);
+      setSendingCode(false);
     }
   };
 
+  // Reset password using email + code + new password
   const handleResetPassword = async () => {
-    if (!email || !code || !newPassword) {
-      Alert.alert("Error", "Please fill all fields");
+    if (!email.trim()) {
+      Alert.alert("Error", "Please enter your email");
+      return;
+    }
+
+    if (!code.trim()) {
+      Alert.alert("Error", "Please enter reset code");
+      return;
+    }
+
+    if (!newPassword.trim()) {
+      Alert.alert("Error", "Please enter new password");
       return;
     }
 
     try {
-      setLoading(true);
+      setResetting(true);
 
-      const response = await resetPassword({
-        email,
-        code,
-        newPassword,
+      const response = await forgotPassword({
+        email: email.trim(),
+        code: code.trim(),
+        newPassword: newPassword.trim(),
       });
 
       Alert.alert(
         "Success",
-        typeof response === "string" ? response : "Password reset successful"
+        typeof response === "string"
+          ? response
+          : "Password reset successful"
       );
 
-      setEmail("");
-      setCode("");
-      setNewPassword("");
-      setGeneratedCode("");
-      setStep(1);
+      navigation.navigate("Login");
     } catch (error: any) {
       Alert.alert(
         "Error",
         error?.response?.data?.message || "Failed to reset password"
       );
     } finally {
-      setLoading(false);
+      setResetting(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Forgot Password</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      {step === 1 ? (
-        <Button
-          title={loading ? "Requesting..." : "Get Reset Code"}
-          onPress={handleRequestCode}
-          disabled={loading}
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        <Image
+          source={require("../../assets/logo.png")}
+          style={styles.logo}
         />
-      ) : (
-        <>
-          <Text style={styles.helperText}>
-            Testing reset code: {generatedCode}
-          </Text>
+
+        <Text style={styles.title}>Reset Password</Text>
+        <Text style={styles.subtitle}>
+          Request a code and set a new password
+        </Text>
+
+        <View style={styles.card}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            placeholderTextColor="#7a7a7a"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleSendCode}
+            disabled={sendingCode}
+          >
+            <Text style={styles.secondaryButtonText}>
+              {sendingCode ? "Sending..." : "Send Reset Code"}
+            </Text>
+          </TouchableOpacity>
 
           <TextInput
             style={styles.input}
-            placeholder="Enter Reset Code"
+            placeholder="Reset Code"
+            placeholderTextColor="#7a7a7a"
             value={code}
             onChangeText={setCode}
           />
 
           <TextInput
             style={styles.input}
-            placeholder="Enter New Password"
-            secureTextEntry
+            placeholder="New Password"
+            placeholderTextColor="#7a7a7a"
             value={newPassword}
             onChangeText={setNewPassword}
+            secureTextEntry
           />
 
-          <Button
-            title={loading ? "Resetting..." : "Reset Password"}
+          <TouchableOpacity
+            style={styles.primaryButton}
             onPress={handleResetPassword}
-            disabled={loading}
-          />
-        </>
-      )}
-    </ScrollView>
+            disabled={resetting}
+          >
+            <Text style={styles.primaryButtonText}>
+              {resetting ? "Resetting..." : "Reset Password"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => navigation.navigate("Login")}
+          >
+            <Text style={styles.linkText}>Back to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 export default ForgotPasswordScreen;
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: "#2b0540",
+  },
   container: {
-    padding: 20,
-    backgroundColor: "#fff",
     flexGrow: 1,
+    padding: 20,
     justifyContent: "center",
   },
+  logo: {
+    width: 110,
+    height: 110,
+    resizeMode: "contain",
+    alignSelf: "center",
+    marginBottom: 18,
+  },
   title: {
+    color: "#fff",
     fontSize: 28,
     fontWeight: "700",
-    marginBottom: 24,
     textAlign: "center",
+    marginBottom: 8,
+  },
+  subtitle: {
+    color: "#da9306",
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: 20,
+    fontWeight: "600",
+  },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 12,
+    borderColor: "#d9d2e1",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginBottom: 12,
-    borderRadius: 8,
+    fontSize: 15,
+    color: "#111",
+    backgroundColor: "#fafafa",
   },
-  helperText: {
+  primaryButton: {
+    backgroundColor: "#da9306",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  primaryButtonText: {
+    color: "#2b0540",
+    fontWeight: "700",
     textAlign: "center",
+    fontSize: 16,
+  },
+  secondaryButton: {
+    backgroundColor: "#2b0540",
+    paddingVertical: 14,
+    borderRadius: 12,
     marginBottom: 12,
-    color: "#444",
+  },
+  secondaryButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    textAlign: "center",
+    fontSize: 15,
+  },
+  linkButton: {
+    marginTop: 14,
+  },
+  linkText: {
+    color: "#2b0540",
+    textAlign: "center",
+    fontWeight: "600",
   },
 });

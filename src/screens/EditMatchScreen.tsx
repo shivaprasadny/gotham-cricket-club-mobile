@@ -36,38 +36,32 @@ type MatchStatus = "UPCOMING" | "COMPLETED" | "CANCELLED";
 const EditMatchScreen = ({ route, navigation }: Props) => {
   const { matchId } = route.params;
 
-  // Dropdown data
   const [teams, setTeams] = useState<Team[]>([]);
   const [leagues, setLeagues] = useState<League[]>([]);
 
-  // Form fields
   const [homeTeamId, setHomeTeamId] = useState<number | null>(null);
   const [awayTeamId, setAwayTeamId] = useState<number | null>(null);
   const [externalOpponentName, setExternalOpponentName] = useState("");
   const [leagueId, setLeagueId] = useState<number | null>(null);
   const [venue, setVenue] = useState("");
   const [notes, setNotes] = useState("");
+  const [matchFee, setMatchFee] = useState("");
   const [matchDate, setMatchDate] = useState<Date | null>(null);
   const [matchType, setMatchType] = useState("League");
   const [status, setStatus] = useState<MatchStatus>("UPCOMING");
-
-  // Opponent mode
   const [opponentMode, setOpponentMode] = useState<"EXTERNAL" | "CLUB">(
     "EXTERNAL"
   );
 
-  // Loading states
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
-  // Date picker visibility
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     void loadScreenData();
   }, []);
 
-  // Load teams, leagues, and current match data
+  // Load current match plus dropdown data
   const loadScreenData = async () => {
     try {
       const [teamData, leagueData, matchData] = await Promise.all([
@@ -79,18 +73,21 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
       setTeams(Array.isArray(teamData) ? teamData : []);
       setLeagues(Array.isArray(leagueData) ? leagueData : []);
 
-      // Fill form from match data
       setHomeTeamId(matchData?.homeTeamId ?? null);
       setAwayTeamId(matchData?.awayTeamId ?? null);
       setExternalOpponentName(matchData?.externalOpponentName || "");
       setLeagueId(matchData?.leagueId ?? null);
       setVenue(matchData?.venue || "");
       setNotes(matchData?.notes || "");
+      setMatchFee(
+        matchData?.matchFee !== null && matchData?.matchFee !== undefined
+          ? String(matchData.matchFee)
+          : ""
+      );
       setMatchDate(matchData?.matchDate ? new Date(matchData.matchDate) : null);
       setMatchType(matchData?.matchType || "League");
       setStatus(matchData?.status || "UPCOMING");
 
-      // Decide opponent mode based on current match
       if (matchData?.awayTeamId) {
         setOpponentMode("CLUB");
       } else {
@@ -106,7 +103,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  // Save updated match
+  // Validate and update match
   const handleUpdateMatch = async () => {
     if (!homeTeamId) {
       Alert.alert("Error", "Please select a home team");
@@ -159,6 +156,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         matchDate: matchDate.toISOString(),
         venue: venue.trim(),
         matchType: matchType.trim(),
+        matchFee: matchFee.trim() ? Number(matchFee) : null,
         notes: notes.trim(),
         status,
       };
@@ -186,7 +184,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   if (loading) {
     return (
       <View style={styles.center}>
-        <Text>Loading match...</Text>
+        <Text style={styles.centerText}>Loading match...</Text>
       </View>
     );
   }
@@ -195,7 +193,6 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Edit Match</Text>
 
-      {/* Match type */}
       <Text style={styles.label}>Match Type</Text>
       <View style={styles.rowWrap}>
         {["League", "Friendly", "Practice", "Intra Club", "Tournament"].map(
@@ -221,7 +218,6 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         )}
       </View>
 
-      {/* League */}
       <Text style={styles.label}>League (Optional)</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={styles.rowWrap}>
@@ -264,7 +260,6 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         </View>
       </ScrollView>
 
-      {/* Home team */}
       <Text style={styles.label}>Home Team</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={styles.rowWrap}>
@@ -290,7 +285,6 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         </View>
       </ScrollView>
 
-      {/* Opponent mode */}
       <Text style={styles.label}>Opponent Setup</Text>
       <View style={styles.rowWrap}>
         <TouchableOpacity
@@ -334,20 +328,19 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         </TouchableOpacity>
       </View>
 
-      {/* Outside opponent */}
       {opponentMode === "EXTERNAL" && (
         <>
           <Text style={styles.label}>Outside Opponent Name</Text>
           <TextInput
             style={styles.input}
             placeholder="Enter outside opponent name"
+            placeholderTextColor="#7a7a7a"
             value={externalOpponentName}
             onChangeText={setExternalOpponentName}
           />
         </>
       )}
 
-      {/* Away team */}
       {opponentMode === "CLUB" && (
         <>
           <Text style={styles.label}>Away Team</Text>
@@ -379,13 +372,12 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         </>
       )}
 
-      {/* Match date */}
       <Text style={styles.label}>Match Date & Time</Text>
       <TouchableOpacity
         style={styles.input}
         onPress={() => setShowDatePicker(true)}
       >
-        <Text>
+        <Text style={styles.inputText}>
           {matchDate ? matchDate.toLocaleString() : "Select match date & time"}
         </Text>
       </TouchableOpacity>
@@ -397,33 +389,40 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
           display={Platform.OS === "ios" ? "inline" : "default"}
           onChange={(event, selectedDate) => {
             setShowDatePicker(false);
-            if (selectedDate) {
-              setMatchDate(selectedDate);
-            }
+            if (selectedDate) setMatchDate(selectedDate);
           }}
         />
       )}
 
-      {/* Venue */}
       <Text style={styles.label}>Venue</Text>
       <TextInput
         style={styles.input}
         placeholder="Enter venue"
+        placeholderTextColor="#7a7a7a"
         value={venue}
         onChangeText={setVenue}
       />
 
-      {/* Notes */}
+      <Text style={styles.label}>Match Fee ($)</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter match fee in dollars"
+        placeholderTextColor="#7a7a7a"
+        value={matchFee}
+        onChangeText={setMatchFee}
+        keyboardType="numeric"
+      />
+
       <Text style={styles.label}>Notes</Text>
       <TextInput
         style={[styles.input, styles.notesInput]}
         placeholder="Optional notes"
+        placeholderTextColor="#7a7a7a"
         value={notes}
         onChangeText={setNotes}
         multiline
       />
 
-      {/* Status */}
       <Text style={styles.label}>Status</Text>
       <View style={styles.rowWrap}>
         {(["UPCOMING", "COMPLETED", "CANCELLED"] as MatchStatus[]).map(
@@ -449,7 +448,6 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         )}
       </View>
 
-      {/* Submit */}
       <TouchableOpacity
         style={styles.submitBtn}
         onPress={handleUpdateMatch}
@@ -468,7 +466,7 @@ export default EditMatchScreen;
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    backgroundColor: "#fff",
+    backgroundColor: "#f8f5fb",
     flexGrow: 1,
   },
   title: {
@@ -476,21 +474,25 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 24,
     textAlign: "center",
+    color: "#2b0540",
   },
   label: {
-    fontWeight: "600",
+    fontWeight: "700",
     fontSize: 15,
     marginBottom: 8,
     marginTop: 6,
-    color: "#333",
+    color: "#2b0540",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#d9d2e1",
     padding: 12,
     marginBottom: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: "#fff",
+  },
+  inputText: {
+    color: "#111",
   },
   notesInput: {
     minHeight: 100,
@@ -504,37 +506,43 @@ const styles = StyleSheet.create({
   },
   chipBtn: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#d6c3e6",
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 20,
-    backgroundColor: "#f9f9f9",
+    backgroundColor: "#fff",
   },
   chipBtnSelected: {
-    backgroundColor: "#4B1D6B",
-    borderColor: "#4B1D6B",
+    backgroundColor: "#2b0540",
+    borderColor: "#2b0540",
   },
   chipText: {
     fontWeight: "600",
-    color: "#333",
+    color: "#2b0540",
   },
   chipTextSelected: {
     color: "#fff",
   },
   submitBtn: {
-    backgroundColor: "#111",
+    backgroundColor: "#da9306",
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     marginTop: 10,
   },
   submitBtnText: {
-    color: "#fff",
+    color: "#2b0540",
     textAlign: "center",
     fontWeight: "700",
+    fontSize: 16,
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f8f5fb",
+  },
+  centerText: {
+    color: "#2b0540",
+    fontWeight: "600",
   },
 });

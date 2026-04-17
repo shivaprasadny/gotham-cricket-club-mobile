@@ -1,6 +1,13 @@
 import api from "../api/axiosConfig";
-import { LoginRequest, LoginResponse, RegisterRequest } from "../types/auth";
+import {
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+} from "../types/auth";
 
+/**
+ * Login user
+ */
 export const loginUser = async (
   payload: LoginRequest
 ): Promise<LoginResponse> => {
@@ -8,6 +15,9 @@ export const loginUser = async (
   return response.data;
 };
 
+/**
+ * Register user
+ */
 export const registerUser = async (
   payload: RegisterRequest
 ): Promise<string> => {
@@ -15,20 +25,24 @@ export const registerUser = async (
   return response.data;
 };
 
-export const requestPasswordResetCode = async (email: string) => {
+/**
+ * Ask backend to send reset code
+ */
+export const requestPasswordResetCode = async (
+  email: string
+): Promise<string> => {
   const response = await api.post("/auth/forgot-password", { email });
   return response.data;
 };
 
-export const resetPassword = async (payload: {
+/**
+ * Reset password using email + code + new password
+ */
+export const forgotPassword = async (payload: {
   email: string;
   code: string;
   newPassword: string;
-}) => {
+}): Promise<string> => {
   const response = await api.post("/auth/reset-password", payload);
-  return response.data;
-};
-export const getAllMembers = async () => {
-  const response = await api.get("/admin/members");
   return response.data;
 };

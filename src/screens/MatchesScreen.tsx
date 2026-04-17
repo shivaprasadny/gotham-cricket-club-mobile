@@ -28,6 +28,7 @@ type Match = {
   matchDate: string;
   venue: string;
   matchType: string;
+  matchFee?: number | null;
   notes?: string;
   createdBy?: string;
   status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
@@ -178,6 +179,9 @@ const MatchesScreen = ({ navigation }: Props) => {
           ) : null}
 
           <Text style={styles.detail}>Type: {item.matchType}</Text>
+          {item.matchFee !== null && item.matchFee !== undefined ? (
+  <Text style={styles.detail}>Match Fee: ${item.matchFee}</Text>
+) : null}
           <Text style={styles.detail}>Venue: {item.venue}</Text>
           <Text style={styles.detail}>
             Date: {new Date(item.matchDate).toLocaleString()}

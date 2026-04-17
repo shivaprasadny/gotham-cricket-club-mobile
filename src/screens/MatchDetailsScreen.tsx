@@ -31,6 +31,7 @@ type MatchDetails = {
   matchDate: string;
   venue: string;
   matchType: string;
+  matchFee?: number | null;
   notes?: string;
   createdBy?: string;
   status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
@@ -57,7 +58,7 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
   const isAdminOrCaptain =
     user?.role === "ADMIN" || user?.role === "CAPTAIN";
 
-  // Load fresh data whenever screen comes into focus
+  // Load latest match details each time screen opens
   useFocusEffect(
     useCallback(() => {
       void loadData();
@@ -91,7 +92,7 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
     await loadData();
   };
 
-  // Build display title for match
+  // Build readable match title
   const getMatchTitle = () => {
     if (!match) return "Match";
 
@@ -104,11 +105,12 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
     }`;
   };
 
+  // Lock availability if match time already passed
   const isAvailabilityLocked =
     match?.matchDate &&
     new Date(match.matchDate).getTime() < new Date().getTime();
 
-  // Count availability statuses
+  // Summary counts
   const availableCount = responses.filter((r) => r.status === "AVAILABLE").length;
   const maybeCount = responses.filter((r) => r.status === "MAYBE").length;
   const notAvailableCount = responses.filter(
@@ -119,8 +121,8 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
-        <Text>Loading match details...</Text>
+        <ActivityIndicator size="large" color="#2b0540" />
+        <Text style={styles.centerText}>Loading match details...</Text>
       </View>
     );
   }
@@ -128,7 +130,7 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
   if (!match) {
     return (
       <View style={styles.center}>
-        <Text>Match not found.</Text>
+        <Text style={styles.centerText}>Match not found.</Text>
       </View>
     );
   }
@@ -141,7 +143,7 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      {/* Match info card */}
+      {/* Match information card */}
       <View style={styles.card}>
         <Text style={styles.title}>{getMatchTitle()}</Text>
 
@@ -150,6 +152,11 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
         ) : null}
 
         <Text style={styles.detail}>Type: {match.matchType}</Text>
+
+        {match.matchFee !== null && match.matchFee !== undefined ? (
+          <Text style={styles.detail}>Match Fee: ${match.matchFee}</Text>
+        ) : null}
+
         <Text style={styles.detail}>Venue: {match.venue}</Text>
         <Text style={styles.detail}>
           Date: {new Date(match.matchDate).toLocaleString()}
@@ -161,74 +168,75 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
         ) : null}
       </View>
 
-      {/* Action card */}
+      {/* User action card */}
       <View style={styles.card}>
-  <View style={styles.myStatusCard}>
-    <Text style={styles.myStatusLabel}>My Availability</Text>
+        <View style={styles.myStatusCard}>
+          <Text style={styles.myStatusLabel}>My Availability</Text>
 
-    <Text
-      style={[
-        styles.myStatusValue,
-        match.myAvailability === "AVAILABLE"
-          ? styles.statusAvailable
-          : match.myAvailability === "NOT_AVAILABLE"
-          ? styles.statusNotAvailable
-          : match.myAvailability === "MAYBE"
-          ? styles.statusMaybe
-          : match.myAvailability === "INJURED"
-          ? styles.statusInjured
-          : styles.statusDefault,
-      ]}
-    >
-    {match.myAvailability === "AVAILABLE" && "AVAILABLE ✅"}
-{match.myAvailability === "NOT_AVAILABLE" && "NOT AVAILABLE ❌"}
-{match.myAvailability === "MAYBE" && "MAYBE 🤔"}
-{match.myAvailability === "INJURED" && "INJURED 🚑"}
-{!match.myAvailability && "Not marked"}
-    </Text>
-  </View>
+          <Text
+            style={[
+              styles.myStatusValue,
+              match.myAvailability === "AVAILABLE"
+                ? styles.statusAvailable
+                : match.myAvailability === "NOT_AVAILABLE"
+                ? styles.statusNotAvailable
+                : match.myAvailability === "MAYBE"
+                ? styles.statusMaybe
+                : match.myAvailability === "INJURED"
+                ? styles.statusInjured
+                : styles.statusDefault,
+            ]}
+          >
+            {match.myAvailability || "Not marked"}
+          </Text>
+        </View>
 
-  {!isAvailabilityLocked ? (
-    <TouchableOpacity
-      style={styles.primaryButton}
-      onPress={() =>
-        navigation.navigate("Availability", {
-          matchId: match.id,
-          opponentName:
-            match.awayTeamName || match.externalOpponentName || "Opponent",
-          venue: match.venue,
-          matchDate: match.matchDate,
-          matchType: match.matchType,
-        })
-      }
-    >
-      <Text style={styles.primaryButtonText}>Mark My Availability</Text>
-    </TouchableOpacity>
-  ) : (
-    <View style={styles.lockedBtn}>
-      <Text style={styles.lockedBtnText}>Availability Locked</Text>
-    </View>
-  )}
+        {!isAvailabilityLocked ? (
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() =>
+              navigation.navigate("Availability", {
+                matchId: match.id,
+                opponentName:
+                  match.awayTeamName || match.externalOpponentName || "Opponent",
+                venue: match.venue,
+                matchDate: match.matchDate,
+                matchType: match.matchType,
+              })
+            }
+          >
+            <Text style={styles.primaryButtonText}>
+              {match.myAvailability
+                ? "Update My Availability"
+                : "Mark My Availability"}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.lockedBtn}>
+            <Text style={styles.lockedBtnText}>Availability Locked</Text>
+          </View>
+        )}
 
-  {isAdminOrCaptain && (
-    <TouchableOpacity
-      style={styles.primaryButton}
-      onPress={() =>
-        navigation.navigate("SquadSelection", {
-          matchId: match.id,
-          opponentName:
-            match.awayTeamName || match.externalOpponentName || "Opponent",
-          teamName: match.homeTeamName || "No team assigned",
-          matchDate: match.matchDate,
-          venue: match.venue,
-          matchType: match.matchType,
-        })
-      }
-    >
-      <Text style={styles.primaryButtonText}>Open Squad Selection</Text>
-    </TouchableOpacity>
-  )}
-</View>
+        {isAdminOrCaptain && (
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() =>
+              navigation.navigate("SquadSelection", {
+                matchId: match.id,
+                opponentName:
+                  match.awayTeamName || match.externalOpponentName || "Opponent",
+                teamName: match.homeTeamName || "No team assigned",
+                matchDate: match.matchDate,
+                venue: match.venue,
+                matchType: match.matchType,
+                matchFee: match.matchFee,
+              })
+            }
+          >
+            <Text style={styles.secondaryButtonText}>Open Squad Selection</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Availability summary */}
       <Text style={styles.sectionTitle}>Availability Summary</Text>
@@ -259,12 +267,12 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
         Total Responses: {responses.length}
       </Text>
 
-      {/* Availability list */}
+      {/* Response list */}
       <Text style={styles.sectionTitle}>Player Responses</Text>
 
       {responses.length === 0 ? (
         <View style={styles.card}>
-          <Text>No responses yet.</Text>
+          <Text style={styles.noDataText}>No responses yet.</Text>
         </View>
       ) : (
         responses.map((item) => (
@@ -286,47 +294,65 @@ export default MatchDetailsScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#f8f5fb",
   },
   content: {
     padding: 16,
   },
   card: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#fff",
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#e8def1",
   },
   title: {
     fontSize: 24,
     fontWeight: "700",
     marginBottom: 10,
+    color: "#2b0540",
   },
   detail: {
     fontSize: 16,
     marginBottom: 6,
+    color: "#2b0540",
   },
   sectionTitle: {
     fontSize: 22,
     fontWeight: "700",
     marginBottom: 12,
     marginTop: 8,
+    color: "#2b0540",
   },
   primaryButton: {
-    backgroundColor: "#111",
+    backgroundColor: "#da9306",
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 12,
   },
   primaryButtonText: {
+    color: "#2b0540",
+    textAlign: "center",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  secondaryButton: {
+    backgroundColor: "#2b0540",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  secondaryButtonText: {
     color: "#fff",
     textAlign: "center",
     fontWeight: "700",
+    fontSize: 15,
   },
   lockedBtn: {
-    backgroundColor: "#777",
+    backgroundColor: "#8f8f8f",
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 12,
   },
   lockedBtnText: {
@@ -334,10 +360,38 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
   },
-  currentStatusText: {
-    fontSize: 16,
+  myStatusCard: {
+    backgroundColor: "#faf7fd",
+    borderWidth: 1,
+    borderColor: "#eadff3",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  myStatusLabel: {
+    fontSize: 13,
+    color: "#6b7280",
+    marginBottom: 6,
     fontWeight: "600",
-    color: "#b91c1c",
+  },
+  myStatusValue: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  statusAvailable: {
+    color: "#16a34a",
+  },
+  statusNotAvailable: {
+    color: "#dc2626",
+  },
+  statusMaybe: {
+    color: "#d97706",
+  },
+  statusInjured: {
+    color: "#7c3aed",
+  },
+  statusDefault: {
+    color: "#2b0540",
   },
   summaryGrid: {
     flexDirection: "row",
@@ -348,96 +402,72 @@ const styles = StyleSheet.create({
   summaryBox: {
     width: "48%",
     padding: 18,
-    borderRadius: 14,
+    borderRadius: 16,
     marginBottom: 12,
     alignItems: "center",
   },
   availableBox: {
-    backgroundColor: "#d9fbe3",
+    backgroundColor: "#dcfce7",
   },
   maybeBox: {
-    backgroundColor: "#fff4cc",
+    backgroundColor: "#fef3c7",
   },
   notAvailableBox: {
-    backgroundColor: "#ffdada",
+    backgroundColor: "#fee2e2",
   },
   injuredBox: {
-    backgroundColor: "#ece2ff",
+    backgroundColor: "#ede9fe",
   },
   summaryCount: {
     fontSize: 28,
     fontWeight: "700",
     marginBottom: 6,
+    color: "#2b0540",
   },
   summaryLabel: {
     fontSize: 16,
     fontWeight: "600",
+    color: "#2b0540",
   },
   totalResponses: {
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 14,
+    color: "#2b0540",
   },
   responseCard: {
-    backgroundColor: "#f7f7f7",
+    backgroundColor: "#fff",
     padding: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#e8def1",
   },
   responseName: {
     fontWeight: "700",
     fontSize: 16,
     marginBottom: 4,
+    color: "#2b0540",
   },
   responseStatus: {
     marginBottom: 4,
+    color: "#2b0540",
   },
   responseMessage: {
     color: "#444",
+  },
+  noDataText: {
+    color: "#2b0540",
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f8f5fb",
   },
-  myStatusCard: {
-  backgroundColor: "#fff",
-  borderWidth: 1,
-  borderColor: "#e5e7eb",
-  padding: 12,
-  borderRadius: 10,
-  marginBottom: 12,
-},
-
-myStatusLabel: {
-  fontSize: 13,
-  color: "#6b7280",
-  marginBottom: 6,
-  fontWeight: "600",
-},
-
-myStatusValue: {
-  fontSize: 18,
-  fontWeight: "700",
-},
-
-statusAvailable: {
-  color: "#16a34a",
-},
-
-statusNotAvailable: {
-  color: "#dc2626",
-},
-
-statusMaybe: {
-  color: "#d97706",
-},
-
-statusInjured: {
-  color: "#7c3aed",
-},
-
-statusDefault: {
-  color: "#111827",
-},
+  centerText: {
+    color: "#2b0540",
+    fontWeight: "600",
+    marginTop: 8,
+  },
 });
