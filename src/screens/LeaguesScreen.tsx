@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -8,113 +9,177 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
-import { getLeagues } from "../services/leagueService";
+import {
+  deleteLeague,
+  getLeagues,
+  League,
+} from "../services/leagueService";
 
 type Props = {
   navigation: any;
 };
 
-// League shape from backend
-type League = {
-  id: number;
-  name: string;
-  season: string;
-  type: "LEAGUE" | "TOURNAMENT" | "FRIENDLY_SERIES";
-  description?: string;
-  startDate?: string;
-  endDate?: string;
-  active: boolean;
-};
-
 const LeaguesScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
 
-  // Store leagues
+  // League list data
   const [leagues, setLeagues] = useState<League[]>([]);
 
-  // Loading flags
+  // Loading states
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Only admin/captain can create leagues
+  // Admin/Captain can manage leagues
   const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
 
-  // Load leagues from backend
+  /**
+   * Load leagues from backend
+   */
   const loadLeagues = async () => {
     try {
       const data = await getLeagues();
       setLeagues(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.log("LEAGUES LOAD ERROR:", error);
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to load leagues"
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    void loadLeagues();
-  }, []);
+  /**
+   * Auto-refresh every time screen becomes active
+   * This fixes stale data after create/edit/delete
+   */
+  useFocusEffect(
+    useCallback(() => {
+      void loadLeagues();
+    }, [])
+  );
 
-  // Pull to refresh
+  /**
+   * Pull-to-refresh
+   */
   const onRefresh = async () => {
     setRefreshing(true);
     await loadLeagues();
   };
 
-  // One league card
+  /**
+   * Delete league with confirmation
+   */
+  const handleDeleteLeague = (leagueId: number, leagueName: string) => {
+    Alert.alert(
+      "Delete League",
+      `Are you sure you want to delete "${leagueName}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await deleteLeague(leagueId);
+
+              Alert.alert(
+                "Success",
+                typeof response === "string"
+                  ? response
+                  : "League deleted successfully"
+              );
+
+              await loadLeagues();
+            } catch (error: any) {
+              Alert.alert(
+                "Error",
+                error?.response?.data?.message || "Failed to delete league"
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /**
+   * Render one league card
+   */
   const renderItem = ({ item }: { item: League }) => (
     <TouchableOpacity
       style={styles.card}
-      onPress={() =>
-        navigation.navigate("LeagueDetails", {
-          leagueId: item.id,
-        })
-      }
+      onPress={() => navigation.navigate("LeagueDetails", { leagueId: item.id })}
     >
-      <View style={styles.cardTop}>
-        <Text style={styles.title}>{item.name}</Text>
+      <View style={styles.cardHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardTitle}>🏆 {item.name}</Text>
+          <Text style={styles.cardSeason}>Season: {item.season}</Text>
+        </View>
 
-        <Text
+        <View
           style={[
             styles.statusBadge,
             item.active ? styles.activeBadge : styles.inactiveBadge,
           ]}
         >
-          {item.active ? "ACTIVE" : "INACTIVE"}
-        </Text>
+          <Text
+            style={[
+              styles.statusBadgeText,
+              item.active ? styles.activeBadgeText : styles.inactiveBadgeText,
+            ]}
+          >
+            {item.active ? "ACTIVE" : "INACTIVE"}
+          </Text>
+        </View>
       </View>
 
-      <Text style={styles.meta}>Season: {item.season}</Text>
-      <Text style={styles.meta}>Type: {item.type}</Text>
+      {item.type ? <Text style={styles.cardText}>Type: {item.type}</Text> : null}
 
       {item.description ? (
-        <Text style={styles.description} numberOfLines={2}>
+        <Text style={styles.cardText} numberOfLines={2}>
           {item.description}
         </Text>
       ) : null}
 
-      {item.startDate ? (
-        <Text style={styles.meta}>
-          Start: {new Date(item.startDate).toLocaleDateString()}
+      {(item.startDate || item.endDate) && (
+        <Text style={styles.cardDate}>
+          📅 {item.startDate ? item.startDate : "N/A"} →{" "}
+          {item.endDate ? item.endDate : "N/A"}
         </Text>
-      ) : null}
+      )}
 
-      {item.endDate ? (
-        <Text style={styles.meta}>
-          End: {new Date(item.endDate).toLocaleDateString()}
-        </Text>
-      ) : null}
+      {canManage && (
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() => navigation.navigate("EditLeague", { leagueId: item.id })}
+          >
+            <Ionicons name="create-outline" size={16} color="#fff" />
+            <Text style={styles.actionText}>Edit</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.deleteBtn]}
+            onPress={() => handleDeleteLeague(item.id, item.name)}
+          >
+            <Ionicons name="trash-outline" size={16} color="#fff" />
+            <Text style={styles.actionText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
-  // Loading UI
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.centerText}>Loading leagues...</Text>
+        <ActivityIndicator size="large" color="#da9306" />
+        <Text style={styles.loadingText}>Loading leagues...</Text>
       </View>
     );
   }
@@ -134,12 +199,13 @@ const LeaguesScreen = ({ navigation }: Props) => {
             style={styles.createBtn}
             onPress={() => navigation.navigate("CreateLeague")}
           >
-            <Text style={styles.createBtnText}>+ Create League</Text>
+            <Ionicons name="add-circle-outline" size={18} color="#2b0540" />
+            <Text style={styles.createBtnText}>Create League</Text>
           </TouchableOpacity>
         ) : null
       }
       ListEmptyComponent={
-        <Text style={styles.centerText}>No leagues found.</Text>
+        <Text style={styles.emptyText}>No leagues found.</Text>
       }
     />
   );
@@ -150,72 +216,115 @@ export default LeaguesScreen;
 const styles = StyleSheet.create({
   list: {
     padding: 16,
-    backgroundColor: "#4B1D6B",
+    backgroundColor: "#2b0540",
   },
-  card: {
-    backgroundColor: "#5A257A",
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
+  center: {
+    flex: 1,
+    backgroundColor: "#2b0540",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
-  cardTop: {
+  loadingText: {
+    marginTop: 10,
+    color: "#fff",
+  },
+  emptyText: {
+    color: "#fff",
+    fontSize: 16,
+  },
+  createBtn: {
+    backgroundColor: "#da9306",
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 16,
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
+    justifyContent: "center",
+    alignItems: "center",
     gap: 8,
   },
-  title: {
-    color: "#fff",
-    fontSize: 18,
+  createBtnText: {
+    color: "#2b0540",
     fontWeight: "700",
-    flex: 1,
+    fontSize: 16,
   },
-  meta: {
-    color: "#ddd",
+  card: {
+    backgroundColor: "#3a0a57",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#4d1670",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 10,
+  },
+  cardTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
     marginBottom: 4,
   },
-  description: {
+  cardSeason: {
+    color: "#da9306",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  cardText: {
     color: "#ddd",
-    marginTop: 4,
     marginBottom: 6,
     lineHeight: 20,
+  },
+  cardDate: {
+    color: "#ddd",
+    marginTop: 4,
+    fontWeight: "600",
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
-    overflow: "hidden",
+  },
+  activeBadge: {
+    backgroundColor: "#dcfce7",
+  },
+  inactiveBadge: {
+    backgroundColor: "#fee2e2",
+  },
+  statusBadgeText: {
     fontSize: 11,
     fontWeight: "700",
   },
-  activeBadge: {
-    backgroundColor: "#22c55e",
-    color: "#fff",
+  activeBadgeText: {
+    color: "#166534",
   },
-  inactiveBadge: {
-    backgroundColor: "#6b7280",
-    color: "#fff",
+  inactiveBadgeText: {
+    color: "#991b1b",
   },
-  createBtn: {
-    backgroundColor: "#F4B400",
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginBottom: 14,
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
   },
-  createBtnText: {
-    textAlign: "center",
-    color: "#000",
-    fontWeight: "700",
-  },
-  center: {
+  actionBtn: {
     flex: 1,
-    backgroundColor: "#4B1D6B",
+    borderRadius: 10,
+    paddingVertical: 10,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+    gap: 6,
   },
-  centerText: {
+  editBtn: {
+    backgroundColor: "#da9306",
+  },
+  deleteBtn: {
+    backgroundColor: "#b91c1c",
+  },
+  actionText: {
     color: "#fff",
+    fontWeight: "700",
   },
 });

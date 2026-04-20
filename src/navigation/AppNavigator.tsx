@@ -28,6 +28,7 @@ import EventDetailsScreen from "../screens/EventDetailsScreen";
 import LeaguesScreen from "../screens/LeaguesScreen";
 import CreateLeagueScreen from "../screens/CreateLeagueScreen";
 import LeagueDetailsScreen from "../screens/LeagueDetailsScreen";
+import EditLeagueScreen from "../screens/EditLeagueScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -76,6 +77,7 @@ const AppNavigator = () => {
 <Stack.Screen name="LeagueDetails" component={LeagueDetailsScreen} />
 <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
 <Stack.Screen name="EventDetails" component={EventDetailsScreen} />
+<Stack.Screen name="EditLeague" component={EditLeagueScreen} />
           <Stack.Screen
             name="Splash"
             component={SplashScreen}

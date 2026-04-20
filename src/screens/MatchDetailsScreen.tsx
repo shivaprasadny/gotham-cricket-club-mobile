@@ -26,6 +26,7 @@ type MatchDetails = {
   awayTeamId?: number | null;
   awayTeamName?: string | null;
   externalOpponentName?: string | null;
+  matchFormat?: string;
   leagueId?: number | null;
   leagueName?: string | null;
   matchDate: string;
@@ -156,7 +157,7 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
         {match.matchFee !== null && match.matchFee !== undefined ? (
           <Text style={styles.detail}>Match Fee: ${match.matchFee}</Text>
         ) : null}
-
+<Text style={styles.detail}>Format: {match.matchFormat || "N/A"}</Text>
         <Text style={styles.detail}>Venue: {match.venue}</Text>
         <Text style={styles.detail}>
           Date: {new Date(match.matchDate).toLocaleString()}

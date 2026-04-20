@@ -26,11 +26,20 @@ export const registerUser = async (
 };
 
 /**
- * Ask backend to send reset code
+ * Response returned when reset code is requested
+ * For now resetCode is returned for testing only
+ */
+export type ForgotPasswordCodeResponse = {
+  message: string;
+  resetCode: string;
+};
+
+/**
+ * Ask backend to generate reset code
  */
 export const requestPasswordResetCode = async (
   email: string
-): Promise<string> => {
+): Promise<ForgotPasswordCodeResponse> => {
   const response = await api.post("/auth/forgot-password", { email });
   return response.data;
 };

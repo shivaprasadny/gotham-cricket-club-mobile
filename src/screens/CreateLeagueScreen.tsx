@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -10,38 +11,60 @@ import {
   View,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Platform } from "react-native";
 import { createLeague } from "../services/leagueService";
 
 type Props = {
   navigation: any;
 };
 
-type LeagueType = "LEAGUE" | "TOURNAMENT" | "FRIENDLY_SERIES";
+/**
+ * Match backend LeagueType enum exactly
+ */
+type LeagueType = "LEAGUE" | "TOURNAMENT" | "FRIENDLY";
+
+/**
+ * Fixed league type options used in UI
+ */
+const LEAGUE_TYPES: LeagueType[] = ["LEAGUE", "TOURNAMENT", "FRIENDLY"];
 
 const CreateLeagueScreen = ({ navigation }: Props) => {
   // Form fields
   const [name, setName] = useState("");
   const [season, setSeason] = useState("");
-  const [description, setDescription] = useState("");
   const [type, setType] = useState<LeagueType>("LEAGUE");
+  const [description, setDescription] = useState("");
   const [active, setActive] = useState(true);
 
-  // Dates
+  // Start / end date states
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
 
-  // Picker controls
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  // Date picker control
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
-  // Submit state
+  // Submit loading state
   const [submitting, setSubmitting] = useState(false);
 
-  // Submit new league
+  /**
+   * Format date nicely for UI display
+   */
+  const formatDate = (date: Date | null) => {
+    if (!date) return "Select date";
+    return date.toLocaleString();
+  };
+
+  /**
+   * Create new league
+   */
   const handleCreateLeague = async () => {
-    if (!name.trim() || !season.trim()) {
-      Alert.alert("Error", "Please enter league name and season");
+    if (!name.trim()) {
+      Alert.alert("Error", "Please enter league name");
+      return;
+    }
+
+    if (!season.trim()) {
+      Alert.alert("Error", "Please enter season");
       return;
     }
 
@@ -52,22 +75,33 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
         name: name.trim(),
         season: season.trim(),
         type,
-        description: description.trim() || undefined,
-        startDate: startDate ? startDate.toISOString() : undefined,
-        endDate: endDate ? endDate.toISOString() : undefined,
+        description: description.trim(),
+        startDate: startDate ? startDate.toISOString() : null,
+        endDate: endDate ? endDate.toISOString() : null,
         active,
       });
 
       Alert.alert(
         "Success",
-        typeof response === "string" ? response : "League created successfully"
+        typeof response === "string"
+          ? response
+          : "League created successfully",
+        [
+          {
+            text: "OK",
+            onPress: () => navigation.goBack(),
+          },
+        ]
       );
-
-      navigation.goBack();
     } catch (error: any) {
+      console.log("CREATE LEAGUE ERROR:", error?.response?.data || error);
+
       Alert.alert(
         "Error",
-        error?.response?.data?.message || "Failed to create league"
+        error?.response?.data?.message ||
+          error?.response?.data ||
+          error?.message ||
+          "Failed to create league"
       );
     } finally {
       setSubmitting(false);
@@ -76,54 +110,59 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {/* Screen title */}
       <Text style={styles.title}>Create League</Text>
 
       {/* League name */}
+      <Text style={styles.label}>League Name</Text>
       <TextInput
         style={styles.input}
-        placeholder="League Name"
+        placeholder="Enter league name"
+        placeholderTextColor="#7a7a7a"
         value={name}
         onChangeText={setName}
       />
 
       {/* Season */}
+      <Text style={styles.label}>Season</Text>
       <TextInput
         style={styles.input}
-        placeholder="Season (example: 2026)"
+        placeholder="Enter season (example: 2026)"
+        placeholderTextColor="#7a7a7a"
         value={season}
         onChangeText={setSeason}
       />
 
-      {/* League type selector */}
-      <Text style={styles.label}>League Type</Text>
+      {/* Type selection */}
+      <Text style={styles.label}>Type</Text>
       <View style={styles.typeRow}>
-        {(["LEAGUE", "TOURNAMENT", "FRIENDLY_SERIES"] as LeagueType[]).map(
-          (item) => (
-            <TouchableOpacity
-              key={item}
+        {LEAGUE_TYPES.map((item) => (
+          <TouchableOpacity
+            key={item}
+            style={[
+              styles.typeBtn,
+              type === item && styles.typeBtnSelected,
+            ]}
+            onPress={() => setType(item)}
+          >
+            <Text
               style={[
-                styles.typeBtn,
-                type === item && styles.typeBtnSelected,
+                styles.typeBtnText,
+                type === item && styles.typeBtnTextSelected,
               ]}
-              onPress={() => setType(item)}
             >
-              <Text
-                style={[
-                  styles.typeBtnText,
-                  type === item && styles.typeBtnTextSelected,
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          )
-        )}
+              {item}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Description */}
+      <Text style={styles.label}>Description</Text>
       <TextInput
         style={[styles.input, styles.textArea]}
-        placeholder="Description (optional)"
+        placeholder="Enter description (optional)"
+        placeholderTextColor="#7a7a7a"
         value={description}
         onChangeText={setDescription}
         multiline
@@ -133,22 +172,18 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
       <Text style={styles.label}>Start Date</Text>
       <TouchableOpacity
         style={styles.input}
-        onPress={() => setShowStartPicker(true)}
+        onPress={() => setShowStartDatePicker(true)}
       >
-        <Text>
-          {startDate
-            ? startDate.toLocaleString()
-            : "Select league start date"}
-        </Text>
+        <Text style={styles.inputText}>{formatDate(startDate)}</Text>
       </TouchableOpacity>
 
-      {showStartPicker && (
+      {showStartDatePicker && (
         <DateTimePicker
           value={startDate || new Date()}
           mode="datetime"
           display={Platform.OS === "ios" ? "inline" : "default"}
           onChange={(event, selectedDate) => {
-            setShowStartPicker(false);
+            setShowStartDatePicker(false);
             if (selectedDate) {
               setStartDate(selectedDate);
             }
@@ -160,22 +195,18 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
       <Text style={styles.label}>End Date</Text>
       <TouchableOpacity
         style={styles.input}
-        onPress={() => setShowEndPicker(true)}
+        onPress={() => setShowEndDatePicker(true)}
       >
-        <Text>
-          {endDate
-            ? endDate.toLocaleString()
-            : "Select league end date"}
-        </Text>
+        <Text style={styles.inputText}>{formatDate(endDate)}</Text>
       </TouchableOpacity>
 
-      {showEndPicker && (
+      {showEndDatePicker && (
         <DateTimePicker
           value={endDate || new Date()}
           mode="datetime"
           display={Platform.OS === "ios" ? "inline" : "default"}
           onChange={(event, selectedDate) => {
-            setShowEndPicker(false);
+            setShowEndDatePicker(false);
             if (selectedDate) {
               setEndDate(selectedDate);
             }
@@ -183,9 +214,12 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
         />
       )}
 
-      {/* Active toggle */}
+      {/* Active switch */}
+      <Text style={styles.label}>Active</Text>
       <View style={styles.switchRow}>
-        <Text style={styles.label}>Active League</Text>
+        <Text style={styles.switchText}>
+          {active ? "League is active" : "League is inactive"}
+        </Text>
         <Switch value={active} onValueChange={setActive} />
       </View>
 
@@ -207,70 +241,91 @@ export default CreateLeagueScreen;
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    backgroundColor: "#fff",
     flexGrow: 1,
+    backgroundColor: "#f8f5fb",
+    padding: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "700",
-    marginBottom: 24,
     textAlign: "center",
+    color: "#2b0540",
+    marginBottom: 24,
   },
   label: {
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2b0540",
     marginBottom: 8,
+    marginTop: 10,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 12,
-    marginBottom: 12,
-    borderRadius: 8,
     backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#d9d2e1",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    marginBottom: 6,
+  },
+  inputText: {
+    color: "#111",
   },
   textArea: {
-    minHeight: 100,
+    minHeight: 110,
     textAlignVertical: "top",
   },
   typeRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   typeBtn: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#d9d2e1",
+    backgroundColor: "#fff",
+    borderRadius: 20,
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    paddingHorizontal: 14,
   },
   typeBtnSelected: {
-    backgroundColor: "#111",
-    borderColor: "#111",
+    backgroundColor: "#2b0540",
+    borderColor: "#2b0540",
   },
   typeBtnText: {
+    color: "#2b0540",
     fontWeight: "600",
   },
   typeBtnTextSelected: {
     color: "#fff",
   },
   switchRow: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#d9d2e1",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginVertical: 12,
+  },
+  switchText: {
+    color: "#2b0540",
+    fontWeight: "600",
   },
   submitBtn: {
-    backgroundColor: "#111",
-    paddingVertical: 14,
-    borderRadius: 10,
+    backgroundColor: "#da9306",
+    paddingVertical: 16,
+    borderRadius: 14,
     marginTop: 10,
   },
   submitBtnText: {
-    color: "#fff",
     textAlign: "center",
+    color: "#2b0540",
     fontWeight: "700",
+    fontSize: 16,
   },
 });

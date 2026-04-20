@@ -21,6 +21,7 @@ export const createMatch = async (payload: {
   matchDate: string;
   venue: string;
   matchType: string;
+  matchFormat: string;
   matchFee: number | null;
   notes: string;
   status: "UPCOMING" | "COMPLETED" | "CANCELLED";
@@ -40,6 +41,7 @@ export const updateMatch = async (
     matchDate: string;
     venue: string;
     matchType: string;
+    matchFormat: string;
     matchFee: number | null;
     notes: string;
     status: "UPCOMING" | "COMPLETED" | "CANCELLED";

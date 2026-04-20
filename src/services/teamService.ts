@@ -52,3 +52,7 @@ export const removeMemberFromTeam = async (teamId: number, userId: number) => {
   const response = await api.delete(`/teams/${teamId}/members/${userId}`);
   return response.data;
 };
+export const getAvailableMembers = async (teamId: number) => {
+  const response = await api.get(`/teams/${teamId}/available-members`);
+  return response.data;
+};

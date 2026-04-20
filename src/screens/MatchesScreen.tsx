@@ -29,6 +29,7 @@ type Match = {
   venue: string;
   matchType: string;
   matchFee?: number | null;
+  matchFormat?: string;
   notes?: string;
   createdBy?: string;
   status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
@@ -186,6 +187,7 @@ const MatchesScreen = ({ navigation }: Props) => {
           <Text style={styles.detail}>
             Date: {new Date(item.matchDate).toLocaleString()}
           </Text>
+          <Text style={styles.detail}>Format: {item.matchFormat || "N/A"}</Text>
           <Text style={styles.detail}>Status: {item.status || "UPCOMING"}</Text>
         </TouchableOpacity>
 

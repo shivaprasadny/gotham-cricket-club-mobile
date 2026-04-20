@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -9,12 +10,14 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { getMatches } from "../services/matchService";
 import {
   getAnnouncements,
   getPinnedAnnouncement,
 } from "../services/announcementService";
+import { getPendingMembers } from "../services/adminService";
 
 type Props = {
   navigation: any;
@@ -23,15 +26,29 @@ type Props = {
 // Match shape used on home screen
 type Match = {
   id: number;
-  opponentName: string;
+  homeTeamId?: number | null;
+  homeTeamName?: string | null;
+  awayTeamId?: number | null;
+  awayTeamName?: string | null;
+  externalOpponentName?: string | null;
+  leagueId?: number | null;
+  leagueName?: string | null;
   venue: string;
   matchDate: string;
   matchType: string;
+  matchFee?: number | null;
   status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
-  teamId?: number | null;
-  teamName?: string | null;
   myAvailability?: "AVAILABLE" | "NOT_AVAILABLE" | "MAYBE" | "INJURED";
 };
+
+type PendingMember = {
+  id: number;
+  fullName: string;
+  email: string;
+  role: "ADMIN" | "CAPTAIN" | "PLAYER";
+  status: "PENDING" | "APPROVED" | "REJECTED" | "INACTIVE";
+};
+
 
 // Announcement shape used on home screen
 type Announcement = {
@@ -67,22 +84,124 @@ const HomeScreen = ({ navigation }: Props) => {
   const [pinnedAnnouncement, setPinnedAnnouncement] =
     useState<Announcement | null>(null);
 
+  // Screen loading and pull-to-refresh state
+  const [loadingHome, setLoadingHome] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Pending members preview for admin home screen
+const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
+
   const isAdmin = user?.role === "ADMIN";
   const isCaptain = user?.role === "CAPTAIN";
   const canManage = isAdmin || isCaptain;
 
-  useEffect(() => {
-    void loadHomeData();
-  }, []);
+  /**
+   * Builds readable match title for both:
+   * 1. club vs outside opponent
+   * 2. club vs club
+   */
+  const getMatchTitle = (match: Match) => {
+    if (match.awayTeamName) {
+      return `${match.homeTeamName || "Team"} vs ${match.awayTeamName}`;
+    }
 
-  // Load matches, announcements, and pinned announcement together
+    return `${match.homeTeamName || "Team"} vs ${
+      match.externalOpponentName || "Opponent"
+    }`;
+  };
+
+  /**
+   * Returns opponent name only
+   * This is useful for Availability screen params
+   */
+  const getOpponentName = (match: Match) => {
+    return match.awayTeamName || match.externalOpponentName || "Opponent";
+  };
+
+  /**
+   * Load matches, announcements, and pinned announcement together.
+   * Uses Promise.allSettled so one failing API does not break the whole home screen.
+   */
   const loadHomeData = async () => {
     try {
-      const [matchesData, announcementData, pinnedData] = await Promise.all([
+      const results = await Promise.allSettled([
         getMatches(),
         getAnnouncements(),
         getPinnedAnnouncement(),
       ]);
+
+
+
+/**
+ * Load matches, announcements, pinned announcement,
+ * and pending members for admin.
+ */
+const loadHomeData = async () => {
+  try {
+    const requests: Promise<any>[] = [
+      getMatches(),
+      getAnnouncements(),
+      getPinnedAnnouncement(),
+    ];
+
+    // Only admin needs pending members
+    if (isAdmin) {
+      requests.push(getPendingMembers());
+    }
+
+    const results = await Promise.allSettled(requests);
+
+    const matchesData =
+      results[0].status === "fulfilled" ? results[0].value : [];
+
+    const announcementData =
+      results[1].status === "fulfilled" ? results[1].value : [];
+
+    const pinnedData =
+      results[2].status === "fulfilled" ? results[2].value : null;
+
+    const pendingData =
+      isAdmin && results[3] && results[3].status === "fulfilled"
+        ? results[3].value
+        : [];
+
+    // Keep only upcoming matches
+    const upcoming = Array.isArray(matchesData)
+      ? matchesData
+          .filter((m) => (m.status || "UPCOMING") === "UPCOMING")
+          .sort(
+            (a, b) =>
+              new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
+          )
+          .slice(0, 3)
+      : [];
+
+    // Show only latest few announcements
+    const latestAnnouncements = Array.isArray(announcementData)
+      ? announcementData.slice(0, 3)
+      : [];
+
+    setUpcomingMatches(upcoming);
+    setAnnouncements(latestAnnouncements);
+    setPinnedAnnouncement(pinnedData || null);
+    setPendingMembers(Array.isArray(pendingData) ? pendingData : []);
+  } catch (error) {
+    console.log("HOME LOAD ERROR:", error);
+  } finally {
+    setLoadingHome(false);
+    setRefreshing(false);
+  }
+};
+
+
+      const matchesData =
+        results[0].status === "fulfilled" ? results[0].value : [];
+
+      const announcementData =
+        results[1].status === "fulfilled" ? results[1].value : [];
+
+      const pinnedData =
+        results[2].status === "fulfilled" ? results[2].value : null;
 
       // Keep only upcoming matches
       const upcoming = Array.isArray(matchesData)
@@ -105,7 +224,28 @@ const HomeScreen = ({ navigation }: Props) => {
       setPinnedAnnouncement(pinnedData || null);
     } catch (error) {
       console.log("HOME LOAD ERROR:", error);
+    } finally {
+      setLoadingHome(false);
+      setRefreshing(false);
     }
+  };
+
+  /**
+   * Refresh home every time the screen becomes active again.
+   * This fixes the issue where user had to restart app after updates.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      void loadHomeData();
+    }, [])
+  );
+
+  /**
+   * Pull-to-refresh handler
+   */
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadHomeData();
   };
 
   // Pick a rotating quote based on current user id
@@ -120,27 +260,26 @@ const HomeScreen = ({ navigation }: Props) => {
     return upcomingMatches[0];
   }, [upcomingMatches]);
 
-
   // True when next match exists and current user has not marked availability yet
-const needsAvailabilityReminder = useMemo(() => {
-  return !!nextMatch && !nextMatch.myAvailability;
-}, [nextMatch]);
+  const needsAvailabilityReminder = useMemo(() => {
+    return !!nextMatch && !nextMatch.myAvailability;
+  }, [nextMatch]);
 
-// Return style for availability text color
-const getAvailabilityColor = (status?: string) => {
-  switch (status) {
-    case "AVAILABLE":
-      return { color: "#22c55e" };
-    case "NOT_AVAILABLE":
-      return { color: "#ef4444" };
-    case "MAYBE":
-      return { color: "#facc15" };
-    case "INJURED":
-      return { color: "#9ca3af" };
-    default:
-      return { color: "#fff" };
-  }
-};
+  // Return style for availability text color
+  const getAvailabilityColor = (status?: string) => {
+    switch (status) {
+      case "AVAILABLE":
+        return { color: "#22c55e" };
+      case "NOT_AVAILABLE":
+        return { color: "#ef4444" };
+      case "MAYBE":
+        return { color: "#facc15" };
+      case "INJURED":
+        return { color: "#9ca3af" };
+      default:
+        return { color: "#fff" };
+    }
+  };
 
   // Build countdown text for next match
   const getCountdownText = (matchDate: string) => {
@@ -182,7 +321,13 @@ const getAvailabilityColor = (status?: string) => {
 
   return (
     <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Top header area */}
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
@@ -196,10 +341,9 @@ const getAvailabilityColor = (status?: string) => {
             style={styles.menuBtn}
             onPress={() => setMenuVisible(true)}
           >
-            <Ionicons name="menu" size={26} color="#F4B400" />
+            <Ionicons name="menu" size={26} color="#da9306" />
           </TouchableOpacity>
         </View>
-
 
         {/* Main hero card */}
         <View style={styles.heroCard}>
@@ -208,10 +352,49 @@ const getAvailabilityColor = (status?: string) => {
           <Text style={styles.heroQuote}>{quote}</Text>
         </View>
 
+
+
+        {/* Pending approvals section for admin */}
+{isAdmin && (
+  <>
+    <Text style={styles.sectionTitle}>Pending Approvals</Text>
+
+    {pendingMembers.length === 0 ? (
+      <View style={styles.infoCard}>
+        <Text style={styles.infoText}>No pending member approvals.</Text>
+      </View>
+    ) : (
+      <TouchableOpacity
+        style={styles.pendingCard}
+        onPress={() => navigation.navigate("AdminApproval")}
+      >
+        <Text style={styles.pendingTitle}>
+          {pendingMembers.length} member(s) waiting for approval
+        </Text>
+
+        {pendingMembers.slice(0, 3).map((member) => (
+          <View key={member.id} style={styles.pendingMemberRow}>
+            <Text style={styles.pendingMemberName}>{member.fullName}</Text>
+            <Text style={styles.pendingMemberEmail}>{member.email}</Text>
+          </View>
+        ))}
+
+        <View style={styles.pendingBtn}>
+          <Text style={styles.pendingBtnText}>Review Approvals</Text>
+        </View>
+      </TouchableOpacity>
+    )}
+  </>
+)}
+
         {/* Next Match section */}
         <Text style={styles.sectionTitle}>Next Match</Text>
 
-        {!nextMatch ? (
+        {loadingHome ? (
+          <View style={styles.infoCard}>
+            <Text style={styles.infoText}>Loading home screen...</Text>
+          </View>
+        ) : !nextMatch ? (
           <View style={styles.infoCard}>
             <Text style={styles.infoText}>No upcoming matches right now.</Text>
           </View>
@@ -221,33 +404,36 @@ const getAvailabilityColor = (status?: string) => {
             onPress={() =>
               navigation.navigate("MatchDetails", {
                 matchId: nextMatch.id,
-                opponentName: nextMatch.opponentName,
-                venue: nextMatch.venue,
-                matchDate: nextMatch.matchDate,
-                matchType: nextMatch.matchType,
-                status: nextMatch.status,
-                teamId: nextMatch.teamId,
-                teamName: nextMatch.teamName,
               })
             }
           >
-            <Text style={styles.nextMatchTitle}>vs {nextMatch.opponentName}</Text>
+            <Text style={styles.nextMatchTitle}>{getMatchTitle(nextMatch)}</Text>
 
             <Text style={styles.countdownText}>
               ⏳ {getCountdownText(nextMatch.matchDate)}
             </Text>
+
+            {nextMatch.leagueName ? (
+              <Text style={styles.nextMatchDetail}>
+                🏆 {nextMatch.leagueName}
+              </Text>
+            ) : null}
 
             <Text style={styles.nextMatchDetail}>📍 {nextMatch.venue}</Text>
             <Text style={styles.nextMatchDetail}>
               🗓 {new Date(nextMatch.matchDate).toLocaleString()}
             </Text>
             <Text style={styles.nextMatchDetail}>🏏 {nextMatch.matchType}</Text>
+
             <Text style={styles.nextMatchDetail}>
-              👥 {nextMatch.teamName || "No team assigned"}
+              👥 {nextMatch.homeTeamName || "No team assigned"}
             </Text>
 
-
-
+            {nextMatch.matchFee !== null && nextMatch.matchFee !== undefined ? (
+              <Text style={styles.nextMatchDetail}>
+                💵 Match Fee: ${nextMatch.matchFee}
+              </Text>
+            ) : null}
 
             {/* Current user's availability */}
             <View style={styles.availabilityStatusBox}>
@@ -255,13 +441,13 @@ const getAvailabilityColor = (status?: string) => {
                 Your Availability:
               </Text>
               <Text
-  style={[
-    styles.availabilityStatusValue,
-    getAvailabilityColor(nextMatch.myAvailability),
-  ]}
->
-  {nextMatch.myAvailability || "Not marked yet"}
-</Text>
+                style={[
+                  styles.availabilityStatusValue,
+                  getAvailabilityColor(nextMatch.myAvailability),
+                ]}
+              >
+                {nextMatch.myAvailability || "Not marked yet"}
+              </Text>
             </View>
 
             {/* Quick CTA */}
@@ -270,7 +456,7 @@ const getAvailabilityColor = (status?: string) => {
               onPress={() =>
                 navigation.navigate("Availability", {
                   matchId: nextMatch.id,
-                  opponentName: nextMatch.opponentName,
+                  opponentName: getOpponentName(nextMatch),
                   matchDate: nextMatch.matchDate,
                   venue: nextMatch.venue,
                   matchType: nextMatch.matchType,
@@ -286,41 +472,38 @@ const getAvailabilityColor = (status?: string) => {
           </TouchableOpacity>
         )}
 
+        {/* Availability reminder card */}
+        {needsAvailabilityReminder && nextMatch && (
+          <>
+            <Text style={styles.sectionTitle}>Reminder</Text>
 
+            <View style={styles.reminderCard}>
+              <Text style={styles.reminderTitle}>
+                You have not marked availability yet
+              </Text>
 
-{/* Availability reminder card */}
-{needsAvailabilityReminder && nextMatch && (
-  <>
-    <Text style={styles.sectionTitle}>Reminder</Text>
+              <Text style={styles.reminderText}>
+                Please update your availability for the next match vs{" "}
+                {getOpponentName(nextMatch)}.
+              </Text>
 
-    <View style={styles.reminderCard}>
-      <Text style={styles.reminderTitle}>
-        You have not marked availability yet
-      </Text>
-
-      <Text style={styles.reminderText}>
-        Please update your availability for the next match vs{" "}
-        {nextMatch.opponentName}.
-      </Text>
-
-      <TouchableOpacity
-        style={styles.reminderBtn}
-        onPress={() =>
-          navigation.navigate("Availability", {
-            matchId: nextMatch.id,
-            opponentName: nextMatch.opponentName,
-            matchDate: nextMatch.matchDate,
-            venue: nextMatch.venue,
-            matchType: nextMatch.matchType,
-          })
-        }
-      >
-        <Text style={styles.reminderBtnText}>Mark Availability</Text>
-      </TouchableOpacity>
-    </View>
-  </>
-)}
-
+              <TouchableOpacity
+                style={styles.reminderBtn}
+                onPress={() =>
+                  navigation.navigate("Availability", {
+                    matchId: nextMatch.id,
+                    opponentName: getOpponentName(nextMatch),
+                    matchDate: nextMatch.matchDate,
+                    venue: nextMatch.venue,
+                    matchType: nextMatch.matchType,
+                  })
+                }
+              >
+                <Text style={styles.reminderBtnText}>Mark Availability</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
         {/* Pinned Announcement section */}
         {pinnedAnnouncement && (
@@ -343,38 +526,54 @@ const getAvailabilityColor = (status?: string) => {
         {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickGrid}>
+
+
+
+{isAdmin && (
+  <TouchableOpacity
+    style={styles.quickCard}
+    onPress={() => navigation.navigate("AdminApproval")}
+  >
+    <Ionicons name="checkmark-circle-outline" size={22} color="#da9306" />
+    <Text style={styles.quickText}>Approvals</Text>
+  </TouchableOpacity>
+)}
+
+
+
           <TouchableOpacity
             style={styles.quickCard}
             onPress={() => navigation.navigate("Matches")}
           >
-            <Ionicons name="calendar-outline" size={22} color="#F4B400" />
+            <Ionicons name="calendar-outline" size={22} color="#da9306" />
             <Text style={styles.quickText}>Matches</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => navigation.navigate("Leagues")}
+          >
+            <Ionicons name="trophy-outline" size={22} color="#da9306" />
+            <Text style={styles.quickText}>Leagues</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-  style={styles.quickCard}
-  onPress={() => navigation.navigate("Leagues")}
->
-  <Ionicons name="trophy-outline" size={22} color="#F4B400" />
-  <Text style={styles.quickText}>Leagues</Text>
-</TouchableOpacity>
-
-
-<TouchableOpacity
-  style={styles.quickCard}
-  onPress={() => navigation.navigate("Events")}
->
-  <Ionicons name="people-circle-outline" size={22} color="#F4B400" />
-  <Text style={styles.quickText}>Events</Text>
-</TouchableOpacity>
-
+            style={styles.quickCard}
+            onPress={() => navigation.navigate("Events")}
+          >
+            <Ionicons name="people-circle-outline" size={22} color="#da9306" />
+            <Text style={styles.quickText}>Events</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.quickCard}
             onPress={() => navigation.navigate("Announcements")}
           >
-            <Ionicons name="notifications-outline" size={22} color="#F4B400" />
+            <Ionicons
+              name="notifications-outline"
+              size={22}
+              color="#da9306"
+            />
             <Text style={styles.quickText}>Announcements</Text>
           </TouchableOpacity>
 
@@ -382,7 +581,7 @@ const getAvailabilityColor = (status?: string) => {
             style={styles.quickCard}
             onPress={() => navigation.navigate("Profile")}
           >
-            <Ionicons name="person-outline" size={22} color="#F4B400" />
+            <Ionicons name="person-outline" size={22} color="#da9306" />
             <Text style={styles.quickText}>Profile</Text>
           </TouchableOpacity>
 
@@ -391,7 +590,7 @@ const getAvailabilityColor = (status?: string) => {
               style={styles.quickCard}
               onPress={() => navigation.navigate("Teams")}
             >
-              <Ionicons name="shield-outline" size={22} color="#F4B400" />
+              <Ionicons name="shield-outline" size={22} color="#da9306" />
               <Text style={styles.quickText}>Teams</Text>
             </TouchableOpacity>
           ) : (
@@ -399,7 +598,11 @@ const getAvailabilityColor = (status?: string) => {
               style={styles.quickCard}
               onPress={() => navigation.navigate("Matches")}
             >
-              <Ionicons name="checkmark-done-outline" size={22} color="#F4B400" />
+              <Ionicons
+                name="checkmark-done-outline"
+                size={22}
+                color="#da9306"
+              />
               <Text style={styles.quickText}>Availability</Text>
             </TouchableOpacity>
           )}
@@ -419,31 +622,35 @@ const getAvailabilityColor = (status?: string) => {
               onPress={() =>
                 navigation.navigate("MatchDetails", {
                   matchId: match.id,
-                  opponentName: match.opponentName,
-                  venue: match.venue,
-                  matchDate: match.matchDate,
-                  matchType: match.matchType,
-                  status: match.status,
-                  teamId: match.teamId,
-                  teamName: match.teamName,
                 })
               }
             >
-              <Text style={styles.cardTitle}>{match.opponentName}</Text>
+              <Text style={styles.cardTitle}>{getMatchTitle(match)}</Text>
+
+              {match.leagueName ? (
+                <Text style={styles.cardText}>League: {match.leagueName}</Text>
+              ) : null}
+
               <Text style={styles.cardText}>Venue: {match.venue}</Text>
+
               <Text style={styles.cardText}>
                 Date: {new Date(match.matchDate).toLocaleString()}
               </Text>
-             <Text
-  style={[
-    styles.cardHighlight,
-    match.myAvailability ? getAvailabilityColor(match.myAvailability) : null,
-  ]}
->
-  {match.myAvailability
-    ? `Availability: ${match.myAvailability}`
-    : "Please mark your availability"}
-</Text>
+
+              {match.matchFee !== null && match.matchFee !== undefined ? (
+                <Text style={styles.cardText}>Match Fee: ${match.matchFee}</Text>
+              ) : null}
+
+              <Text
+                style={[
+                  styles.cardHighlight,
+                  match.myAvailability ? getAvailabilityColor(match.myAvailability) : null,
+                ]}
+              >
+                {match.myAvailability
+                  ? `Availability: ${match.myAvailability}`
+                  : "Please mark your availability"}
+              </Text>
             </TouchableOpacity>
           ))
         )}
@@ -490,7 +697,7 @@ const getAvailabilityColor = (status?: string) => {
               style={styles.menuItem}
               onPress={() => closeMenuAndNavigate("Home")}
             >
-              <Ionicons name="home-outline" size={20} color="#F4B400" />
+              <Ionicons name="home-outline" size={20} color="#da9306" />
               <Text style={styles.menuItemText}>Home</Text>
             </TouchableOpacity>
 
@@ -498,7 +705,7 @@ const getAvailabilityColor = (status?: string) => {
               style={styles.menuItem}
               onPress={() => closeMenuAndNavigate("Matches")}
             >
-              <Ionicons name="calendar-outline" size={20} color="#F4B400" />
+              <Ionicons name="calendar-outline" size={20} color="#da9306" />
               <Text style={styles.menuItemText}>Matches</Text>
             </TouchableOpacity>
 
@@ -506,8 +713,32 @@ const getAvailabilityColor = (status?: string) => {
               style={styles.menuItem}
               onPress={() => closeMenuAndNavigate("Announcements")}
             >
-              <Ionicons name="notifications-outline" size={20} color="#F4B400" />
+              <Ionicons
+                name="notifications-outline"
+                size={20}
+                color="#da9306"
+              />
               <Text style={styles.menuItemText}>Announcements</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => closeMenuAndNavigate("Leagues")}
+            >
+              <Ionicons name="trophy-outline" size={20} color="#da9306" />
+              <Text style={styles.menuItemText}>Leagues</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => closeMenuAndNavigate("Events")}
+            >
+              <Ionicons
+                name="people-circle-outline"
+                size={20}
+                color="#da9306"
+              />
+              <Text style={styles.menuItemText}>Events</Text>
             </TouchableOpacity>
 
             {canManage && (
@@ -515,7 +746,7 @@ const getAvailabilityColor = (status?: string) => {
                 style={styles.menuItem}
                 onPress={() => closeMenuAndNavigate("Teams")}
               >
-                <Ionicons name="shield-outline" size={20} color="#F4B400" />
+                <Ionicons name="shield-outline" size={20} color="#da9306" />
                 <Text style={styles.menuItemText}>Teams</Text>
               </TouchableOpacity>
             )}
@@ -525,7 +756,7 @@ const getAvailabilityColor = (status?: string) => {
                 style={styles.menuItem}
                 onPress={() => closeMenuAndNavigate("Members")}
               >
-                <Ionicons name="people-outline" size={20} color="#F4B400" />
+                <Ionicons name="people-outline" size={20} color="#da9306" />
                 <Text style={styles.menuItemText}>Members</Text>
               </TouchableOpacity>
             )}
@@ -535,7 +766,11 @@ const getAvailabilityColor = (status?: string) => {
                 style={styles.menuItem}
                 onPress={() => closeMenuAndNavigate("AdminApproval")}
               >
-                <Ionicons name="checkmark-circle-outline" size={20} color="#F4B400" />
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={20}
+                  color="#da9306"
+                />
                 <Text style={styles.menuItemText}>Approve Members</Text>
               </TouchableOpacity>
             )}
@@ -544,7 +779,7 @@ const getAvailabilityColor = (status?: string) => {
               style={styles.menuItem}
               onPress={() => closeMenuAndNavigate("Profile")}
             >
-              <Ionicons name="person-outline" size={20} color="#F4B400" />
+              <Ionicons name="person-outline" size={20} color="#da9306" />
               <Text style={styles.menuItemText}>Profile</Text>
             </TouchableOpacity>
 
@@ -567,7 +802,7 @@ export default HomeScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#4B1D6B",
+    backgroundColor: "#2b0540",
   },
   content: {
     padding: 16,
@@ -590,17 +825,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   roleText: {
-    color: "#F4B400",
+    color: "#da9306",
     marginTop: 4,
     fontWeight: "600",
   },
   menuBtn: {
-    backgroundColor: "#5A257A",
+    backgroundColor: "#3a0a57",
     padding: 10,
     borderRadius: 14,
   },
   heroCard: {
-    backgroundColor: "#5A257A",
+    backgroundColor: "#3a0a57",
     padding: 18,
     borderRadius: 18,
     marginBottom: 18,
@@ -612,7 +847,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   heroSub: {
-    color: "#F4B400",
+    color: "#da9306",
     fontSize: 15,
     marginBottom: 8,
     fontWeight: "600",
@@ -630,21 +865,21 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   nextMatchCard: {
-    backgroundColor: "#5A257A",
+    backgroundColor: "#3a0a57",
     padding: 18,
     borderRadius: 18,
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: "#7a49a0",
+    borderColor: "#4d1670",
   },
   nextMatchTitle: {
     color: "#fff",
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "700",
     marginBottom: 8,
   },
   countdownText: {
-    color: "#F4B400",
+    color: "#da9306",
     fontSize: 15,
     fontWeight: "700",
     marginBottom: 10,
@@ -655,7 +890,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   availabilityStatusBox: {
-    backgroundColor: "#4B1D6B",
+    backgroundColor: "#2b0540",
     padding: 12,
     borderRadius: 12,
     marginTop: 12,
@@ -672,26 +907,26 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   nextMatchButton: {
-    backgroundColor: "#F4B400",
+    backgroundColor: "#da9306",
     paddingVertical: 12,
     borderRadius: 12,
     marginTop: 4,
   },
   nextMatchButtonText: {
-    color: "#000",
+    color: "#2b0540",
     textAlign: "center",
     fontWeight: "700",
   },
   pinnedCard: {
-    backgroundColor: "#6A2C91",
+    backgroundColor: "#3a0a57",
     padding: 18,
     borderRadius: 18,
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: "#F4B400",
+    borderColor: "#da9306",
   },
   pinnedLabel: {
-    color: "#F4B400",
+    color: "#da9306",
     fontWeight: "700",
     marginBottom: 8,
   },
@@ -713,7 +948,7 @@ const styles = StyleSheet.create({
   },
   quickCard: {
     width: "48%",
-    backgroundColor: "#5A257A",
+    backgroundColor: "#3a0a57",
     padding: 16,
     borderRadius: 16,
     marginBottom: 12,
@@ -724,7 +959,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   infoCard: {
-    backgroundColor: "#5A257A",
+    backgroundColor: "#3a0a57",
     padding: 16,
     borderRadius: 16,
     marginBottom: 12,
@@ -743,7 +978,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardHighlight: {
-    color: "#F4B400",
+    color: "#da9306",
     marginTop: 6,
     fontWeight: "700",
   },
@@ -757,15 +992,15 @@ const styles = StyleSheet.create({
   },
   menuPanel: {
     width: 270,
-    backgroundColor: "#4B1D6B",
+    backgroundColor: "#2b0540",
     borderRadius: 18,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#6b3a91",
+    borderColor: "#4d1670",
   },
   menuHeader: {
     borderBottomWidth: 1,
-    borderBottomColor: "#6b3a91",
+    borderBottomColor: "#4d1670",
     paddingBottom: 12,
     marginBottom: 12,
   },
@@ -775,7 +1010,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   menuRole: {
-    color: "#F4B400",
+    color: "#da9306",
     marginTop: 4,
     fontWeight: "600",
   },
@@ -802,32 +1037,78 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   reminderCard: {
-  backgroundColor: "#fff4e5",
+    backgroundColor: "#fff7e6",
+    borderWidth: 1,
+    borderColor: "#da9306",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 18,
+  },
+  reminderTitle: {
+    color: "#8a5b00",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  reminderText: {
+    color: "#8a5b00",
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  reminderBtn: {
+    backgroundColor: "#da9306",
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  reminderBtnText: {
+    textAlign: "center",
+    color: "#2b0540",
+    fontWeight: "700",
+  },
+  pendingCard: {
+  backgroundColor: "#fff7e6",
   borderWidth: 1,
-  borderColor: "#f59e0b",
+  borderColor: "#da9306",
   padding: 16,
   borderRadius: 16,
   marginBottom: 18,
 },
-reminderTitle: {
-  color: "#92400e",
+
+pendingTitle: {
+  color: "#8a5b00",
   fontSize: 16,
   fontWeight: "700",
-  marginBottom: 8,
-},
-reminderText: {
-  color: "#92400e",
-  lineHeight: 20,
   marginBottom: 12,
 },
-reminderBtn: {
-  backgroundColor: "#F4B400",
+
+pendingMemberRow: {
+  paddingVertical: 8,
+  borderBottomWidth: 1,
+  borderBottomColor: "#f1d8a6",
+},
+
+pendingMemberName: {
+  color: "#2b0540",
+  fontSize: 15,
+  fontWeight: "700",
+},
+
+pendingMemberEmail: {
+  color: "#6b7280",
+  fontSize: 13,
+  marginTop: 2,
+},
+
+pendingBtn: {
+  backgroundColor: "#da9306",
   paddingVertical: 12,
   borderRadius: 10,
+  marginTop: 14,
 },
-reminderBtnText: {
+
+pendingBtnText: {
   textAlign: "center",
-  color: "#000",
+  color: "#2b0540",
   fontWeight: "700",
 },
 });

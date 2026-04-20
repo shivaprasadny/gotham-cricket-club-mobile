@@ -2,14 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 // Push notification code kept commented because Expo Go can cause issues
-// import {
-//   registerForPushNotificationsAsync,
-//   savePushTokenToBackend,
-// } from "../services/pushNotificationService";
-
-/**
- * Logged-in user shape stored in app state and AsyncStorage
- */
+import {
+  registerForPushNotificationsAsync,
+  savePushTokenToBackend,
+} from "../services/pushNotificationService";
 type UserType = {
   id: number;
   fullName: string;
@@ -100,14 +96,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await AsyncStorage.setItem("token", newToken);
       await AsyncStorage.setItem("user", JSON.stringify(newUser));
 
-      /**
-       * Push notification registration can be enabled later
-       * when using a development build instead of Expo Go
+            /**
+       * Register push token after successful login
+       * This works properly in a development build on a real device
        */
-      // const pushToken = await registerForPushNotificationsAsync();
-      // if (pushToken) {
-      //   await savePushTokenToBackend(pushToken);
-      // }
+      const pushToken = await registerForPushNotificationsAsync();
+      if (pushToken) {
+        await savePushTokenToBackend(pushToken);
+      }
     } catch (error) {
       console.error("Error saving auth data:", error);
     }

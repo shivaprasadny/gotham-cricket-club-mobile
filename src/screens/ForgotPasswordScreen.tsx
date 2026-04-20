@@ -31,32 +31,33 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
   const [resetting, setResetting] = useState(false);
 
   // Request reset code
-  const handleSendCode = async () => {
-    if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email");
-      return;
-    }
+const handleSendCode = async () => {
+  if (!email.trim()) {
+    Alert.alert("Error", "Please enter your email");
+    return;
+  }
 
-    try {
-      setSendingCode(true);
+  try {
+    setSendingCode(true);
 
-      const response = await requestPasswordResetCode(email.trim());
+    const response = await requestPasswordResetCode(email.trim());
 
-      Alert.alert(
-        "Success",
-        typeof response === "string"
-          ? response
-          : "Reset code sent successfully"
-      );
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to send reset code"
-      );
-    } finally {
-      setSendingCode(false);
-    }
-  };
+    // Auto-fill code input for easier testing
+    setCode(response.resetCode);
+
+    Alert.alert(
+      "Reset Code",
+      `Code: ${response.resetCode}\n\n${response.message}`
+    );
+  } catch (error: any) {
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Failed to send reset code"
+    );
+  } finally {
+    setSendingCode(false);
+  }
+};
 
   // Reset password using email + code + new password
   const handleResetPassword = async () => {
