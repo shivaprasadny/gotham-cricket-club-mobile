@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState,useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { deleteMatch, getMatches } from "../services/matchService";
+import { useFocusEffect } from "@react-navigation/native";
+
 
 type Props = {
   navigation: any;
@@ -69,9 +71,11 @@ const MatchesScreen = ({ navigation }: Props) => {
     }
   };
 
-  useEffect(() => {
+ useFocusEffect(
+  useCallback(() => {
     void loadMatches();
-  }, []);
+  }, [])
+);
 
   // Pull to refresh
   const onRefresh = async () => {

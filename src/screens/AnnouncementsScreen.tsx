@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -9,6 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import * as Clipboard from "expo-clipboard";
 import { useAuth } from "../context/AuthContext";
 import {
   deleteAnnouncement,
@@ -16,74 +19,62 @@ import {
   pinAnnouncement,
   unpinAnnouncement,
 } from "../services/announcementService";
-import * as Clipboard from "expo-clipboard";
 
 type Props = {
   navigation: any;
 };
 
-// Announcement shape
 type Announcement = {
   id: number;
   title: string;
   message: string;
-  createdBy: string;
-  createdAt: string;
+  createdBy?: string;
+  createdAt?: string;
   pinned?: boolean;
 };
 
 const AnnouncementsScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
 
-  // List of announcements
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-
-  // Loading states
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  const isAdmin = user?.role === "ADMIN";
+  const isCaptain = user?.role === "CAPTAIN";
+  const canManage = isAdmin || isCaptain;
 
-  useEffect(() => {
-    void loadAnnouncements();
-  }, []);
-
-  // Load all announcements from backend
   const loadAnnouncements = async () => {
     try {
       const data = await getAnnouncements();
       setAnnouncements(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      Alert.alert("Error", "Failed to load announcements");
+      console.log("ANNOUNCEMENTS LOAD ERROR:", error?.response?.data || error);
+
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message ||
+          error?.response?.data ||
+          "Failed to load announcements"
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Pull to refresh
+  useFocusEffect(
+    useCallback(() => {
+      void loadAnnouncements();
+    }, [])
+  );
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadAnnouncements();
   };
 
-  // Copy announcement to clipboard
-  const handleCopy = async (item: Announcement) => {
-    try {
-      const text =
-        `${item.title}\n\n${item.message}\n\n` +
-        `Shared by ${item.createdBy}\n` +
-        `${new Date(item.createdAt).toLocaleString()}`;
-
-      await Clipboard.setStringAsync(text);
-      Alert.alert("Copied", "Announcement copied to clipboard");
-    } catch (error) {
-      Alert.alert("Error", "Failed to copy announcement");
-    }
-  };
-
-  // Delete announcement
-  const handleDelete = async (id: number) => {
+  const handleDelete = (announcementId: number) => {
     Alert.alert(
       "Delete Announcement",
       "Are you sure you want to delete this announcement?",
@@ -94,11 +85,28 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
           style: "destructive",
           onPress: async () => {
             try {
-              await deleteAnnouncement(id);
-              Alert.alert("Success", "Announcement deleted");
+              const response = await deleteAnnouncement(announcementId);
+
+              Alert.alert(
+                "Success",
+                typeof response === "string"
+                  ? response
+                  : "Announcement deleted successfully"
+              );
+
               await loadAnnouncements();
             } catch (error: any) {
-              Alert.alert("Error", "Failed to delete announcement");
+              console.log(
+                "DELETE ANNOUNCEMENT ERROR:",
+                error?.response?.data || error
+              );
+
+              Alert.alert(
+                "Error",
+                error?.response?.data?.message ||
+                  error?.response?.data ||
+                  "Failed to delete announcement"
+              );
             }
           },
         },
@@ -106,103 +114,149 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     );
   };
 
-  // Pin announcement to show on home
+  const handleCopy = async (item: Announcement) => {
+    try {
+      const textToCopy = `${item.title}\n\n${item.message}`;
+      await Clipboard.setStringAsync(textToCopy);
+      Alert.alert("Copied", "Announcement copied to clipboard");
+    } catch (error) {
+      Alert.alert("Error", "Failed to copy announcement");
+    }
+  };
+
   const handlePin = async (item: Announcement) => {
     try {
       const response = await pinAnnouncement(item.id);
+
       Alert.alert(
         "Success",
         typeof response === "string"
           ? response
           : "Announcement pinned successfully"
       );
+
       await loadAnnouncements();
     } catch (error: any) {
+      console.log("PIN ANNOUNCEMENT ERROR:", error?.response?.data || error);
+
       Alert.alert(
         "Error",
-        error?.response?.data?.message || "Failed to pin announcement"
+        error?.response?.data?.message ||
+          error?.response?.data ||
+          "Failed to pin announcement"
       );
     }
   };
 
-  // Unpin announcement from home
   const handleUnpin = async (item: Announcement) => {
     try {
       const response = await unpinAnnouncement(item.id);
+
       Alert.alert(
         "Success",
         typeof response === "string"
           ? response
           : "Announcement unpinned successfully"
       );
+
       await loadAnnouncements();
     } catch (error: any) {
+      console.log("UNPIN ANNOUNCEMENT ERROR:", error?.response?.data || error);
+
       Alert.alert(
         "Error",
-        error?.response?.data?.message || "Failed to unpin announcement"
+        error?.response?.data?.message ||
+          error?.response?.data ||
+          "Failed to unpin announcement"
       );
     }
   };
 
-  // Render one announcement card
-  const renderItem = ({ item }: { item: Announcement }) => (
-    <View style={styles.card}>
-      <Text style={styles.title}>
-        {item.title} {item.pinned ? "📌" : ""}
-      </Text>
+  const renderItem = ({ item }: { item: Announcement }) => {
+    return (
+      <TouchableOpacity
+        style={[styles.card, item.pinned && styles.pinnedCard]}
+        activeOpacity={canManage ? 0.9 : 1}
+        onPress={() =>
+          canManage
+            ? navigation.navigate("EditAnnouncement", { announcement: item })
+            : undefined
+        }
+      >
+        {item.pinned && <Text style={styles.pinnedLabel}>📌 Pinned</Text>}
 
-      <Text style={styles.message}>{item.message}</Text>
+        <Text style={styles.cardTitle}>{item.title}</Text>
+        <Text style={styles.cardMessage}>{item.message}</Text>
 
-      <Text style={styles.meta}>By: {item.createdBy}</Text>
-      <Text style={styles.meta}>
-        {new Date(item.createdAt).toLocaleString()}
-      </Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>By: {item.createdBy || "Unknown"}</Text>
+          {item.createdAt ? (
+            <Text style={styles.metaText}>
+              {new Date(item.createdAt).toLocaleString()}
+            </Text>
+          ) : null}
+        </View>
 
-      {canManage && (
         <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.editBtn]}
-            onPress={() =>
-              navigation.navigate("EditAnnouncement", {
-                announcement: item,
-              })
-            }
-          >
-            <Text style={styles.actionText}>Edit</Text>
-          </TouchableOpacity>
+          {canManage && (
+            <>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.editBtn]}
+                onPress={() =>
+                  navigation.navigate("EditAnnouncement", {
+                    announcement: item,
+                  })
+                }
+              >
+                <Ionicons name="create-outline" size={16} color="#fff" />
+                <Text style={styles.actionText}>Edit</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.actionBtn,
+                  item.pinned ? styles.unpinBtn : styles.pinBtn,
+                ]}
+                onPress={() => (item.pinned ? handleUnpin(item) : handlePin(item))}
+              >
+                <Ionicons
+                  name={item.pinned ? "bookmark-outline" : "bookmark"}
+                  size={16}
+                  color="#fff"
+                />
+                <Text style={styles.actionText}>
+                  {item.pinned ? "Unpin" : "Pin"}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <TouchableOpacity
             style={[styles.actionBtn, styles.copyBtn]}
             onPress={() => handleCopy(item)}
           >
+            <Ionicons name="copy-outline" size={16} color="#fff" />
             <Text style={styles.actionText}>Copy</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, item.pinned ? styles.unpinBtn : styles.pinBtn]}
-            onPress={() => (item.pinned ? handleUnpin(item) : handlePin(item))}
-          >
-            <Text style={styles.actionText}>
-              {item.pinned ? "Unpin" : "Pin"}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.deleteBtn]}
-            onPress={() => handleDelete(item.id)}
-          >
-            <Text style={styles.actionText}>Delete</Text>
-          </TouchableOpacity>
+          {canManage && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.deleteBtn]}
+              onPress={() => handleDelete(item.id)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#fff" />
+              <Text style={styles.actionText}>Delete</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      )}
-    </View>
-  );
+      </TouchableOpacity>
+    );
+  };
 
-  // Loading UI
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#da9306" />
         <Text style={styles.loadingText}>Loading announcements...</Text>
       </View>
     );
@@ -214,22 +268,21 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
       keyExtractor={(item) => item.id.toString()}
       renderItem={renderItem}
       contentContainerStyle={
-        announcements.length === 0 ? styles.center : styles.list
+        announcements.length === 0 ? styles.center : styles.listContainer
       }
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
       ListHeaderComponent={
-        <View>
-          {canManage && (
-            <TouchableOpacity
-              style={styles.createBtn}
-              onPress={() => navigation.navigate("CreateAnnouncement")}
-            >
-              <Text style={styles.createBtnText}>+ Create Announcement</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        canManage ? (
+          <TouchableOpacity
+            style={styles.createBtn}
+            onPress={() => navigation.navigate("CreateAnnouncement")}
+          >
+            <Ionicons name="add-circle-outline" size={18} color="#2b0540" />
+            <Text style={styles.createBtnText}>Create Announcement</Text>
+          </TouchableOpacity>
+        ) : null
       }
       ListEmptyComponent={
         <Text style={styles.emptyText}>No announcements available.</Text>
@@ -241,87 +294,113 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
 export default AnnouncementsScreen;
 
 const styles = StyleSheet.create({
-  list: {
+  listContainer: {
     padding: 16,
-    backgroundColor: "#4B1D6B",
+    backgroundColor: "#2b0540",
+    flexGrow: 1,
   },
-  createBtn: {
-    backgroundColor: "#F4B400",
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginBottom: 14,
-  },
-  createBtnText: {
-    textAlign: "center",
-    fontWeight: "700",
-    color: "#000",
-  },
-  card: {
-    backgroundColor: "#5A257A",
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 8,
-    color: "#fff",
-  },
-  message: {
-    fontSize: 15,
-    marginBottom: 10,
-    lineHeight: 22,
-    color: "#ddd",
-  },
-  meta: {
-    fontSize: 12,
-    color: "#ccc",
-  },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 12,
-  },
-  actionBtn: {
-    minWidth: "22%",
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  editBtn: {
-    backgroundColor: "#111",
-  },
-  copyBtn: {
-    backgroundColor: "#2563eb",
-  },
-  pinBtn: {
-    backgroundColor: "#8e44ad",
-  },
-  unpinBtn: {
-    backgroundColor: "#6b7280",
-  },
-  deleteBtn: {
-    backgroundColor: "#c0392b",
-  },
-  actionText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "700",
+  center: {
+    flexGrow: 1,
+    backgroundColor: "#2b0540",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
   loadingText: {
     color: "#fff",
     marginTop: 10,
+    fontWeight: "600",
   },
   emptyText: {
     color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
-  center: {
-    flex: 1,
+  createBtn: {
+    backgroundColor: "#da9306",
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 16,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#4B1D6B",
-    padding: 20,
+    gap: 8,
+  },
+  createBtnText: {
+    color: "#2b0540",
+    fontWeight: "800",
+    fontSize: 16,
+  },
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  pinnedCard: {
+    borderColor: "#da9306",
+    borderWidth: 2,
+    backgroundColor: "#fff8e8",
+  },
+  pinnedLabel: {
+    color: "#8a5b00",
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  cardTitle: {
+    color: "#111827",
+    fontSize: 18,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  cardMessage: {
+    color: "#111827",
+    fontSize: 14,
+    lineHeight: 21,
+    fontWeight: "500",
+    marginBottom: 12,
+  },
+  metaRow: {
+    marginBottom: 12,
+  },
+  metaText: {
+    color: "#4b5563",
+    fontSize: 12,
+    marginBottom: 3,
+    fontWeight: "600",
+  },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+  },
+  editBtn: {
+    backgroundColor: "#2b0540",
+  },
+  pinBtn: {
+    backgroundColor: "#da9306",
+  },
+  unpinBtn: {
+    backgroundColor: "#92400e",
+  },
+  copyBtn: {
+    backgroundColor: "#2563eb",
+  },
+  deleteBtn: {
+    backgroundColor: "#b91c1c",
+  },
+  actionText: {
+    color: "#fff",
+    fontWeight: "700",
   },
 });

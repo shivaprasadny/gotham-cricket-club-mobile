@@ -1,23 +1,43 @@
 import api from "../api/axiosConfig";
 
-// Get all events
 export const getEvents = async () => {
   const response = await api.get("/events");
   return response.data;
 };
 
-// Create new event
 export const createEvent = async (payload: {
   title: string;
   description: string;
-  eventDate: string;
   location: string;
+  eventDate: string;
 }) => {
   const response = await api.post("/events", payload);
   return response.data;
 };
 
-// Submit event availability
+export const updateEvent = async (
+  eventId: number,
+  payload: {
+    title: string;
+    description: string;
+    location: string;
+    eventDate: string;
+  }
+) => {
+  const response = await api.put(`/events/${eventId}`, payload);
+  return response.data;
+};
+
+export const deleteEvent = async (eventId: number) => {
+  const response = await api.delete(`/events/${eventId}`);
+  return response.data;
+};
+
+export const getEventAvailability = async (eventId: number) => {
+  const response = await api.get(`/events/${eventId}/availability`);
+  return response.data;
+};
+
 export const submitEventAvailability = async (
   eventId: number,
   payload: {
@@ -25,12 +45,6 @@ export const submitEventAvailability = async (
     message?: string;
   }
 ) => {
-  const response = await api.put(`/events/${eventId}/availability`, payload);
-  return response.data;
-};
-
-// Get all event responses
-export const getEventAvailability = async (eventId: number) => {
-  const response = await api.get(`/events/${eventId}/availability`);
+  const response = await api.post(`/events/${eventId}/availability`, payload);
   return response.data;
 };
