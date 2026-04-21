@@ -33,6 +33,9 @@ type MatchDetails = {
   venue: string;
   matchType: string;
   matchFee?: number | null;
+  matchFeeAmount?: number | null;
+matchFeeDueDate?: string | null;
+matchFeeDescription?: string | null;
   notes?: string;
   createdBy?: string;
   status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
@@ -154,11 +157,29 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
 
         <Text style={styles.detail}>Type: {match.matchType}</Text>
 
-        {match.matchFee !== null && match.matchFee !== undefined ? (
-          <Text style={styles.detail}>Match Fee: ${match.matchFee}</Text>
-        ) : null}
+        
 <Text style={styles.detail}>Format: {match.matchFormat || "N/A"}</Text>
         <Text style={styles.detail}>Venue: {match.venue}</Text>
+
+<Text style={styles.detail}>
+  Match Fee:{" "}
+  {match.matchFeeAmount !== null && match.matchFeeAmount !== undefined
+    ? `$${match.matchFeeAmount}`
+    : "N/A"}
+</Text>
+
+<Text style={styles.detail}>
+  Fee Due Date:{" "}
+  {match.matchFeeDueDate
+    ? new Date(match.matchFeeDueDate).toLocaleString()
+    : "N/A"}
+</Text>
+
+{match.matchFeeDescription ? (
+  <Text style={styles.detail}>Fee Note: {match.matchFeeDescription}</Text>
+) : null}
+
+
         <Text style={styles.detail}>
           Date: {new Date(match.matchDate).toLocaleString()}
         </Text>
@@ -233,6 +254,9 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
                 matchType: match.matchType,
                 matchFee: match.matchFee,
                  matchFormat: match.matchFormat,
+                 matchFeeAmount:match.matchFeeAmount,
+                 matchFeeDueDate: match.matchFeeDueDate,
+                 matchFeeDiscription: match.matchFeeDescription,
               })
             }
           >

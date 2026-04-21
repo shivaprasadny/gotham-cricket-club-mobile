@@ -21,6 +21,7 @@ import {
   getSquadByMatch,
   removeSquadMember,
 } from "../services/squadService";
+import { assignMatchFeeToSquad } from "../services/matchService";
 
 type Props = {
   route: any;
@@ -96,6 +97,9 @@ const SquadSelectionScreen = ({ route, navigation }: Props) => {
     venue,
     matchType,
     matchFormat,
+        matchFeeAmount,
+    matchFeeDueDate,
+    matchFeeDescription,
   } = route.params || {};
 
   const [teamPlayers, setTeamPlayers] = useState<TeamPlayer[]>([]);
@@ -316,57 +320,78 @@ const SquadSelectionScreen = ({ route, navigation }: Props) => {
   }, [currentBaseList, search, sortBy]);
 
   const handleAdd = async (userId: number, isPlayingXi: boolean) => {
-    try {
-      const roleInMatch = roleInputs[userId]?.trim() || undefined;
+  try {
+    const roleInMatch = roleInputs[userId]?.trim() || undefined;
 
-      if (roleInMatch === "IMPACT_PLAYER") {
-        const alreadyImpact =
-          impactPlayer && impactPlayer.userId !== userId ? true : false;
+    if (roleInMatch === "IMPACT_PLAYER") {
+      const alreadyImpact =
+        impactPlayer && impactPlayer.userId !== userId;
 
-        if (alreadyImpact) {
-          Alert.alert("Error", "Only 1 impact player is allowed");
-          return;
-        }
+      if (alreadyImpact) {
+        Alert.alert("Error", "Only 1 impact player allowed");
+        return;
       }
-
-      const response = await addOrUpdateSquadMember(matchId, {
-        userId,
-        isPlayingXi: roleInMatch === "IMPACT_PLAYER" ? false : isPlayingXi,
-        roleInMatch,
-      });
-
-      Alert.alert(
-        "Success",
-        typeof response === "string" ? response : "Squad updated successfully"
-      );
-
-      await loadData();
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to update squad"
-      );
     }
-  };
+
+    await addOrUpdateSquadMember(matchId, {
+      userId,
+      isPlayingXi: roleInMatch === "IMPACT_PLAYER" ? false : isPlayingXi,
+      roleInMatch,
+    });
+
+    // add/update selected player locally
+    const player =
+      [...normalizedTeamPlayers, ...normalizedOtherClubPlayers].find(
+        (p) => p.userId === userId
+      );
+
+    if (!player) return;
+
+    setSquad((prev) => {
+      const withoutOld = prev.filter((p) => p.userId !== userId);
+
+      return [
+        ...withoutOld,
+        {
+          squadId: Date.now(), // temp local id until next full refresh
+          userId: player.userId,
+          fullName: player.fullName,
+          nickname: player.nickname || undefined,
+          playerType: player.playerType || undefined,
+          jerseyNumber: player.jerseyNumber || undefined,
+          isPlayingXi: roleInMatch === "IMPACT_PLAYER" ? false : isPlayingXi,
+          roleInMatch,
+        },
+      ];
+    });
+  } catch (error: any) {
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Failed to update squad"
+    );
+  }
+};
 
   const handleRemove = async (userId: number) => {
-    try {
-      const response = await removeSquadMember(matchId, userId);
+  try {
+    await removeSquadMember(matchId, userId);
 
-      Alert.alert(
-        "Success",
-        typeof response === "string" ? response : "Player removed from squad"
-      );
+    // remove player from local squad state
+    setSquad((prev) => prev.filter((player) => player.userId !== userId));
 
-      await loadData();
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to remove player"
-      );
-    }
-  };
-
+    // clear any typed role for that player
+    setRoleInputs((prev) => {
+      const updated = { ...prev };
+      delete updated[userId];
+      return updated;
+    });
+  } catch (error: any) {
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Failed to remove player"
+    );
+  }
+};
   const captain = playingXi.find((p) => p.roleInMatch === "CAPTAIN");
   const viceCaptain = playingXi.find((p) => p.roleInMatch === "VICE_CAPTAIN");
   const wicketKeeper = playingXi.find((p) => p.roleInMatch === "WICKETKEEPER");
@@ -518,6 +543,32 @@ const SquadSelectionScreen = ({ route, navigation }: Props) => {
     );
   }
 
+
+
+    // Assign saved match fee config to squad players
+  const handleAssignMatchFee = async () => {
+    try {
+      if (!matchFeeAmount || !matchFeeDueDate) {
+        Alert.alert("Error", "This match does not have fee configuration");
+        return;
+      }
+
+      const response = await assignMatchFeeToSquad(matchId);
+
+      Alert.alert(
+        "Success",
+        typeof response === "string"
+          ? response
+          : "Match fee assigned successfully"
+      );
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to assign match fee"
+      );
+    }
+  };
+
   return (
     <FlatList
       data={filteredAndSortedPlayers}
@@ -582,6 +633,28 @@ const SquadSelectionScreen = ({ route, navigation }: Props) => {
                 </Text>
               ))
             )}
+          </View>
+
+                    <View style={styles.summaryCard}>
+            <Text style={styles.sectionTitle}>Match Fee</Text>
+            <Text style={styles.summaryName}>
+              Amount: {matchFeeAmount ? `$${matchFeeAmount}` : "N/A"}
+            </Text>
+            <Text style={styles.summaryName}>
+              Due Date: {matchFeeDueDate ? new Date(matchFeeDueDate).toLocaleString() : "N/A"}
+            </Text>
+            {matchFeeDescription ? (
+              <Text style={styles.summaryName}>Note: {matchFeeDescription}</Text>
+            ) : null}
+
+            {matchFeeAmount && matchFeeDueDate ? (
+              <TouchableOpacity
+                style={styles.assignFeeBtn}
+                onPress={handleAssignMatchFee}
+              >
+                <Text style={styles.assignFeeBtnText}>Assign Match Fee to Squad</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
 
           {squadWarnings.length > 0 && (
@@ -1164,6 +1237,17 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     color: "#2b0540",
+    fontWeight: "700",
+  },
+    assignFeeBtn: {
+    backgroundColor: "#2b0540",
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  assignFeeBtnText: {
+    color: "#fff",
+    textAlign: "center",
     fontWeight: "700",
   },
 });

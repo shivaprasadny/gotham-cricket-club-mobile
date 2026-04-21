@@ -24,6 +24,9 @@ export const createMatch = async (payload: {
   matchFormat: string;
   matchFee: number | null;
   notes: string;
+    matchFeeAmount: number | null;
+  matchFeeDueDate: string | null;
+  matchFeeDescription: string;
   status: "UPCOMING" | "COMPLETED" | "CANCELLED";
 }) => {
   const response = await api.post("/matches", payload);
@@ -44,6 +47,9 @@ export const updateMatch = async (
     matchFormat: string;
     matchFee: number | null;
     notes: string;
+      matchFeeAmount: number | null;
+  matchFeeDueDate: string | null;
+  matchFeeDescription: string;
     status: "UPCOMING" | "COMPLETED" | "CANCELLED";
   }
 ) => {
@@ -54,5 +60,10 @@ export const updateMatch = async (
 // Delete match
 export const deleteMatch = async (matchId: number) => {
   const response = await api.delete(`/matches/${matchId}`);
+  return response.data;
+};
+// Assign saved match fee to squad players
+export const assignMatchFeeToSquad = async (matchId: number) => {
+  const response = await api.post(`/fees/matches/${matchId}/assign-to-squad`);
   return response.data;
 };

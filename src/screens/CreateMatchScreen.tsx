@@ -98,6 +98,11 @@ const CreateMatchScreen = ({ navigation }: Props) => {
 
   const [submitting, setSubmitting] = useState(false);
 
+    const [matchFeeAmount, setMatchFeeAmount] = useState(""); // fee amount per player
+  const [matchFeeDescription, setMatchFeeDescription] = useState(""); // fee note
+  const [matchFeeDueDate, setMatchFeeDueDate] = useState<Date | null>(null); // fee due date
+  const [showMatchFeeDueDatePicker, setShowMatchFeeDueDatePicker] = useState(false); // fee date picker
+
   useEffect(() => {
     void loadDropdownData();
   }, []);
@@ -185,6 +190,9 @@ const CreateMatchScreen = ({ navigation }: Props) => {
         matchType,
         matchFormat: finalMatchFormat,
         matchFee: matchFee.trim() ? Number(matchFee) : null,
+                matchFeeAmount: matchFeeAmount.trim() ? Number(matchFeeAmount) : null,
+        matchFeeDueDate: matchFeeDueDate ? matchFeeDueDate.toISOString() : null,
+        matchFeeDescription: matchFeeDescription.trim(),
         notes: notes.trim(),
         status,
       };
@@ -374,15 +382,61 @@ const CreateMatchScreen = ({ navigation }: Props) => {
           onChangeText={setVenue}
         />
 
-        <Text style={styles.label}>Match Fee ($)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter match fee in dollars"
-          placeholderTextColor="#7a7a7a"
-          value={matchFee}
-          onChangeText={setMatchFee}
-          keyboardType="numeric"
+
+
+
+
+
+
+
+              <Text style={styles.label}>Match Fee Per Player $(Optional)</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter fee amount per player"
+        placeholderTextColor="#7a7a7a"
+        value={matchFeeAmount}
+        onChangeText={setMatchFeeAmount}
+        keyboardType="numeric"
+      />
+
+      <Text style={styles.label}>Match Fee Due Date (Optional)</Text>
+      <TouchableOpacity
+        style={styles.input}
+        onPress={() => setShowMatchFeeDueDatePicker(true)}
+      >
+        <Text style={styles.inputText}>
+          {matchFeeDueDate
+            ? matchFeeDueDate.toLocaleString()
+            : "Select fee due date & time"}
+        </Text>
+      </TouchableOpacity>
+
+      {showMatchFeeDueDatePicker && (
+        <DateTimePicker
+          value={matchFeeDueDate || new Date()}
+          mode="datetime"
+          display={Platform.OS === "ios" ? "inline" : "default"}
+          onChange={(event, selectedDate) => {
+            setShowMatchFeeDueDatePicker(false);
+            if (selectedDate) setMatchFeeDueDate(selectedDate);
+          }}
         />
+      )}
+
+      <Text style={styles.label}>Match Fee Description (Optional)</Text>
+      <TextInput
+        style={[styles.input, styles.notesInput]}
+        placeholder="Example: Pay before match day"
+        placeholderTextColor="#7a7a7a"
+        value={matchFeeDescription}
+        onChangeText={setMatchFeeDescription}
+        multiline
+      />
+
+
+
+
+
 
         <Text style={styles.label}>Notes</Text>
         <TextInput
@@ -663,4 +717,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
   },
+  inputText:{
+    color:"#111",
+    fontWeight:"500",
+  }
 });

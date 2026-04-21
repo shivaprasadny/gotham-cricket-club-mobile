@@ -30,6 +30,10 @@ import CreateLeagueScreen from "../screens/CreateLeagueScreen";
 import LeagueDetailsScreen from "../screens/LeagueDetailsScreen";
 import EditLeagueScreen from "../screens/EditLeagueScreen";
 import EditEventScreen from "../screens/EditEventScreen";
+import MyFeesScreen from "../screens/MyFeesScreen";
+import CreateFeeScreen from "../screens/CreateFeeScreen";
+import FeeListScreen from "../screens/FeeListScreen";
+import FeeDetailsScreen from "../screens/FeeDetailsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -79,9 +83,10 @@ const AppNavigator = () => {
 <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
 <Stack.Screen name="EventDetails" component={EventDetailsScreen} />
 <Stack.Screen name="EditLeague" component={EditLeagueScreen} />
-
-
-
+<Stack.Screen name="MyFees" component={MyFeesScreen} />
+<Stack.Screen name="CreateFee" component={CreateFeeScreen} />
+<Stack.Screen name="FeeList" component={FeeListScreen} />
+<Stack.Screen name="FeeDetails" component={FeeDetailsScreen} /> 
 
 <Stack.Screen name="EditEvent" component={EditEventScreen} />
           <Stack.Screen

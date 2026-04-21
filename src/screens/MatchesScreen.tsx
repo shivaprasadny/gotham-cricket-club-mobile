@@ -1,18 +1,19 @@
-import React, { useEffect, useMemo, useState,useCallback } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { deleteMatch, getMatches } from "../services/matchService";
-import { useFocusEffect } from "@react-navigation/native";
-
 
 type Props = {
   navigation: any;
@@ -30,7 +31,9 @@ type Match = {
   matchDate: string;
   venue: string;
   matchType: string;
-  matchFee?: number | null;
+  matchFeeAmount?: number | null;
+  matchFeeDueDate?: string | null;
+  matchFeeDescription?: string | null;
   matchFormat?: string;
   notes?: string;
   createdBy?: string;
@@ -39,21 +42,25 @@ type Match = {
 };
 
 type MatchFilter = "UPCOMING" | "PAST" | "ALL" | "CANCELLED";
+type TeamFilter = "ALL_TEAMS" | string;
+type LeagueFilter = "ALL_LEAGUES" | string;
+type PickerType = "STATUS" | "TEAM" | "LEAGUE" | null;
 
 const MatchesScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
 
-  // All matches from backend
-  const [matches, setMatches] = useState<Match[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]); // all matches
+  const [loading, setLoading] = useState(true); // page loading
+  const [refreshing, setRefreshing] = useState(false); // pull refresh
 
-  // Loading states
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<MatchFilter>("UPCOMING"); // status filter
+  const [teamFilter, setTeamFilter] = useState<TeamFilter>("ALL_TEAMS"); // team filter
+  const [leagueFilter, setLeagueFilter] = useState<LeagueFilter>("ALL_LEAGUES"); // league filter
 
-  // Default filter = upcoming only
-  const [filter, setFilter] = useState<MatchFilter>("UPCOMING");
+  const [pickerVisible, setPickerVisible] = useState(false); // popup open/close
+  const [pickerType, setPickerType] = useState<PickerType>(null); // current popup type
 
-  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN"; // admin/captain actions
 
   // Load matches from backend
   const loadMatches = async () => {
@@ -71,11 +78,12 @@ const MatchesScreen = ({ navigation }: Props) => {
     }
   };
 
- useFocusEffect(
-  useCallback(() => {
-    void loadMatches();
-  }, [])
-);
+  // Reload on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      void loadMatches();
+    }, [])
+  );
 
   // Pull to refresh
   const onRefresh = async () => {
@@ -94,7 +102,37 @@ const MatchesScreen = ({ navigation }: Props) => {
     }`;
   };
 
-  // Filter matches by date and cancelled state
+  // Build unique team options
+  const teamOptions = useMemo(() => {
+    const teams = new Set<string>();
+
+    matches.forEach((match) => {
+      if (match.homeTeamName) {
+        teams.add(match.homeTeamName);
+      }
+
+      if (match.awayTeamName) {
+        teams.add(match.awayTeamName);
+      }
+    });
+
+    return ["ALL_TEAMS", ...Array.from(teams)];
+  }, [matches]);
+
+  // Build unique league options
+  const leagueOptions = useMemo(() => {
+    const leagues = new Set<string>();
+
+    matches.forEach((match) => {
+      if (match.leagueName) {
+        leagues.add(match.leagueName);
+      }
+    });
+
+    return ["ALL_LEAGUES", ...Array.from(leagues)];
+  }, [matches]);
+
+  // Apply status/team/league filters
   const filteredMatches = useMemo(() => {
     const now = new Date();
 
@@ -103,23 +141,36 @@ const MatchesScreen = ({ navigation }: Props) => {
       const isPast = matchDate < now;
       const isCancelled = match.status === "CANCELLED";
 
-      if (filter === "UPCOMING") {
-        return !isPast && !isCancelled;
+      if (filter === "UPCOMING" && (isPast || isCancelled)) {
+        return false;
       }
 
-      if (filter === "PAST") {
-        return isPast && !isCancelled;
+      if (filter === "PAST" && (!isPast || isCancelled)) {
+        return false;
       }
 
-      if (filter === "CANCELLED") {
-        return isCancelled;
+      if (filter === "CANCELLED" && !isCancelled) {
+        return false;
+      }
+
+      if (teamFilter !== "ALL_TEAMS") {
+        const teamMatch =
+          match.homeTeamName === teamFilter || match.awayTeamName === teamFilter;
+
+        if (!teamMatch) {
+          return false;
+        }
+      }
+
+      if (leagueFilter !== "ALL_LEAGUES" && match.leagueName !== leagueFilter) {
+        return false;
       }
 
       return true;
     });
-  }, [matches, filter]);
+  }, [matches, filter, teamFilter, leagueFilter]);
 
-  // Color availability text
+  // Availability color
   const getAvailabilityColor = (status?: string) => {
     switch (status) {
       case "AVAILABLE":
@@ -163,6 +214,76 @@ const MatchesScreen = ({ navigation }: Props) => {
     ]);
   };
 
+  // Open selector modal
+  const openPicker = (type: PickerType) => {
+    setPickerType(type);
+    setPickerVisible(true);
+  };
+
+  // Close selector modal
+  const closePicker = () => {
+    setPickerVisible(false);
+    setPickerType(null);
+  };
+
+  // Modal title
+  const getPickerTitle = () => {
+    if (pickerType === "STATUS") return "Select Match Filter";
+    if (pickerType === "TEAM") return "Select Team";
+    if (pickerType === "LEAGUE") return "Select League";
+    return "Select";
+  };
+
+  // Modal items
+  const pickerOptions = useMemo(() => {
+    if (pickerType === "STATUS") {
+      return ["UPCOMING", "PAST", "ALL", "CANCELLED"];
+    }
+
+    if (pickerType === "TEAM") {
+      return teamOptions;
+    }
+
+    if (pickerType === "LEAGUE") {
+      return leagueOptions;
+    }
+
+    return [];
+  }, [pickerType, teamOptions, leagueOptions]);
+
+  // Current selected label
+  const getCurrentSelectedValue = () => {
+    if (pickerType === "STATUS") return filter;
+    if (pickerType === "TEAM") return teamFilter;
+    if (pickerType === "LEAGUE") return leagueFilter;
+    return "";
+  };
+
+  // Handle picker selection
+  const handlePickerSelect = (value: string) => {
+    if (pickerType === "STATUS") {
+      setFilter(value as MatchFilter);
+    }
+
+    if (pickerType === "TEAM") {
+      setTeamFilter(value);
+    }
+
+    if (pickerType === "LEAGUE") {
+      setLeagueFilter(value);
+    }
+
+    closePicker();
+  };
+
+  // Team button label
+  const teamButtonLabel =
+    teamFilter === "ALL_TEAMS" ? "All Teams" : teamFilter;
+
+  // League button label
+  const leagueButtonLabel =
+    leagueFilter === "ALL_LEAGUES" ? "All Leagues" : leagueFilter;
+
   // Render one match card
   const renderItem = ({ item }: { item: Match }) => {
     const isAvailabilityLocked =
@@ -184,15 +305,25 @@ const MatchesScreen = ({ navigation }: Props) => {
           ) : null}
 
           <Text style={styles.detail}>Type: {item.matchType}</Text>
-          {item.matchFee !== null && item.matchFee !== undefined ? (
-  <Text style={styles.detail}>Match Fee: ${item.matchFee}</Text>
-) : null}
+
+          <Text style={styles.detail}>
+            Fee Per Player:{" "}
+            {item.matchFeeAmount !== null && item.matchFeeAmount !== undefined
+              ? `$${item.matchFeeAmount}`
+              : "N/A"}
+          </Text>
+
           <Text style={styles.detail}>Venue: {item.venue}</Text>
+
           <Text style={styles.detail}>
             Date: {new Date(item.matchDate).toLocaleString()}
           </Text>
+
           <Text style={styles.detail}>Format: {item.matchFormat || "N/A"}</Text>
-          <Text style={styles.detail}>Status: {item.status || "UPCOMING"}</Text>
+
+          <Text style={styles.detail}>
+            Status: {item.status || "UPCOMING"}
+          </Text>
         </TouchableOpacity>
 
         {item.myAvailability ? (
@@ -250,6 +381,7 @@ const MatchesScreen = ({ navigation }: Props) => {
     );
   };
 
+  // Loading UI
   if (loading) {
     return (
       <View style={styles.center}>
@@ -260,64 +392,132 @@ const MatchesScreen = ({ navigation }: Props) => {
   }
 
   return (
-    <FlatList
-      data={filteredMatches}
-      keyExtractor={(item) => item.id.toString()}
-      renderItem={renderItem}
-      contentContainerStyle={
-        filteredMatches.length === 0 ? styles.center : styles.list
-      }
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-      ListHeaderComponent={
-        <View>
-          {canManage && (
-            <TouchableOpacity
-              style={styles.createBtn}
-              onPress={() => navigation.navigate("CreateMatch")}
-            >
-              <Text style={styles.createBtnText}>+ Create Match</Text>
-            </TouchableOpacity>
-          )}
-
-          <View style={styles.filterRow}>
-            {(["UPCOMING", "PAST", "ALL", "CANCELLED"] as MatchFilter[]).map(
-              (item) => (
-                <TouchableOpacity
-                  key={item}
-                  style={[
-                    styles.filterBtn,
-                    filter === item && styles.filterBtnSelected,
-                  ]}
-                  onPress={() => setFilter(item)}
-                >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      filter === item && styles.filterTextSelected,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )
+    <>
+      <FlatList
+        data={filteredMatches}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={renderItem}
+        contentContainerStyle={
+          filteredMatches.length === 0 ? styles.center : styles.list
+        }
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListHeaderComponent={
+          <View>
+            {canManage && (
+              <TouchableOpacity
+                style={styles.createBtn}
+                onPress={() => navigation.navigate("CreateMatch")}
+              >
+                <Text style={styles.createBtnText}>+ Create Match</Text>
+              </TouchableOpacity>
             )}
+
+            <View style={styles.topFilterRow}>
+              <TouchableOpacity
+                style={styles.topFilterBtn}
+                onPress={() => openPicker("STATUS")}
+              >
+                <Text style={styles.topFilterBtnText}>
+                  {filter}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.topFilterBtn}
+                onPress={() => openPicker("TEAM")}
+              >
+                <Text style={styles.topFilterBtnText}>
+                  {teamButtonLabel}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.topFilterBtn}
+                onPress={() => openPicker("LEAGUE")}
+              >
+                <Text style={styles.topFilterBtnText}>
+                  {leagueButtonLabel}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.resetBtn}
+                onPress={() => {
+                  setFilter("UPCOMING");
+                  setTeamFilter("ALL_TEAMS");
+                  setLeagueFilter("ALL_LEAGUES");
+                }}
+              >
+                <Text style={styles.resetBtnText}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        }
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>
+            {filter === "UPCOMING"
+              ? "No upcoming matches found."
+              : filter === "PAST"
+              ? "No past matches found."
+              : filter === "CANCELLED"
+              ? "No cancelled matches found."
+              : "No matches found."}
+          </Text>
+        }
+      />
+
+      <Modal
+        visible={pickerVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closePicker}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{getPickerTitle()}</Text>
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.modalList}
+            >
+              {pickerOptions.map((option) => {
+                const isSelected = getCurrentSelectedValue() === option;
+
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.modalOptionBtn,
+                      isSelected && styles.modalOptionBtnSelected,
+                    ]}
+                    onPress={() => handlePickerSelect(option)}
+                  >
+                    <Text
+                      style={[
+                        styles.modalOptionText,
+                        isSelected && styles.modalOptionTextSelected,
+                      ]}
+                    >
+                      {option === "ALL_TEAMS"
+                        ? "All Teams"
+                        : option === "ALL_LEAGUES"
+                        ? "All Leagues"
+                        : option}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity style={styles.closeModalBtn} onPress={closePicker}>
+              <Text style={styles.closeModalBtnText}>Close</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      }
-      ListEmptyComponent={
-        <Text style={styles.emptyText}>
-          {filter === "UPCOMING"
-            ? "No upcoming matches found."
-            : filter === "PAST"
-            ? "No past matches found."
-            : filter === "CANCELLED"
-            ? "No cancelled matches found."
-            : "No matches found."}
-        </Text>
-      }
-    />
+      </Modal>
+    </>
   );
 };
 
@@ -328,31 +528,25 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#4B1D6B",
   },
-  filterRow: {
+  topFilterRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
     marginBottom: 16,
   },
-  filterBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  topFilterBtn: {
+    flex: 1,
+    backgroundColor: "#5A257A",
     borderWidth: 1,
     borderColor: "#b89ad1",
-    borderRadius: 20,
-    backgroundColor: "#5A257A",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
   },
-  filterBtnSelected: {
-    backgroundColor: "#F4B400",
-    borderColor: "#F4B400",
-  },
-  filterText: {
-    fontSize: 12,
-    fontWeight: "600",
+  topFilterBtnText: {
     color: "#fff",
-  },
-  filterTextSelected: {
-    color: "#000",
+    textAlign: "center",
+    fontWeight: "700",
+    fontSize: 12,
   },
   createBtn: {
     backgroundColor: "#F4B400",
@@ -364,6 +558,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
     color: "#000",
+  },
+  resetBtn: {
+    backgroundColor: "#F4B400",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    justifyContent: "center",
+  },
+  resetBtnText: {
+    textAlign: "center",
+    fontWeight: "700",
+    color: "#000",
+    fontSize: 12,
   },
   card: {
     backgroundColor: "#5A257A",
@@ -441,6 +648,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: "#fff",
+    textAlign: "center",
   },
   center: {
     flex: 1,
@@ -448,5 +656,59 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#4B1D6B",
     padding: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: "#4B1D6B",
+    borderRadius: 16,
+    padding: 18,
+    maxHeight: "75%",
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#F4B400",
+    marginBottom: 14,
+    textAlign: "center",
+  },
+  modalList: {
+    gap: 8,
+    paddingBottom: 12,
+  },
+  modalOptionBtn: {
+    backgroundColor: "#5A257A",
+    borderWidth: 1,
+    borderColor: "#b89ad1",
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  modalOptionBtnSelected: {
+    backgroundColor: "#F4B400",
+    borderColor: "#F4B400",
+  },
+  modalOptionText: {
+    color: "#fff",
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  modalOptionTextSelected: {
+    color: "#000",
+  },
+  closeModalBtn: {
+    backgroundColor: "#F4B400",
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  closeModalBtnText: {
+    color: "#000",
+    textAlign: "center",
+    fontWeight: "700",
   },
 });

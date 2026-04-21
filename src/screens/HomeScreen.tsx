@@ -18,10 +18,12 @@ import {
   getPinnedAnnouncement,
 } from "../services/announcementService";
 import { getPendingMembers } from "../services/adminService";
+import HomeFeeCard from "../components/HomeFeeCard";
 
 type Props = {
   navigation: any;
 };
+
 
 // Match shape used on home screen
 type Match = {
@@ -331,6 +333,11 @@ const loadHomeData = async () => {
         {/* Top header area */}
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
+
+
+<HomeFeeCard navigation={navigation} />
+
+
             <Text style={styles.heading}>Welcome back</Text>
             <Text style={styles.name}>{user?.fullName}</Text>
             <Text style={styles.roleText}>{user?.role}</Text>
@@ -386,6 +393,9 @@ const loadHomeData = async () => {
     )}
   </>
 )}
+
+
+
 
         {/* Next Match section */}
         <Text style={styles.sectionTitle}>Next Match</Text>
@@ -527,6 +537,25 @@ const loadHomeData = async () => {
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.quickGrid}>
 
+
+          <TouchableOpacity
+  style={styles.quickCard}
+  onPress={() => navigation.navigate("MyFees")}
+>
+  <Ionicons name="card-outline" size={22} color="#F4B400" />
+  <Text style={styles.quickText}>My Fees</Text>
+</TouchableOpacity>
+
+
+{canManage && (
+  <TouchableOpacity
+    style={styles.quickCard}
+    onPress={() => navigation.navigate("FeeList")}
+  >
+    <Ionicons name="wallet-outline" size={22} color="#F4B400" />
+    <Text style={styles.quickText}>Fees Admin</Text>
+  </TouchableOpacity>
+)}
 
 
 {isAdmin && (
