@@ -1,25 +1,21 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 
-// Get all club members from admin service
 import { getAllMembers } from "../services/adminService";
-
-// Get player availability for this match
 import { getAvailabilityByMatch } from "../services/availabilityService";
-
-// Post squad announcement
 import { createAnnouncement } from "../services/announcementService";
-
-// Squad APIs
+import { getTeamMembers } from "../services/teamService";
 import {
   addOrUpdateSquadMember,
   getSquadByMatch,
@@ -28,19 +24,29 @@ import {
 
 type Props = {
   route: any;
+  navigation: any;
 };
 
-// Club player shape from members API
 type ClubPlayer = {
   id?: number;
   userId?: number;
   fullName?: string;
   role?: string;
   status?: string;
-  playerType?: string;
+  playerType?: string | null;
+  nickname?: string | null;
+  jerseyNumber?: number | null;
 };
 
-// Availability row shape
+type TeamPlayer = {
+  teamMemberId?: number;
+  userId: number;
+  fullName: string;
+  nickname?: string | null;
+  playerType?: string | null;
+  jerseyNumber?: number | null;
+};
+
 type AvailabilityItem = {
   id: number;
   matchId: number;
@@ -50,7 +56,6 @@ type AvailabilityItem = {
   message?: string;
 };
 
-// Squad row shape
 type SquadItem = {
   squadId: number;
   userId: number;
@@ -62,11 +67,13 @@ type SquadItem = {
   roleInMatch?: string;
 };
 
-// Combined player row for UI
 type PlayerRow = {
   userId: number;
   fullName: string;
-  playerType?: string;
+  nickname?: string | null;
+  playerType?: string | null;
+  jerseyNumber?: number | null;
+  source: "TEAM" | "CLUB_OTHER";
   availabilityStatus:
     | "AVAILABLE"
     | "NOT_AVAILABLE"
@@ -76,78 +83,83 @@ type PlayerRow = {
   availabilityMessage?: string;
 };
 
-// Sort options
 type SortType = "STATUS" | "NAME";
+type ViewType = "TEAM" | "CLUB_OTHER" | "ADDED";
 
-const SquadSelectionScreen = ({ route }: Props) => {
-  // Match info passed from MatchDetails screen
+const SquadSelectionScreen = ({ route, navigation }: Props) => {
   const {
     matchId,
+    teamId,
     opponentName,
     teamName,
     matchDate,
     venue,
     matchType,
+    matchFormat,
   } = route.params || {};
 
-  // All club players
-  const [players, setPlayers] = useState<ClubPlayer[]>([]);
-
-  // Availability records for this match
+  const [teamPlayers, setTeamPlayers] = useState<TeamPlayer[]>([]);
+  const [clubPlayers, setClubPlayers] = useState<ClubPlayer[]>([]);
   const [availability, setAvailability] = useState<AvailabilityItem[]>([]);
-
-  // Current squad for this match
   const [squad, setSquad] = useState<SquadItem[]>([]);
 
-  // Loading state
   const [loading, setLoading] = useState(true);
-
-  // Announcement loading state
+  const [refreshing, setRefreshing] = useState(false);
   const [announcing, setAnnouncing] = useState(false);
 
-  // Search text for player list
   const [search, setSearch] = useState("");
-
-  // Sort players by status or name
   const [sortBy, setSortBy] = useState<SortType>("STATUS");
+  const [viewType, setViewType] = useState<ViewType>("TEAM");
 
-  // Temporary input per player for role in match
-  // Example:
-  // { 12: "CAPTAIN", 15: "WICKETKEEPER" }
   const [roleInputs, setRoleInputs] = useState<Record<number, string>>({});
-
-  // Optional custom message for squad announcement
   const [customMessage, setCustomMessage] = useState("");
 
-  useEffect(() => {
-    void loadData();
-  }, []);
-
-  // Load all data needed for squad screen
   const loadData = async () => {
+    if (!matchId || !teamId) {
+      Alert.alert("Error", "Match ID or Team ID is missing");
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     try {
       setLoading(true);
 
-      const [allPlayers, availabilityData, squadData] = await Promise.all([
-        getAllMembers(),
-        getAvailabilityByMatch(matchId),
-        getSquadByMatch(matchId),
-      ]);
+      const [teamData, allClubPlayers, availabilityData, squadData] =
+        await Promise.all([
+          getTeamMembers(teamId),
+          getAllMembers(),
+          getAvailabilityByMatch(matchId),
+          getSquadByMatch(matchId),
+        ]);
 
-      setPlayers(Array.isArray(allPlayers) ? allPlayers : []);
+      setTeamPlayers(Array.isArray(teamData) ? teamData : []);
+      setClubPlayers(Array.isArray(allClubPlayers) ? allClubPlayers : []);
       setAvailability(Array.isArray(availabilityData) ? availabilityData : []);
       setSquad(Array.isArray(squadData) ? squadData : []);
     } catch (error: any) {
+      console.log("SQUAD LOAD ERROR:", error?.response?.data || error);
       Alert.alert(
         "Error",
         error?.response?.data?.message || "Failed to load squad data"
       );
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Get one player's availability status for this match
+  useFocusEffect(
+    useCallback(() => {
+      void loadData();
+    }, [matchId, teamId])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+  };
+
   const getAvailabilityStatus = (
     userId: number
   ): PlayerRow["availabilityStatus"] => {
@@ -155,56 +167,137 @@ const SquadSelectionScreen = ({ route }: Props) => {
     return found?.status || "NO_RESPONSE";
   };
 
-  // Get one player's availability message/note
   const getAvailabilityMessage = (userId: number) => {
     const found = availability.find((a) => a.userId === userId);
     return found?.message;
   };
 
-  // Priority for status sorting
-  // Lower number = appears first
   const getPriority = (status: PlayerRow["availabilityStatus"]) => {
     switch (status) {
       case "AVAILABLE":
         return 1;
       case "MAYBE":
         return 2;
-      case "NO_RESPONSE":
-        return 3;
       case "NOT_AVAILABLE":
-        return 4;
+        return 3;
       case "INJURED":
+        return 4;
+      case "NO_RESPONSE":
         return 5;
       default:
         return 6;
     }
   };
 
-  
+  const selectedUserIds = useMemo(() => squad.map((s) => s.userId), [squad]);
+  const teamUserIds = useMemo(
+    () => teamPlayers.map((p) => p.userId),
+    [teamPlayers]
+  );
 
-  // Convert raw players into UI-ready rows
-  const allClubPlayers: PlayerRow[] = useMemo(() => {
-    return players
+  const normalizedTeamPlayers: PlayerRow[] = useMemo(() => {
+    return teamPlayers.map((p) => ({
+      userId: p.userId,
+      fullName: p.fullName || "Unknown Player",
+      nickname: p.nickname,
+      playerType: p.playerType,
+      jerseyNumber: p.jerseyNumber,
+      source: "TEAM" as const,
+      availabilityStatus: getAvailabilityStatus(p.userId),
+      availabilityMessage: getAvailabilityMessage(p.userId),
+    }));
+  }, [teamPlayers, availability]);
+
+  const normalizedOtherClubPlayers: PlayerRow[] = useMemo(() => {
+    return clubPlayers
       .map((p) => {
-        // Some APIs return id, some return userId
         const normalizedUserId = p.userId ?? p.id ?? 0;
 
         return {
           userId: normalizedUserId,
           fullName: p.fullName || "Unknown Player",
+          nickname: p.nickname,
           playerType: p.playerType,
+          jerseyNumber: p.jerseyNumber,
+          source: "CLUB_OTHER" as const,
           availabilityStatus: getAvailabilityStatus(normalizedUserId),
           availabilityMessage: getAvailabilityMessage(normalizedUserId),
         };
       })
-      .filter((p) => p.userId !== 0);
-  }, [players, availability]);
+      .filter((p) => p.userId !== 0)
+      .filter((p) => !teamUserIds.includes(p.userId));
+  }, [clubPlayers, availability, teamUserIds]);
 
-  // Apply search + sorting
+  const playingXi = useMemo(
+    () =>
+      squad.filter(
+        (s) => s.isPlayingXi && s.roleInMatch !== "IMPACT_PLAYER"
+      ),
+    [squad]
+  );
+
+  const impactPlayer = useMemo(
+    () => squad.find((s) => s.roleInMatch === "IMPACT_PLAYER") || null,
+    [squad]
+  );
+
+  const reserves = useMemo(
+    () =>
+      squad.filter(
+        (s) => !s.isPlayingXi && s.roleInMatch !== "IMPACT_PLAYER"
+      ),
+    [squad]
+  );
+
+  const addedPlayersOnly: PlayerRow[] = useMemo(() => {
+    return squad.map((s) => ({
+      userId: s.userId,
+      fullName: s.fullName,
+      nickname: s.nickname,
+      playerType: s.playerType,
+      jerseyNumber: s.jerseyNumber,
+      source: teamUserIds.includes(s.userId) ? "TEAM" : "CLUB_OTHER",
+      availabilityStatus: getAvailabilityStatus(s.userId),
+      availabilityMessage: getAvailabilityMessage(s.userId),
+    }));
+  }, [squad, availability, teamUserIds]);
+
+  const getSquadEntry = (userId: number) =>
+    squad.find((s) => s.userId === userId);
+
+  const isSelected = (userId: number) => selectedUserIds.includes(userId);
+
+  const currentBaseList = useMemo(() => {
+    if (viewType === "TEAM") {
+      return normalizedTeamPlayers.filter((p) => !isSelected(p.userId));
+    }
+
+    if (viewType === "CLUB_OTHER") {
+      return normalizedOtherClubPlayers.filter((p) => !isSelected(p.userId));
+    }
+
+    return addedPlayersOnly;
+  }, [
+    viewType,
+    normalizedTeamPlayers,
+    normalizedOtherClubPlayers,
+    addedPlayersOnly,
+    selectedUserIds,
+  ]);
+
   const filteredAndSortedPlayers = useMemo(() => {
-    let result = allClubPlayers.filter((p) =>
-      p.fullName.toLowerCase().includes(search.toLowerCase())
-    );
+    let result = currentBaseList.filter((p) => {
+      const text = search.trim().toLowerCase();
+
+      if (!text) return true;
+
+      return (
+        p.fullName.toLowerCase().includes(text) ||
+        (p.nickname || "").toLowerCase().includes(text) ||
+        (p.playerType || "").toLowerCase().includes(text) ||
+        String(p.jerseyNumber || "").includes(text)
+      );
+    });
 
     if (sortBy === "STATUS") {
       result = [...result].sort((a, b) => {
@@ -213,7 +306,6 @@ const SquadSelectionScreen = ({ route }: Props) => {
 
         if (statusCompare !== 0) return statusCompare;
 
-        // If same status, sort by name
         return a.fullName.localeCompare(b.fullName);
       });
     } else {
@@ -221,27 +313,25 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
 
     return result;
-  }, [allClubPlayers, search, sortBy]);
+  }, [currentBaseList, search, sortBy]);
 
-  // Find one player's squad entry
-  const getSquadEntry = (userId: number) => {
-    return squad.find((s) => s.userId === userId);
-  };
-
-  // Check if player is already selected
-  const isSelected = (userId: number) => {
-    return squad.some((s) => s.userId === userId);
-  };
-
-  // Add or update player in squad
   const handleAdd = async (userId: number, isPlayingXi: boolean) => {
     try {
-      // Use current role input for player if available
       const roleInMatch = roleInputs[userId]?.trim() || undefined;
+
+      if (roleInMatch === "IMPACT_PLAYER") {
+        const alreadyImpact =
+          impactPlayer && impactPlayer.userId !== userId ? true : false;
+
+        if (alreadyImpact) {
+          Alert.alert("Error", "Only 1 impact player is allowed");
+          return;
+        }
+      }
 
       const response = await addOrUpdateSquadMember(matchId, {
         userId,
-        isPlayingXi,
+        isPlayingXi: roleInMatch === "IMPACT_PLAYER" ? false : isPlayingXi,
         roleInMatch,
       });
 
@@ -259,7 +349,6 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
-  // Remove player from squad
   const handleRemove = async (userId: number) => {
     try {
       const response = await removeSquadMember(matchId, userId);
@@ -278,47 +367,19 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
-  // Playing XI players
-  const playingXi = useMemo(
-    () => squad.filter((s) => s.isPlayingXi),
-    [squad]
-  );
+  const captain = playingXi.find((p) => p.roleInMatch === "CAPTAIN");
+  const viceCaptain = playingXi.find((p) => p.roleInMatch === "VICE_CAPTAIN");
+  const wicketKeeper = playingXi.find((p) => p.roleInMatch === "WICKETKEEPER");
 
-  // Reserve players
-  const reserves = useMemo(
-    () => squad.filter((s) => !s.isPlayingXi),
-    [squad]
-  );
-
-  // Playing XI count
-  const playingXiCount = useMemo(() => playingXi.length, [playingXi]);
-
-  // Special role checks
-  const captain = useMemo(
-    () => playingXi.find((p) => p.roleInMatch === "CAPTAIN"),
-    [playingXi]
-  );
-
-  const viceCaptain = useMemo(
-    () => playingXi.find((p) => p.roleInMatch === "VICE_CAPTAIN"),
-    [playingXi]
-  );
-
-  const wicketKeeper = useMemo(
-    () => playingXi.find((p) => p.roleInMatch === "WICKETKEEPER"),
-    [playingXi]
-  );
-
-  // Build warning messages for invalid or incomplete squad
   const squadWarnings = useMemo(() => {
     const warnings: string[] = [];
 
-    if (playingXiCount < 11) {
-      warnings.push(`Need ${11 - playingXiCount} more player(s) in Playing XI`);
+    if (playingXi.length < 11) {
+      warnings.push(`Need ${11 - playingXi.length} more player(s) in Playing XI`);
     }
 
-    if (playingXiCount > 11) {
-      warnings.push(`Playing XI has ${playingXiCount} players. Maximum is 11`);
+    if (playingXi.length > 11) {
+      warnings.push(`Playing XI has ${playingXi.length} players. Maximum is 11`);
     }
 
     if (!captain) {
@@ -334,9 +395,8 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
 
     return warnings;
-  }, [playingXiCount, captain, viceCaptain, wicketKeeper]);
+  }, [playingXi, captain, viceCaptain, wicketKeeper]);
 
-  // Pick badge color based on availability
   const getAvailabilityStyle = (status: PlayerRow["availabilityStatus"]) => {
     switch (status) {
       case "AVAILABLE":
@@ -354,7 +414,6 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
-  // Format date for announcement
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Not set";
     try {
@@ -364,50 +423,43 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
-  // Announce squad to announcement board
+  const formatRoleTag = (role?: string) => {
+    switch (role) {
+      case "CAPTAIN":
+        return " (C)";
+      case "VICE_CAPTAIN":
+        return " (VC)";
+      case "WICKETKEEPER":
+        return " (WK)";
+      default:
+        return "";
+    }
+  };
+
   const handleAnnounceSquad = async () => {
     try {
       setAnnouncing(true);
 
-      // Build Playing XI text with tags
       const playingXiText =
         playingXi.length > 0
           ? playingXi
-              .map((p, index) => {
-                const tag =
-                  p.roleInMatch === "CAPTAIN"
-                    ? " (C)"
-                    : p.roleInMatch === "VICE_CAPTAIN"
-                    ? " (VC)"
-                    : p.roleInMatch === "WICKETKEEPER"
-                    ? " (WK)"
-                    : "";
-
-                return `${index + 1}. ${p.fullName}${tag}`;
-              })
+              .map(
+                (p, index) =>
+                  `${index + 1}. ${p.fullName}${formatRoleTag(p.roleInMatch)}`
+              )
               .join("\n")
           : "No Playing XI selected";
 
-      // Build reserve text with tags
       const reservesText =
         reserves.length > 0
           ? reserves
-              .map((p, index) => {
-                const tag =
-                  p.roleInMatch === "CAPTAIN"
-                    ? " (C)"
-                    : p.roleInMatch === "VICE_CAPTAIN"
-                    ? " (VC)"
-                    : p.roleInMatch === "WICKETKEEPER"
-                    ? " (WK)"
-                    : "";
-
-                return `${index + 1}. ${p.fullName}${tag}`;
-              })
+              .map(
+                (p, index) =>
+                  `${index + 1}. ${p.fullName}${formatRoleTag(p.roleInMatch)}`
+              )
               .join("\n")
           : "No reserve players";
 
-      // Better title for announcement
       const title =
         teamName && opponentName
           ? `${teamName} vs ${opponentName}`
@@ -415,15 +467,16 @@ const SquadSelectionScreen = ({ route }: Props) => {
           ? `Match vs ${opponentName}`
           : "Squad Announcement";
 
-      // Full announcement body
       const message =
         `${customMessage.trim() ? customMessage.trim() + "\n\n" : ""}` +
         `Team: ${teamName || "No team assigned"}\n` +
         `Opponent: ${opponentName || "Not set"}\n` +
         `Date: ${formatDate(matchDate)}\n` +
         `Venue: ${venue || "Not set"}\n` +
-        `Match Type: ${matchType || "Not set"}\n\n` +
+        `Match Type: ${matchType || "Not set"}\n` +
+        `Format: ${matchFormat || "Not set"}\n\n` +
         `Playing XI:\n${playingXiText}\n\n` +
+        `Impact Player:\n${impactPlayer ? impactPlayer.fullName : "Not selected"}\n\n` +
         `Reserve:\n${reservesText}`;
 
       const response = await createAnnouncement({
@@ -435,7 +488,16 @@ const SquadSelectionScreen = ({ route }: Props) => {
         "Success",
         typeof response === "string"
           ? response
-          : "Squad announced successfully"
+          : "Squad announced successfully",
+        [
+          {
+            text: "OK",
+            onPress: () =>
+              navigation.navigate("MainTabs", {
+                screen: "Announcements",
+              }),
+          },
+        ]
       );
     } catch (error: any) {
       Alert.alert(
@@ -447,12 +509,11 @@ const SquadSelectionScreen = ({ route }: Props) => {
     }
   };
 
-  // Loading screen
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
-        <Text>Loading squad...</Text>
+        <ActivityIndicator size="large" color="#da9306" />
+        <Text style={styles.loadingText}>Loading squad...</Text>
       </View>
     );
   }
@@ -462,32 +523,53 @@ const SquadSelectionScreen = ({ route }: Props) => {
       data={filteredAndSortedPlayers}
       keyExtractor={(item) => item.userId.toString()}
       contentContainerStyle={styles.list}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
       ListHeaderComponent={
         <View>
           <Text style={styles.title}>Squad Selection</Text>
 
-          {/* Playing XI summary */}
+          <View style={styles.matchInfoCard}>
+            <Text style={styles.matchInfoText}>Team: {teamName || "Not set"}</Text>
+            <Text style={styles.matchInfoText}>
+              Opponent: {opponentName || "Not set"}
+            </Text>
+            <Text style={styles.matchInfoText}>
+              Date: {formatDate(matchDate)}
+            </Text>
+            <Text style={styles.matchInfoText}>Venue: {venue || "Not set"}</Text>
+            <Text style={styles.matchInfoText}>
+              Match Type: {matchType || "Not set"}
+            </Text>
+            <Text style={styles.matchInfoText}>
+              Format: {matchFormat || "N/A"}
+            </Text>
+          </View>
+
           <View style={styles.summaryCard}>
-            <Text style={styles.sectionTitle}>Playing XI ({playingXiCount}/11)</Text>
+            <Text style={styles.sectionTitle}>Playing XI ({playingXi.length}/11)</Text>
             {playingXi.length === 0 ? (
               <Text style={styles.summaryEmpty}>No players selected yet</Text>
             ) : (
               playingXi.map((p) => (
                 <Text key={p.squadId} style={styles.summaryName}>
                   • {p.fullName}
-                  {p.roleInMatch === "CAPTAIN"
-                    ? " (C)"
-                    : p.roleInMatch === "VICE_CAPTAIN"
-                    ? " (VC)"
-                    : p.roleInMatch === "WICKETKEEPER"
-                    ? " (WK)"
-                    : ""}
+                  {formatRoleTag(p.roleInMatch)}
                 </Text>
               ))
             )}
           </View>
 
-          {/* Reserve summary */}
+          <View style={styles.summaryCard}>
+            <Text style={styles.sectionTitle}>Impact Player</Text>
+            {impactPlayer ? (
+              <Text style={styles.summaryName}>• {impactPlayer.fullName} (IP)</Text>
+            ) : (
+              <Text style={styles.summaryEmpty}>No impact player selected</Text>
+            )}
+          </View>
+
           <View style={styles.summaryCard}>
             <Text style={styles.sectionTitle}>Reserve</Text>
             {reserves.length === 0 ? (
@@ -496,23 +578,15 @@ const SquadSelectionScreen = ({ route }: Props) => {
               reserves.map((p) => (
                 <Text key={p.squadId} style={styles.summaryName}>
                   • {p.fullName}
-                  {p.roleInMatch === "CAPTAIN"
-                    ? " (C)"
-                    : p.roleInMatch === "VICE_CAPTAIN"
-                    ? " (VC)"
-                    : p.roleInMatch === "WICKETKEEPER"
-                    ? " (WK)"
-                    : ""}
+                  {formatRoleTag(p.roleInMatch)}
                 </Text>
               ))
             )}
           </View>
 
-          {/* Squad warnings */}
           {squadWarnings.length > 0 && (
             <View style={styles.warningCard}>
               <Text style={styles.warningTitle}>Squad Warnings</Text>
-
               {squadWarnings.map((warning, index) => (
                 <Text key={index} style={styles.warningText}>
                   ⚠ {warning}
@@ -521,15 +595,67 @@ const SquadSelectionScreen = ({ route }: Props) => {
             </View>
           )}
 
-          {/* Search player by name */}
           <TextInput
             style={styles.searchInput}
             placeholder="Search player name..."
+            placeholderTextColor="#7a7a7a"
             value={search}
             onChangeText={setSearch}
           />
 
-          {/* Sort options */}
+          <View style={styles.viewRow}>
+            <TouchableOpacity
+              style={[
+                styles.viewBtn,
+                viewType === "TEAM" && styles.viewBtnSelected,
+              ]}
+              onPress={() => setViewType("TEAM")}
+            >
+              <Text
+                style={[
+                  styles.viewBtnText,
+                  viewType === "TEAM" && styles.viewBtnTextSelected,
+                ]}
+              >
+                Team Players
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.viewBtn,
+                viewType === "CLUB_OTHER" && styles.viewBtnSelected,
+              ]}
+              onPress={() => setViewType("CLUB_OTHER")}
+            >
+              <Text
+                style={[
+                  styles.viewBtnText,
+                  viewType === "CLUB_OTHER" && styles.viewBtnTextSelected,
+                ]}
+              >
+                Other Club Players
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.viewBtn,
+                viewType === "ADDED" && styles.viewBtnSelected,
+              ]}
+              onPress={() => setViewType("ADDED")}
+            >
+              <Text
+                style={[
+                  styles.viewBtnText,
+                  viewType === "ADDED" && styles.viewBtnTextSelected,
+                ]}
+              >
+                Added Players
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.sortRow}>
             <TouchableOpacity
               style={[
@@ -544,7 +670,7 @@ const SquadSelectionScreen = ({ route }: Props) => {
                   sortBy === "STATUS" && styles.sortTextSelected,
                 ]}
               >
-                Sort by Status
+                Status
               </Text>
             </TouchableOpacity>
 
@@ -561,22 +687,21 @@ const SquadSelectionScreen = ({ route }: Props) => {
                   sortBy === "NAME" && styles.sortTextSelected,
                 ]}
               >
-                Sort by Name
+                Name
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Optional custom message for squad announcement */}
           <Text style={styles.sectionTitle}>Announcement Message</Text>
           <TextInput
             style={styles.customMessageInput}
             placeholder="Write message for squad announcement..."
+            placeholderTextColor="#7a7a7a"
             value={customMessage}
             onChangeText={setCustomMessage}
             multiline
           />
 
-          {/* Announce squad button */}
           <TouchableOpacity
             style={styles.announceBtn}
             onPress={handleAnnounceSquad}
@@ -586,6 +711,14 @@ const SquadSelectionScreen = ({ route }: Props) => {
               {announcing ? "Announcing..." : "Announce Squad"}
             </Text>
           </TouchableOpacity>
+
+          <Text style={styles.sectionTitle}>
+            {viewType === "TEAM"
+              ? "Team Players"
+              : viewType === "CLUB_OTHER"
+              ? "Other Club Players"
+              : "Added Players"}
+          </Text>
         </View>
       }
       renderItem={({ item }) => {
@@ -594,12 +727,13 @@ const SquadSelectionScreen = ({ route }: Props) => {
 
         return (
           <View style={styles.card}>
-            {/* Top line: player name + type + availability badge */}
             <View style={styles.topRow}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.fullName}</Text>
                 <Text style={styles.typeText}>
                   {item.playerType || "Player"}
+                  {item.jerseyNumber ? ` • Jersey ${item.jerseyNumber}` : ""}
+                  {item.nickname ? ` • ${item.nickname}` : ""}
                 </Text>
               </View>
 
@@ -610,14 +744,12 @@ const SquadSelectionScreen = ({ route }: Props) => {
               </Text>
             </View>
 
-            {/* Optional player note */}
             {item.availabilityMessage ? (
               <Text style={styles.noteText}>Note: {item.availabilityMessage}</Text>
             ) : null}
 
             {!selected ? (
               <>
-                {/* Quick role buttons for captain / vice-captain / wicketkeeper */}
                 <View style={styles.specialRoleRow}>
                   <TouchableOpacity
                     style={styles.specialRoleBtn}
@@ -654,19 +786,30 @@ const SquadSelectionScreen = ({ route }: Props) => {
                   >
                     <Text style={styles.specialRoleBtnText}>WK</Text>
                   </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.specialRoleBtn}
+                    onPress={() =>
+                      setRoleInputs((prev) => ({
+                        ...prev,
+                        [item.userId]: "IMPACT_PLAYER",
+                      }))
+                    }
+                  >
+                    <Text style={styles.specialRoleBtnText}>IP</Text>
+                  </TouchableOpacity>
                 </View>
 
-                {/* Free text role input */}
                 <TextInput
                   style={styles.roleInput}
-                  placeholder="Role in match (CAPTAIN / VICE_CAPTAIN / WICKETKEEPER)"
+                  placeholder="Role in match (CAPTAIN / VICE_CAPTAIN / WICKETKEEPER / IMPACT_PLAYER)"
+                  placeholderTextColor="#7a7a7a"
                   value={roleInputs[item.userId] || ""}
                   onChangeText={(text) =>
                     setRoleInputs((prev) => ({ ...prev, [item.userId]: text }))
                   }
                 />
 
-                {/* Add to Playing XI */}
                 <TouchableOpacity
                   style={styles.btn}
                   onPress={() => handleAdd(item.userId, true)}
@@ -674,7 +817,6 @@ const SquadSelectionScreen = ({ route }: Props) => {
                   <Text style={styles.btnText}>Add to Playing XI</Text>
                 </TouchableOpacity>
 
-                {/* Add to Reserve */}
                 <TouchableOpacity
                   style={styles.btn2}
                   onPress={() => handleAdd(item.userId, false)}
@@ -684,12 +826,14 @@ const SquadSelectionScreen = ({ route }: Props) => {
               </>
             ) : (
               <>
-                {/* Selected state */}
                 <Text style={styles.selectedText}>
-                  {squadEntry?.isPlayingXi ? "Playing XI ✅" : "Reserve 🟡"}
+                  {squadEntry?.roleInMatch === "IMPACT_PLAYER"
+                    ? "Impact Player ⭐"
+                    : squadEntry?.isPlayingXi
+                    ? "Playing XI ✅"
+                    : "Reserve 🟡"}
                 </Text>
 
-                {/* Role badge if special role exists */}
                 {squadEntry?.roleInMatch ? (
                   <View style={styles.roleBadge}>
                     <Text style={styles.roleBadgeText}>
@@ -699,12 +843,13 @@ const SquadSelectionScreen = ({ route }: Props) => {
                         ? "VC"
                         : squadEntry.roleInMatch === "WICKETKEEPER"
                         ? "WK"
+                        : squadEntry.roleInMatch === "IMPACT_PLAYER"
+                        ? "IP"
                         : squadEntry.roleInMatch}
                     </Text>
                   </View>
                 ) : null}
 
-                {/* Remove from squad */}
                 <TouchableOpacity
                   style={styles.removeBtn}
                   onPress={() => handleRemove(item.userId)}
@@ -716,7 +861,15 @@ const SquadSelectionScreen = ({ route }: Props) => {
           </View>
         );
       }}
-      ListEmptyComponent={<Text style={styles.empty}>No players found.</Text>}
+      ListEmptyComponent={
+        <Text style={styles.empty}>
+          {viewType === "TEAM"
+            ? "No team players left to add."
+            : viewType === "CLUB_OTHER"
+            ? "No other club players found."
+            : "No added players yet."}
+        </Text>
+      }
     />
   );
 };
@@ -726,32 +879,51 @@ export default SquadSelectionScreen;
 const styles = StyleSheet.create({
   list: {
     padding: 16,
-    backgroundColor: "#fff",
+    backgroundColor: "#f8f5fb",
     flexGrow: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "700",
     textAlign: "center",
     marginBottom: 16,
+    color: "#2b0540",
+  },
+  matchInfoCard: {
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  matchInfoText: {
+    color: "#111827",
+    fontWeight: "600",
+    marginBottom: 4,
   },
   summaryCard: {
-    backgroundColor: "#f7f7f7",
+    backgroundColor: "#fff",
     padding: 14,
-    borderRadius: 10,
+    borderRadius: 12,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 8,
+    color: "#2b0540",
   },
   summaryEmpty: {
-    color: "#666",
+    color: "#6b7280",
   },
   summaryName: {
     fontSize: 14,
     marginBottom: 4,
+    color: "#111827",
+    fontWeight: "600",
   },
   warningCard: {
     backgroundColor: "#fff4e5",
@@ -773,21 +945,49 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#d9d2e1",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 12,
     backgroundColor: "#fff",
   },
   customMessageInput: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#d9d2e1",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 12,
     minHeight: 100,
     textAlignVertical: "top",
     backgroundColor: "#fff",
+  },
+  viewRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: "wrap",
+  },
+  viewBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#d9d2e1",
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    minWidth: "30%",
+  },
+  viewBtnSelected: {
+    backgroundColor: "#2b0540",
+    borderColor: "#2b0540",
+  },
+  viewBtnText: {
+    textAlign: "center",
+    fontWeight: "600",
+    color: "#2b0540",
+    fontSize: 12,
+  },
+  viewBtnTextSelected: {
+    color: "#fff",
   },
   sortRow: {
     flexDirection: "row",
@@ -797,29 +997,31 @@ const styles = StyleSheet.create({
   sortBtn: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#d9d2e1",
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 10,
+    backgroundColor: "#fff",
   },
   sortBtnSelected: {
-    backgroundColor: "#111",
-    borderColor: "#111",
+    backgroundColor: "#2b0540",
+    borderColor: "#2b0540",
   },
   sortText: {
     textAlign: "center",
     fontWeight: "600",
+    color: "#2b0540",
   },
   sortTextSelected: {
     color: "#fff",
   },
   announceBtn: {
-    backgroundColor: "#111",
+    backgroundColor: "#da9306",
     padding: 14,
     borderRadius: 10,
     marginBottom: 16,
   },
   announceBtnText: {
-    color: "#fff",
+    color: "#2b0540",
     textAlign: "center",
     fontWeight: "700",
   },
@@ -827,22 +1029,24 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    backgroundColor: "#f7f7f7",
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    backgroundColor: "#fff",
   },
   topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 10,
   },
   name: {
     fontWeight: "700",
     fontSize: 16,
     marginBottom: 2,
+    color: "#111827",
   },
   typeText: {
-    color: "#555",
+    color: "#4b5563",
     fontSize: 13,
   },
   badge: {
@@ -883,9 +1087,10 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 10,
     marginBottom: 4,
+    flexWrap: "wrap",
   },
   specialRoleBtn: {
-    backgroundColor: "#6A2C91",
+    backgroundColor: "#2b0540",
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 8,
@@ -897,27 +1102,27 @@ const styles = StyleSheet.create({
   },
   roleInput: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#d9d2e1",
     padding: 10,
     borderRadius: 8,
     marginTop: 10,
     backgroundColor: "#fff",
   },
   btn: {
-    backgroundColor: "green",
-    padding: 10,
+    backgroundColor: "#2b8a3e",
+    padding: 12,
     marginTop: 10,
     borderRadius: 8,
   },
   btn2: {
-    backgroundColor: "orange",
-    padding: 10,
+    backgroundColor: "#da9306",
+    padding: 12,
     marginTop: 10,
     borderRadius: 8,
   },
   removeBtn: {
     backgroundColor: "#c0392b",
-    padding: 10,
+    padding: 12,
     marginTop: 10,
     borderRadius: 8,
   },
@@ -929,6 +1134,7 @@ const styles = StyleSheet.create({
   selectedText: {
     marginTop: 10,
     fontWeight: "700",
+    color: "#111827",
   },
   roleBadge: {
     backgroundColor: "#F4B400",
@@ -946,10 +1152,18 @@ const styles = StyleSheet.create({
   empty: {
     textAlign: "center",
     marginTop: 20,
+    color: "#6b7280",
+    fontWeight: "600",
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f8f5fb",
+  },
+  loadingText: {
+    marginTop: 10,
+    color: "#2b0540",
+    fontWeight: "700",
   },
 });

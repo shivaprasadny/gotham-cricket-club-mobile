@@ -224,6 +224,7 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
             onPress={() =>
               navigation.navigate("SquadSelection", {
                 matchId: match.id,
+                 teamId: match.homeTeamId,
                 opponentName:
                   match.awayTeamName || match.externalOpponentName || "Opponent",
                 teamName: match.homeTeamName || "No team assigned",
@@ -231,6 +232,7 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
                 venue: match.venue,
                 matchType: match.matchType,
                 matchFee: match.matchFee,
+                 matchFormat: match.matchFormat,
               })
             }
           >
