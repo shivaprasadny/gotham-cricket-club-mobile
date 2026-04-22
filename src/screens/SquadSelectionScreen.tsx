@@ -13,8 +13,9 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { getAllMembers } from "../services/memberService";
 
-import { getAllMembers } from "../services/adminService";
+
 import { getAvailabilityByMatch } from "../services/availabilityService";
 import { createAnnouncement } from "../services/announcementService";
 import { getTeamMembers } from "../services/teamService";
@@ -128,39 +129,56 @@ const SquadSelectionScreen = ({ route, navigation }: Props) => {
 
   // Load all required data for this screen
   const loadData = async () => {
-    if (!matchId || !teamId) {
-      Alert.alert("Error", "Match ID or Team ID is missing");
-      setLoading(false);
-      setRefreshing(false);
-      return;
+  if (!matchId || !teamId) {
+    Alert.alert("Error", "Match ID or Team ID is missing");
+    setLoading(false);
+    setRefreshing(false);
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const teamData = await getTeamMembers(teamId);
+
+    let allClubPlayers = [];
+    let availabilityData = [];
+    let squadData = [];
+
+    try {
+      allClubPlayers = await getAllMembers();
+    } catch (e) {
+      console.log("Members API failed (likely role issue)");
     }
 
     try {
-      setLoading(true);
-
-      const [teamData, allClubPlayers, availabilityData, squadData] =
-        await Promise.all([
-          getTeamMembers(teamId),
-          getAllMembers(),
-          getAvailabilityByMatch(matchId),
-          getSquadByMatch(matchId),
-        ]);
-
-      setTeamPlayers(Array.isArray(teamData) ? teamData : []);
-      setClubPlayers(Array.isArray(allClubPlayers) ? allClubPlayers : []);
-      setAvailability(Array.isArray(availabilityData) ? availabilityData : []);
-      setSquad(Array.isArray(squadData) ? squadData : []);
-    } catch (error: any) {
-      console.log("SQUAD LOAD ERROR:", error?.response?.data || error);
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to load squad data"
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      availabilityData = await getAvailabilityByMatch(matchId);
+    } catch (e) {
+      console.log("Availability API failed (likely role issue)");
     }
-  };
+
+    try {
+      squadData = await getSquadByMatch(matchId);
+    } catch (e) {
+      console.log("Squad API failed");
+    }
+
+    setTeamPlayers(Array.isArray(teamData) ? teamData : []);
+    setClubPlayers(Array.isArray(allClubPlayers) ? allClubPlayers : []);
+    setAvailability(Array.isArray(availabilityData) ? availabilityData : []);
+    setSquad(Array.isArray(squadData) ? squadData : []);
+
+  } catch (error: any) {
+    console.log("SQUAD LOAD ERROR:", error?.response?.data || error);
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Failed to load squad data"
+    );
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   // Reload when screen comes into focus
   useFocusEffect(

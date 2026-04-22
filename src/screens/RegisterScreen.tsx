@@ -31,7 +31,7 @@ const RegisterScreen = ({ navigation }: Props) => {
   const [playerType, setPlayerType] = useState("");
   const [jerseyNumber, setJerseyNumber] = useState("");
 
-  // Submit state
+  // Submit loading state
   const [submitting, setSubmitting] = useState(false);
 
   // Register handler
@@ -78,12 +78,13 @@ const RegisterScreen = ({ navigation }: Props) => {
 
       const response = await registerUser(payload);
 
+      // Notify admin side that a new member requested to join
       await addNotification({
-  title: "New Join Request",
-  message: `${fullName.trim()} requested to join the club`,
-  type: "MEMBER",
-  targetScreen: "AdminApproval",
-});
+        title: "New Join Request",
+        message: `${fullName.trim()} requested to join the club`,
+        type: "MEMBER",
+        targetScreen: "AdminApproval",
+      });
 
       Alert.alert(
         "Success",
@@ -104,21 +105,30 @@ const RegisterScreen = ({ navigation }: Props) => {
   };
 
   return (
+    // KeyboardAvoidingView helps content move above keyboard on iPhone
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      {/* ScrollView keeps the long form scrollable on smaller screens */}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Club logo */}
         <Image
           source={require("../../assets/logo.png")}
           style={styles.logo}
         />
 
+        {/* Heading */}
         <Text style={styles.title}>Join Gotham Cricket Club</Text>
         <Text style={styles.subtitle}>
           Register and wait for admin approval
         </Text>
 
+        {/* Registration form card */}
         <View style={styles.card}>
           <TextInput
             style={styles.input}
@@ -206,6 +216,7 @@ const RegisterScreen = ({ navigation }: Props) => {
             keyboardType="numeric"
           />
 
+          {/* Register button */}
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handleRegister}
@@ -216,6 +227,7 @@ const RegisterScreen = ({ navigation }: Props) => {
             </Text>
           </TouchableOpacity>
 
+          {/* Login link */}
           <TouchableOpacity
             style={styles.linkButton}
             onPress={() => navigation.navigate("Login")}
@@ -231,15 +243,21 @@ const RegisterScreen = ({ navigation }: Props) => {
 export default RegisterScreen;
 
 const styles = StyleSheet.create({
+  // Main screen background
   root: {
     flex: 1,
     backgroundColor: "#2b0540",
   },
+
+  // Scroll container for full form
   container: {
     flexGrow: 1,
     padding: 20,
     justifyContent: "center",
+    paddingBottom: 40,
   },
+
+  // Club logo
   logo: {
     width: 110,
     height: 110,
@@ -247,6 +265,8 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 18,
   },
+
+  // Screen title
   title: {
     color: "#fff",
     fontSize: 28,
@@ -254,6 +274,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 8,
   },
+
+  // Screen subtitle
   subtitle: {
     color: "#da9306",
     fontSize: 15,
@@ -261,11 +283,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontWeight: "600",
   },
+
+  // White form card
   card: {
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 18,
   },
+
+  // Standard input style
   input: {
     borderWidth: 1,
     borderColor: "#d9d2e1",
@@ -277,21 +303,27 @@ const styles = StyleSheet.create({
     color: "#111",
     backgroundColor: "#fafafa",
   },
+
+  // Main action button
   primaryButton: {
     backgroundColor: "#da9306",
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 6,
   },
+
   primaryButtonText: {
     color: "#2b0540",
     fontWeight: "700",
     textAlign: "center",
     fontSize: 16,
   },
+
+  // Bottom navigation link
   linkButton: {
     marginTop: 14,
   },
+
   linkText: {
     color: "#2b0540",
     textAlign: "center",

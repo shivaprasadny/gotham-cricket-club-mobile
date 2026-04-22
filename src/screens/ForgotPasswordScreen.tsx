@@ -26,38 +26,38 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
-  // Loading state
+  // Loading states
   const [sendingCode, setSendingCode] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   // Request reset code
-const handleSendCode = async () => {
-  if (!email.trim()) {
-    Alert.alert("Error", "Please enter your email");
-    return;
-  }
+  const handleSendCode = async () => {
+    if (!email.trim()) {
+      Alert.alert("Error", "Please enter your email");
+      return;
+    }
 
-  try {
-    setSendingCode(true);
+    try {
+      setSendingCode(true);
 
-    const response = await requestPasswordResetCode(email.trim());
+      const response = await requestPasswordResetCode(email.trim());
 
-    // Auto-fill code input for easier testing
-    setCode(response.resetCode);
+      // Auto-fill code input for easier testing
+      setCode(response.resetCode);
 
-    Alert.alert(
-      "Reset Code",
-      `Code: ${response.resetCode}\n\n${response.message}`
-    );
-  } catch (error: any) {
-    Alert.alert(
-      "Error",
-      error?.response?.data?.message || "Failed to send reset code"
-    );
-  } finally {
-    setSendingCode(false);
-  }
-};
+      Alert.alert(
+        "Reset Code",
+        `Code: ${response.resetCode}\n\n${response.message}`
+      );
+    } catch (error: any) {
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message || "Failed to send reset code"
+      );
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
   // Reset password using email + code + new password
   const handleResetPassword = async () => {
@@ -104,21 +104,30 @@ const handleSendCode = async () => {
   };
 
   return (
+    // KeyboardAvoidingView helps keep fields visible above keyboard
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      {/* ScrollView keeps form usable on smaller screens */}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Club logo */}
         <Image
           source={require("../../assets/logo.png")}
           style={styles.logo}
         />
 
+        {/* Heading */}
         <Text style={styles.title}>Reset Password</Text>
         <Text style={styles.subtitle}>
           Request a code and set a new password
         </Text>
 
+        {/* Reset form card */}
         <View style={styles.card}>
           <TextInput
             style={styles.input}
@@ -130,6 +139,7 @@ const handleSendCode = async () => {
             keyboardType="email-address"
           />
 
+          {/* Send reset code button */}
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={handleSendCode}
@@ -157,6 +167,7 @@ const handleSendCode = async () => {
             secureTextEntry
           />
 
+          {/* Reset password button */}
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handleResetPassword}
@@ -167,6 +178,7 @@ const handleSendCode = async () => {
             </Text>
           </TouchableOpacity>
 
+          {/* Back to login link */}
           <TouchableOpacity
             style={styles.linkButton}
             onPress={() => navigation.navigate("Login")}
@@ -182,15 +194,21 @@ const handleSendCode = async () => {
 export default ForgotPasswordScreen;
 
 const styles = StyleSheet.create({
+  // Main screen background
   root: {
     flex: 1,
     backgroundColor: "#2b0540",
   },
+
+  // Scroll container
   container: {
     flexGrow: 1,
     padding: 20,
     justifyContent: "center",
+    paddingBottom: 40,
   },
+
+  // Club logo
   logo: {
     width: 110,
     height: 110,
@@ -198,6 +216,8 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 18,
   },
+
+  // Screen title
   title: {
     color: "#fff",
     fontSize: 28,
@@ -205,6 +225,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 8,
   },
+
+  // Screen subtitle
   subtitle: {
     color: "#da9306",
     fontSize: 15,
@@ -212,11 +234,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontWeight: "600",
   },
+
+  // White form card
   card: {
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 20,
   },
+
+  // Standard input field
   input: {
     borderWidth: 1,
     borderColor: "#d9d2e1",
@@ -228,33 +254,42 @@ const styles = StyleSheet.create({
     color: "#111",
     backgroundColor: "#fafafa",
   },
+
+  // Primary action button
   primaryButton: {
     backgroundColor: "#da9306",
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 4,
   },
+
   primaryButtonText: {
     color: "#2b0540",
     fontWeight: "700",
     textAlign: "center",
     fontSize: 16,
   },
+
+  // Secondary action button
   secondaryButton: {
     backgroundColor: "#2b0540",
     paddingVertical: 14,
     borderRadius: 12,
     marginBottom: 12,
   },
+
   secondaryButtonText: {
     color: "#fff",
     fontWeight: "700",
     textAlign: "center",
     fontSize: 15,
   },
+
+  // Bottom link button
   linkButton: {
     marginTop: 14,
   },
+
   linkText: {
     color: "#2b0540",
     textAlign: "center",

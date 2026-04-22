@@ -15,12 +15,13 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-import { getAllMembers } from "../services/adminService";
+
 import { createFee, createSplitFee } from "../services/feeService";
 import { getTeamMembers, getTeams } from "../services/teamService";
 import { getMatches } from "../services/matchService";
 import { getSquadByMatch } from "../services/squadService";
 import { addNotification } from "../services/notificationService";
+import { getAllMembers } from "../services/memberService";
 
 type Props = {
   navigation: any;
@@ -112,6 +113,8 @@ const CreateFeeScreen = ({ navigation }: Props) => {
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [loadingSourceMembers, setLoadingSourceMembers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showSelectedCount, setShowSelectedCount] = useState(10);
+const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -125,11 +128,13 @@ const CreateFeeScreen = ({ navigation }: Props) => {
   }, []);
 
   // Reset selected source data when source type changes
-  useEffect(() => {
-    setSelectedTeamId(null);
-    setSelectedMatchId(null);
-    setSelectedSplits([]);
-  }, [sourceType]);
+ useEffect(() => {
+  setSelectedTeamId(null);
+  setSelectedMatchId(null);
+  setSelectedSplits([]);
+  setShowSelectedCount(10);
+  setSelectedMemberSearch("");
+}, [sourceType]);
 
   // Auto-fill equal split amounts
   useEffect(() => {
@@ -418,6 +423,21 @@ const CreateFeeScreen = ({ navigation }: Props) => {
       )
     );
   };
+
+  const filteredSelectedSplits = useMemo(() => {
+  const text = selectedMemberSearch.trim().toLowerCase();
+
+  if (!text) return selectedSplits;
+
+  return selectedSplits.filter((item) =>
+    item.fullName.toLowerCase().includes(text)
+  );
+}, [selectedSplits, selectedMemberSearch]);
+
+
+const visibleSelectedSplits = useMemo(() => {
+  return filteredSelectedSplits.slice(0, showSelectedCount);
+}, [filteredSelectedSplits, showSelectedCount]);
 
   // Search extra members
   const filteredMembers = useMemo(() => {
@@ -873,59 +893,84 @@ return;
             })
           )}
 
-          <Text style={styles.sectionTitle}>
-            Selected Members ({selectedSplits.length})
+          {/* ===== SEARCH INSIDE SELECTED MEMBERS ===== */}
+<TextInput
+  style={styles.input}
+  placeholder="Search selected members"
+  placeholderTextColor="#7a7a7a"
+  value={selectedMemberSearch}
+  onChangeText={(text) => {
+    setSelectedMemberSearch(text);
+    setShowSelectedCount(10); // reset pagination on search
+  }}
+/>
+
+<Text style={styles.sectionTitle}>
+  Selected Members ({filteredSelectedSplits.length})
+</Text>
+
+{/* ===== EMPTY STATE ===== */}
+{filteredSelectedSplits.length === 0 ? (
+  <Text style={styles.infoText}>No members found.</Text>
+) : (
+  <>
+    {/* ===== PAGINATED LIST ===== */}
+    {visibleSelectedSplits.map((item) => (
+      <View key={item.userId} style={styles.selectedCard}>
+        <View style={styles.selectedTopRow}>
+          <Text style={styles.memberName}>{item.fullName}</Text>
+
+          <TouchableOpacity
+            style={styles.removeBtn}
+            onPress={() => handleRemoveSelected(item.userId)}
+          >
+            <Text style={styles.removeBtnText}>Remove</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ===== BILLING MODES ===== */}
+        {billingMode === "CUSTOM_SPLIT" ? (
+          <View style={styles.amountRow}>
+            <View style={styles.dollarBox}>
+              <Text style={styles.dollarText}>$</Text>
+            </View>
+
+            <TextInput
+              style={styles.amountInput}
+              placeholder="Enter amount"
+              placeholderTextColor="#7a7a7a"
+              keyboardType="numeric"
+              value={item.amount}
+              onChangeText={(text) =>
+                handleAmountChange(item.userId, text)
+              }
+            />
+          </View>
+        ) : billingMode === "EQUAL_SPLIT" ? (
+          <Text style={styles.equalAmountPreviewText}>
+            ${item.amount || "0.00"}
           </Text>
+        ) : (
+          <Text style={styles.equalAmountPreviewText}>
+            {amount ? `$${amount}` : "Not set"}
+          </Text>
+        )}
+      </View>
+    ))}
 
-          {selectedSplits.length === 0 ? (
-            <Text style={styles.infoText}>No members selected yet.</Text>
-          ) : (
-            selectedSplits.map((item) => (
-              <View key={item.userId} style={styles.selectedCard}>
-                <View style={styles.selectedTopRow}>
-                  <Text style={styles.memberName}>{item.fullName}</Text>
-
-                  <TouchableOpacity
-                    style={styles.removeBtn}
-                    onPress={() => handleRemoveSelected(item.userId)}
-                  >
-                    <Text style={styles.removeBtnText}>Remove</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {billingMode === "CUSTOM_SPLIT" ? (
-                  <View style={styles.amountRow}>
-                    <View style={styles.dollarBox}>
-                      <Text style={styles.dollarText}>$</Text>
-                    </View>
-
-                    <TextInput
-                      style={styles.amountInput}
-                      placeholder="Enter custom amount"
-                      placeholderTextColor="#7a7a7a"
-                      keyboardType="numeric"
-                      value={item.amount}
-                      onChangeText={(text) =>
-                        handleAmountChange(item.userId, text)
-                      }
-                    />
-                  </View>
-                ) : billingMode === "EQUAL_SPLIT" ? (
-                  <View style={styles.equalAmountPreview}>
-                    <Text style={styles.equalAmountPreviewText}>
-                      Assigned Amount: ${item.amount || "0.00"}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.equalAmountPreview}>
-                    <Text style={styles.equalAmountPreviewText}>
-                      Fixed Amount: {amount ? `$${amount}` : "Not set yet"}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ))
-          )}
+    {/* ===== SEE MORE BUTTON ===== */}
+    {filteredSelectedSplits.length > showSelectedCount && (
+      <TouchableOpacity
+        style={styles.loadSourceBtn}
+        onPress={() =>
+          setShowSelectedCount((prev) => prev + 10)
+        }
+      >
+        <Text style={styles.loadSourceBtnText}>See More</Text>
+      </TouchableOpacity>
+    )}
+  </>
+)}
 
           {(billingMode === "EQUAL_SPLIT" || billingMode === "CUSTOM_SPLIT") && (
             <View style={styles.totalCard}>

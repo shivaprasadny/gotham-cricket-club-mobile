@@ -7,7 +7,6 @@ import AnnouncementsScreen from "../screens/AnnouncementsScreen";
 import MembersScreen from "../screens/MembersScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import TeamsScreen from "../screens/TeamsScreen";
-import { useAuth } from "../context/AuthContext";
 
 const Tab = createBottomTabNavigator();
 
@@ -24,8 +23,6 @@ const HeaderLogo = () => (
 );
 
 const MainTabNavigator = () => {
-  const { user } = useAuth();
-
   return (
     <Tab.Navigator
       screenOptions={{
@@ -45,15 +42,8 @@ const MainTabNavigator = () => {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Matches" component={MatchesScreen} />
       <Tab.Screen name="Announcements" component={AnnouncementsScreen} />
-
-      {(user?.role === "ADMIN" || user?.role === "CAPTAIN") && (
-        <Tab.Screen name="Members" component={MembersScreen} />
-      )}
-
-      {(user?.role === "ADMIN" || user?.role === "CAPTAIN") && (
-        <Tab.Screen name="Teams" component={TeamsScreen} />
-      )}
-
+      <Tab.Screen name="Members" component={MembersScreen} />
+      <Tab.Screen name="Teams" component={TeamsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

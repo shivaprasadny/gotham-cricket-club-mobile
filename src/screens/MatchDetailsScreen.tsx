@@ -75,27 +75,28 @@ const canManageSquad = isAdmin || isCaptain;
     }, [matchId])
   );
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
 
-      const [matchData, availabilityData] = await Promise.all([
-        getMatchById(matchId),
-        getAvailabilityByMatch(matchId),
-      ]);
+ const loadData = async () => {
+  try {
+    setLoading(true);
 
-      setMatch(matchData || null);
-      setResponses(Array.isArray(availabilityData) ? availabilityData : []);
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to load match details"
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    const [matchData, availabilityData] = await Promise.all([
+      getMatchById(matchId),
+      getAvailabilityByMatch(matchId),
+    ]);
+
+    setMatch(matchData || null);
+    setResponses(Array.isArray(availabilityData) ? availabilityData : []);
+  } catch (error: any) {
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Failed to load match details"
+    );
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -250,15 +251,20 @@ const canManageSquad = isAdmin || isCaptain;
     style={styles.squadBtn}
     onPress={() =>
       navigation.navigate("SquadSelection", {
-        matchId: match.id,
-        teamId: match.homeTeamId,
-        opponentName: match.awayTeamName || match.externalOpponentName,
-        teamName: match.homeTeamName,
-        matchDate: match.matchDate,
-        venue: match.venue,
-        matchType: match.matchType,
-        matchFormat: match.matchFormat,
-      })
+  matchId: match.id,
+  teamId: match.homeTeamId,
+  opponentName: match.awayTeamName || match.externalOpponentName,
+  teamName: match.homeTeamName,
+  matchDate: match.matchDate,
+  venue: match.venue,
+  matchType: match.matchType,
+  matchFormat: match.matchFormat,
+
+  // ✅ ADD THESE
+  matchFeeAmount: match.matchFeeAmount,
+  matchFeeDueDate: match.matchFeeDueDate,
+  matchFeeDescription: match.matchFeeDescription,
+})
     }
   >
     <Text style={styles.squadBtnText}>Open Squad Selection</Text>

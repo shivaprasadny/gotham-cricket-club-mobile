@@ -20,18 +20,20 @@ type Props = {
 const LoginScreen = ({ navigation }: Props) => {
   const { login, biometricLogin } = useAuth();
 
-  // Login form state
+  // Email input state
   const [email, setEmail] = useState("");
+
+  // Password input state
   const [password, setPassword] = useState("");
 
-  // Toggle password visibility
+  // Show/hide password toggle
   const [showPassword, setShowPassword] = useState(false);
 
   // Loading states
   const [submitting, setSubmitting] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
 
-  // Handle email/password login
+  // Handle normal email/password login
   const handleLogin = async () => {
     if (!email.trim()) {
       Alert.alert("Error", "Please enter email");
@@ -51,7 +53,7 @@ const LoginScreen = ({ navigation }: Props) => {
         password: password.trim(),
       });
 
-      // Save login session in auth context
+      // Save session and user data in auth context
       await login(response.token, {
         id: response.id,
         fullName: response.fullName,
@@ -87,6 +89,7 @@ const LoginScreen = ({ navigation }: Props) => {
   };
 
   return (
+    // KeyboardAvoidingView helps move UI above keyboard on iPhone
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -104,6 +107,7 @@ const LoginScreen = ({ navigation }: Props) => {
 
         {/* Login card */}
         <View style={styles.card}>
+          {/* Email input */}
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -114,7 +118,7 @@ const LoginScreen = ({ navigation }: Props) => {
             keyboardType="email-address"
           />
 
-          {/* Password input with show/hide */}
+          {/* Password input with show/hide toggle */}
           <View style={styles.passwordRow}>
             <TextInput
               style={styles.passwordInput}
@@ -132,7 +136,7 @@ const LoginScreen = ({ navigation }: Props) => {
             </TouchableOpacity>
           </View>
 
-          {/* Login button */}
+          {/* Email/password login button */}
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handleLogin}
@@ -143,7 +147,7 @@ const LoginScreen = ({ navigation }: Props) => {
             </Text>
           </TouchableOpacity>
 
-          {/* Biometric button */}
+          {/* Biometric login button */}
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={handleBiometricLogin}
@@ -154,7 +158,7 @@ const LoginScreen = ({ navigation }: Props) => {
             </Text>
           </TouchableOpacity>
 
-          {/* Forgot password */}
+          {/* Forgot password link */}
           <TouchableOpacity
             style={styles.linkButton}
             onPress={() => navigation.navigate("ForgotPassword")}
@@ -162,7 +166,7 @@ const LoginScreen = ({ navigation }: Props) => {
             <Text style={styles.linkText}>Forgot Password?</Text>
           </TouchableOpacity>
 
-          {/* Register */}
+          {/* Register link */}
           <TouchableOpacity
             style={styles.linkButton}
             onPress={() => navigation.navigate("Register")}
@@ -178,15 +182,20 @@ const LoginScreen = ({ navigation }: Props) => {
 export default LoginScreen;
 
 const styles = StyleSheet.create({
+  // Main screen background
   root: {
     flex: 1,
     backgroundColor: "#2b0540",
   },
+
+  // Center content vertically
   container: {
     flex: 1,
     justifyContent: "center",
     padding: 20,
   },
+
+  // Club logo image
   logo: {
     width: 110,
     height: 110,
@@ -194,6 +203,8 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 18,
   },
+
+  // App title
   title: {
     color: "#fff",
     fontSize: 30,
@@ -201,6 +212,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 8,
   },
+
+  // App subtitle
   subtitle: {
     color: "#da9306",
     fontSize: 15,
@@ -208,11 +221,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontWeight: "600",
   },
+
+  // White login card
   card: {
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 20,
   },
+
+  // Standard input
   input: {
     borderWidth: 1,
     borderColor: "#d9d2e1",
@@ -224,6 +241,8 @@ const styles = StyleSheet.create({
     color: "#111",
     backgroundColor: "#fafafa",
   },
+
+  // Password input row with show/hide action
   passwordRow: {
     borderWidth: 1,
     borderColor: "#d9d2e1",
@@ -234,43 +253,56 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+
+  // Password text input
   passwordInput: {
     flex: 1,
     paddingVertical: 12,
     fontSize: 15,
     color: "#111",
   },
+
+  // Show/hide text
   showText: {
     color: "#2b0540",
     fontWeight: "700",
   },
+
+  // Primary login button
   primaryButton: {
     backgroundColor: "#da9306",
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 4,
   },
+
   primaryButtonText: {
     color: "#2b0540",
     fontWeight: "700",
     textAlign: "center",
     fontSize: 16,
   },
+
+  // Biometric login button
   secondaryButton: {
     backgroundColor: "#2b0540",
     paddingVertical: 14,
     borderRadius: 12,
     marginTop: 12,
   },
+
   secondaryButtonText: {
     color: "#fff",
     fontWeight: "700",
     textAlign: "center",
     fontSize: 15,
   },
+
+  // Bottom links
   linkButton: {
     marginTop: 14,
   },
+
   linkText: {
     color: "#2b0540",
     textAlign: "center",

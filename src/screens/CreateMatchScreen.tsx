@@ -225,9 +225,8 @@ const CreateMatchScreen = ({ navigation }: Props) => {
         status,
       };
 
-    const response = await createMatch(payload);
+ const response = await createMatch(payload);
 
-// Build correct opponent name for notification
 const notificationOpponentName =
   opponentMode === "CLUB"
     ? selectedAwayTeamName
@@ -238,10 +237,7 @@ await addNotification({
   message: `${selectedHomeTeamName} vs ${notificationOpponentName}`,
   type: "MATCH",
   targetScreen: "MatchDetails",
-  targetId:
-    typeof response === "object" && response !== null && "id" in response
-      ? Number(response.id)
-      : null,
+  targetId: response?.id ?? null,
 });
 
 Alert.alert(
