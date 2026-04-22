@@ -14,6 +14,7 @@ import {
   rejectMember,
   ApprovalRole,
 } from "../services/adminService";
+import { addNotification } from "../services/notificationService";
 
 type PendingUser = {
   id: number;
@@ -70,26 +71,38 @@ const AdminApprovalScreen = () => {
   };
 
   const handleApprove = async (userId: number) => {
-    try {
-      const selectedRole = selectedRoles[userId] || "PLAYER";
-      const response = await approveMember(userId, selectedRole);
+  try {
+    const selectedRole = selectedRoles[userId] || "PLAYER";
 
-      Alert.alert(
-        "Success",
-        typeof response === "string"
-          ? response
-          : `User approved as ${selectedRole}`
-      );
+    const approvedUser = users.find((user) => user.id === userId);
 
-      loadUsers();
-    } catch (error: any) {
-      console.log("APPROVE ERROR:", error?.response?.data || error?.message);
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to approve user"
-      );
-    }
-  };
+    const response = await approveMember(userId, selectedRole);
+
+    await addNotification({
+      title: "Member Approved",
+      message: approvedUser
+        ? `${approvedUser.fullName} approved as ${selectedRole}`
+        : `A member was approved as ${selectedRole}`,
+      type: "MEMBER",
+      targetScreen: "Members",
+    });
+
+    Alert.alert(
+      "Success",
+      typeof response === "string"
+        ? response
+        : `User approved as ${selectedRole}`
+    );
+
+    loadUsers();
+  } catch (error: any) {
+    console.log("APPROVE ERROR:", error?.response?.data || error?.message);
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Failed to approve user"
+    );
+  }
+};
 
   const handleReject = async (userId: number) => {
     try {

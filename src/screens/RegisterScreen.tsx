@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { registerUser } from "../services/authService";
+import { addNotification } from "../services/notificationService";
 
 type Props = {
   navigation: any;
@@ -76,6 +77,13 @@ const RegisterScreen = ({ navigation }: Props) => {
       };
 
       const response = await registerUser(payload);
+
+      await addNotification({
+  title: "New Join Request",
+  message: `${fullName.trim()} requested to join the club`,
+  type: "MEMBER",
+  targetScreen: "AdminApproval",
+});
 
       Alert.alert(
         "Success",

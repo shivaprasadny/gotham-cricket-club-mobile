@@ -46,17 +46,16 @@ export const updateMatch = async (
     matchType: string;
     matchFormat: string;
     matchFee: number | null;
+    matchFeeAmount: number | null;
+    matchFeeDueDate: string | null;
+    matchFeeDescription: string;
     notes: string;
-      matchFeeAmount: number | null;
-  matchFeeDueDate: string | null;
-  matchFeeDescription: string;
     status: "UPCOMING" | "COMPLETED" | "CANCELLED";
   }
 ) => {
   const response = await api.put(`/matches/${matchId}`, payload);
   return response.data;
 };
-
 // Delete match
 export const deleteMatch = async (matchId: number) => {
   const response = await api.delete(`/matches/${matchId}`);

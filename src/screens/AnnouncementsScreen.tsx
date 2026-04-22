@@ -12,6 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Clipboard from "expo-clipboard";
+
 import { useAuth } from "../context/AuthContext";
 import {
   deleteAnnouncement,
@@ -36,14 +37,21 @@ type Announcement = {
 const AnnouncementsScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
 
+  // List of announcements shown on the screen
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+
+  // Screen loading state
   const [loading, setLoading] = useState(true);
+
+  // Pull-to-refresh loading state
   const [refreshing, setRefreshing] = useState(false);
 
+  // Role-based permissions
   const isAdmin = user?.role === "ADMIN";
   const isCaptain = user?.role === "CAPTAIN";
   const canManage = isAdmin || isCaptain;
 
+  // Load announcements from backend
   const loadAnnouncements = async () => {
     try {
       const data = await getAnnouncements();
@@ -63,17 +71,20 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Reload announcements every time this screen comes into focus
   useFocusEffect(
     useCallback(() => {
       void loadAnnouncements();
     }, [])
   );
 
+  // Pull-to-refresh handler
   const onRefresh = async () => {
     setRefreshing(true);
     await loadAnnouncements();
   };
 
+  // Delete announcement with confirmation dialog
   const handleDelete = (announcementId: number) => {
     Alert.alert(
       "Delete Announcement",
@@ -114,6 +125,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     );
   };
 
+  // Copy announcement title + message to clipboard
   const handleCopy = async (item: Announcement) => {
     try {
       const textToCopy = `${item.title}\n\n${item.message}`;
@@ -124,6 +136,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Pin announcement
   const handlePin = async (item: Announcement) => {
     try {
       const response = await pinAnnouncement(item.id);
@@ -148,6 +161,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Unpin announcement
   const handleUnpin = async (item: Announcement) => {
     try {
       const response = await unpinAnnouncement(item.id);
@@ -172,6 +186,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Render each announcement card
   const renderItem = ({ item }: { item: Announcement }) => {
     return (
       <TouchableOpacity
@@ -183,11 +198,14 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
             : undefined
         }
       >
+        {/* Pinned badge */}
         {item.pinned && <Text style={styles.pinnedLabel}>📌 Pinned</Text>}
 
+        {/* Announcement content */}
         <Text style={styles.cardTitle}>{item.title}</Text>
         <Text style={styles.cardMessage}>{item.message}</Text>
 
+        {/* Created by and created date */}
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>By: {item.createdBy || "Unknown"}</Text>
           {item.createdAt ? (
@@ -197,6 +215,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
           ) : null}
         </View>
 
+        {/* Action buttons */}
         <View style={styles.actionRow}>
           {canManage && (
             <>
@@ -217,7 +236,9 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
                   styles.actionBtn,
                   item.pinned ? styles.unpinBtn : styles.pinBtn,
                 ]}
-                onPress={() => (item.pinned ? handleUnpin(item) : handlePin(item))}
+                onPress={() =>
+                  item.pinned ? handleUnpin(item) : handlePin(item)
+                }
               >
                 <Ionicons
                   name={item.pinned ? "bookmark-outline" : "bookmark"}
@@ -253,6 +274,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
     );
   };
 
+  // Initial loading screen
   if (loading) {
     return (
       <View style={styles.center}>
@@ -273,6 +295,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
+      // Show create button only for admin/captain
       ListHeaderComponent={
         canManage ? (
           <TouchableOpacity
@@ -284,6 +307,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
           </TouchableOpacity>
         ) : null
       }
+      // Show message if no announcements exist
       ListEmptyComponent={
         <Text style={styles.emptyText}>No announcements available.</Text>
       }
@@ -294,11 +318,14 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
 export default AnnouncementsScreen;
 
 const styles = StyleSheet.create({
+  // Main list container when announcements exist
   listContainer: {
     padding: 16,
     backgroundColor: "#2b0540",
     flexGrow: 1,
   },
+
+  // Centered layout for loading and empty states
   center: {
     flexGrow: 1,
     backgroundColor: "#2b0540",
@@ -306,16 +333,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
+
   loadingText: {
     color: "#fff",
     marginTop: 10,
     fontWeight: "600",
   },
+
   emptyText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
   },
+
+  // Top create announcement button
   createBtn: {
     backgroundColor: "#da9306",
     borderRadius: 12,
@@ -326,11 +357,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+
   createBtnText: {
     color: "#2b0540",
     fontWeight: "800",
     fontSize: 16,
   },
+
+  // Individual announcement card
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 16,
@@ -339,22 +373,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e5e7eb",
   },
+
+  // Highlight pinned announcement
   pinnedCard: {
     borderColor: "#da9306",
     borderWidth: 2,
     backgroundColor: "#fff8e8",
   },
+
   pinnedLabel: {
     color: "#8a5b00",
     fontWeight: "800",
     marginBottom: 8,
   },
+
   cardTitle: {
     color: "#111827",
     fontSize: 18,
     fontWeight: "800",
     marginBottom: 8,
   },
+
   cardMessage: {
     color: "#111827",
     fontSize: 14,
@@ -362,20 +401,26 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginBottom: 12,
   },
+
+  // Metadata section
   metaRow: {
     marginBottom: 12,
   },
+
   metaText: {
     color: "#4b5563",
     fontSize: 12,
     marginBottom: 3,
     fontWeight: "600",
   },
+
+  // Action buttons area
   actionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
+
   actionBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -384,21 +429,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 10,
   },
+
   editBtn: {
     backgroundColor: "#2b0540",
   },
+
   pinBtn: {
     backgroundColor: "#da9306",
   },
+
   unpinBtn: {
     backgroundColor: "#92400e",
   },
+
   copyBtn: {
     backgroundColor: "#2563eb",
   },
+
   deleteBtn: {
     backgroundColor: "#b91c1c",
   },
+
   actionText: {
     color: "#fff",
     fontWeight: "700",

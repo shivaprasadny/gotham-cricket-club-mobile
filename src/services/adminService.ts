@@ -20,6 +20,11 @@ export const rejectMember = async (userId: number) => {
   return response.data;
 };
 
+
+
+
+
+// Get all approved members
 export const getAllMembers = async () => {
   const response = await api.get("/admin/members");
   return response.data;

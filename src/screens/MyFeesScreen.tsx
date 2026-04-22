@@ -56,6 +56,14 @@ type FeeSummary = {
   paidCount: number;
 };
 
+type FeeTypeFilter =
+  | "ALL_TYPES"
+  | "MATCH_FEE"
+  | "EVENT_FEE"
+  | "NET_PRACTICE_FEE"
+  | "ANNUAL_MEMBERSHIP_FEE"
+  | "OTHER";
+
 type FilterType = "UNPAID" | "OVERDUE" | "SUBMITTED" | "PAID" | "WAIVED" | "ALL";
 
 const MyFeesScreen = ({ navigation }: Props) => {
@@ -72,6 +80,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [feeTypeFilter, setFeeTypeFilter] = useState<FeeTypeFilter>("ALL_TYPES"); // fee type filter
 
   const loadData = async () => {
     try {
@@ -110,27 +119,28 @@ const MyFeesScreen = ({ navigation }: Props) => {
   };
 
   const filteredFees = useMemo(() => {
-    switch (filter) {
-      case "UNPAID":
-        return fees.filter((item) => item.status === "UNPAID" && !isOverdue(item));
+  let result = [...fees];
 
-      case "OVERDUE":
-        return fees.filter((item) => isOverdue(item));
+  // Apply status filter
+  if (filter === "UNPAID") {
+    result = result.filter((item) => item.status === "UNPAID" && !isOverdue(item));
+  } else if (filter === "OVERDUE") {
+    result = result.filter((item) => isOverdue(item));
+  } else if (filter === "SUBMITTED") {
+    result = result.filter((item) => item.status === "PAYMENT_SUBMITTED");
+  } else if (filter === "PAID") {
+    result = result.filter((item) => item.status === "PAID");
+  } else if (filter === "WAIVED") {
+    result = result.filter((item) => item.status === "WAIVED");
+  }
 
-      case "SUBMITTED":
-        return fees.filter((item) => item.status === "PAYMENT_SUBMITTED");
+  // Apply fee type filter
+  if (feeTypeFilter !== "ALL_TYPES") {
+    result = result.filter((item) => item.feeType === feeTypeFilter);
+  }
 
-      case "PAID":
-        return fees.filter((item) => item.status === "PAID");
-
-      case "WAIVED":
-        return fees.filter((item) => item.status === "WAIVED");
-
-      case "ALL":
-      default:
-        return fees;
-    }
-  }, [fees, filter]);
+  return result;
+}, [fees, filter, feeTypeFilter]);
 
   const getStatusLabel = (item: FeeItem) => {
     if (isOverdue(item)) return "OVERDUE";
@@ -352,6 +362,42 @@ const MyFeesScreen = ({ navigation }: Props) => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+
+            <Text style={styles.filterSectionTitle}>Fee Type</Text>
+
+<ScrollView
+  horizontal
+  showsHorizontalScrollIndicator={false}
+  contentContainerStyle={styles.filterRow}
+>
+  {[
+    { label: "All Types", value: "ALL_TYPES" },
+    { label: "Match", value: "MATCH_FEE" },
+    { label: "Event", value: "EVENT_FEE" },
+    { label: "Net", value: "NET_PRACTICE_FEE" },
+    { label: "Annual", value: "ANNUAL_MEMBERSHIP_FEE" },
+    { label: "Other", value: "OTHER" },
+  ].map((item) => (
+    <TouchableOpacity
+      key={item.value}
+      style={[
+        styles.filterBtn,
+        feeTypeFilter === item.value && styles.filterBtnSelected,
+      ]}
+      onPress={() => setFeeTypeFilter(item.value as FeeTypeFilter)}
+    >
+      <Text
+        style={[
+          styles.filterBtnText,
+          feeTypeFilter === item.value && styles.filterBtnTextSelected,
+        ]}
+      >
+        {item.label}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</ScrollView>
           </View>
         }
         ListEmptyComponent={
@@ -615,4 +661,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
   },
+  filterSectionTitle: {
+  fontSize: 15,
+  fontWeight: "700",
+  color: "#2b0540",
+  marginBottom: 8,
+  marginTop: 4,
+},
 });

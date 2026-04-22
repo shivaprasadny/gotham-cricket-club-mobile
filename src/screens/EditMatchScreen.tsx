@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -15,6 +16,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { getMatchById, updateMatch } from "../services/matchService";
 import { getTeams } from "../services/teamService";
 import { getLeagues } from "../services/leagueService";
+import { addNotification } from "../services/notificationService";
 
 type Props = {
   route: any;
@@ -83,7 +85,6 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   const [leagueId, setLeagueId] = useState<number | null>(null);
   const [venue, setVenue] = useState("");
   const [notes, setNotes] = useState("");
-  const [matchFee, setMatchFee] = useState("");
   const [matchDate, setMatchDate] = useState<Date | null>(null);
 
   const [matchType, setMatchType] = useState<MatchType>("LEAGUE");
@@ -91,11 +92,16 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   const [customFormat, setCustomFormat] = useState("");
   const [status, setStatus] = useState<MatchStatus>("UPCOMING");
 
+  const [matchFeeAmount, setMatchFeeAmount] = useState("");
+  const [matchFeeDueDate, setMatchFeeDueDate] = useState<Date | null>(null);
+  const [matchFeeDescription, setMatchFeeDescription] = useState("");
+
   const [opponentMode, setOpponentMode] = useState<"EXTERNAL" | "CLUB">(
     "EXTERNAL"
   );
 
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showFeeDueDatePicker, setShowFeeDueDatePicker] = useState(false);
   const [showLeaguePicker, setShowLeaguePicker] = useState(false);
   const [showHomeTeamPicker, setShowHomeTeamPicker] = useState(false);
   const [showAwayTeamPicker, setShowAwayTeamPicker] = useState(false);
@@ -104,6 +110,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
+  // Load teams, leagues, match details
   useEffect(() => {
     void loadEditData();
   }, []);
@@ -125,12 +132,20 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
       setLeagueId(matchData?.leagueId ?? null);
       setVenue(matchData?.venue || "");
       setNotes(matchData?.notes || "");
-      setMatchFee(
-        matchData?.matchFee !== null && matchData?.matchFee !== undefined
-          ? String(matchData.matchFee)
+      setMatchDate(matchData?.matchDate ? new Date(matchData.matchDate) : null);
+
+      setMatchFeeAmount(
+        matchData?.matchFeeAmount !== null &&
+          matchData?.matchFeeAmount !== undefined
+          ? String(matchData.matchFeeAmount)
           : ""
       );
-      setMatchDate(matchData?.matchDate ? new Date(matchData.matchDate) : null);
+
+      setMatchFeeDueDate(
+        matchData?.matchFeeDueDate ? new Date(matchData.matchFeeDueDate) : null
+      );
+
+      setMatchFeeDescription(matchData?.matchFeeDescription || "");
 
       const loadedType = (matchData?.matchType || "LEAGUE").toUpperCase();
       if (MATCH_TYPES.includes(loadedType as MatchType)) {
@@ -155,6 +170,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
       }
     } catch (error: any) {
       console.log("EDIT MATCH LOAD ERROR:", error?.response?.data || error);
+
       Alert.alert(
         "Error",
         error?.response?.data?.message ||
@@ -168,15 +184,24 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
 
   const selectedLeagueName = useMemo(() => {
     if (leagueId === null) return "None";
-    return leagues.find((league) => league.id === leagueId)?.name || "Select league";
+
+    return (
+      leagues.find((league) => league.id === leagueId)?.name || "Select league"
+    );
   }, [leagueId, leagues]);
 
   const selectedHomeTeamName = useMemo(() => {
-    return teams.find((team) => team.id === homeTeamId)?.teamName || "Select home team";
+    return (
+      teams.find((team) => team.id === homeTeamId)?.teamName ||
+      "Select home team"
+    );
   }, [homeTeamId, teams]);
 
   const selectedAwayTeamName = useMemo(() => {
-    return teams.find((team) => team.id === awayTeamId)?.teamName || "Select away team";
+    return (
+      teams.find((team) => team.id === awayTeamId)?.teamName ||
+      "Select away team"
+    );
   }, [awayTeamId, teams]);
 
   const finalMatchFormat =
@@ -223,30 +248,48 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
     try {
       setSubmitting(true);
 
-      const payload = {
-        homeTeamId,
-        awayTeamId: opponentMode === "CLUB" ? awayTeamId : null,
-        externalOpponentName:
-          opponentMode === "EXTERNAL" ? externalOpponentName.trim() : "",
-        leagueId,
-        matchDate: matchDate.toISOString(),
-        venue: venue.trim(),
-        matchType,
-        matchFormat: finalMatchFormat,
-        matchFee: matchFee.trim() ? Number(matchFee) : null,
-        notes: notes.trim(),
-        status,
-      };
+   const payload = {
+  homeTeamId,
+  awayTeamId: opponentMode === "CLUB" ? awayTeamId : null,
+  externalOpponentName:
+    opponentMode === "EXTERNAL" ? externalOpponentName.trim() : "",
+  leagueId,
+  matchDate: matchDate.toISOString(),
+  venue: venue.trim(),
+  matchType,
+  matchFormat: finalMatchFormat,
+  matchFee: null,
+  matchFeeAmount: matchFeeAmount.trim() ? Number(matchFeeAmount) : null,
+  matchFeeDueDate: matchFeeDueDate ? matchFeeDueDate.toISOString() : null,
+  matchFeeDescription: matchFeeDescription.trim(),
+  notes: notes.trim(),
+  status,
+};
 
       const response = await updateMatch(matchId, payload);
 
-      Alert.alert(
-        "Success",
-        typeof response === "string" ? response : "Match updated successfully",
-        [{ text: "OK", onPress: () => navigation.goBack() }]
-      );
+// Build correct opponent name for notification
+const notificationOpponentName =
+  opponentMode === "CLUB"
+    ? selectedAwayTeamName
+    : externalOpponentName.trim();
+
+await addNotification({
+  title: "Match Updated",
+  message: `${selectedHomeTeamName} vs ${notificationOpponentName}`,
+  type: "MATCH",
+  targetScreen: "MatchDetails",
+  targetId: matchId,
+});
+
+Alert.alert(
+  "Success",
+  typeof response === "string" ? response : "Match updated successfully",
+  [{ text: "OK", onPress: () => navigation.goBack() }]
+);
     } catch (error: any) {
       console.log("UPDATE MATCH ERROR:", error?.response?.data || error);
+
       Alert.alert(
         "Error",
         error?.response?.data?.message ||
@@ -268,226 +311,272 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
 
   return (
     <>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Edit Match</Text>
-
-        <Text style={styles.label}>Match Type</Text>
-        <View style={styles.rowWrap}>
-          {MATCH_TYPES.map((item) => (
-            <TouchableOpacity
-              key={item}
-              style={[
-                styles.chipBtn,
-                matchType === item && styles.chipBtnSelected,
-              ]}
-              onPress={() => setMatchType(item)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  matchType === item && styles.chipTextSelected,
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.label}>Match Format</Text>
-        <TouchableOpacity
-          style={styles.selectInput}
-          onPress={() => setShowFormatPicker(true)}
+      <KeyboardAvoidingView
+        style={styles.screen}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
+      >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.selectInputText}>
-            {matchFormat === "CUSTOM"
-              ? customFormat || "Custom format"
-              : matchFormat}
-          </Text>
-        </TouchableOpacity>
+          <Text style={styles.title}>Edit Match</Text>
 
-        {matchFormat === "CUSTOM" && (
-          <TextInput
-            style={styles.input}
-            placeholder="Enter custom format"
-            placeholderTextColor="#7a7a7a"
-            value={customFormat}
-            onChangeText={setCustomFormat}
-          />
-        )}
-
-        <Text style={styles.label}>League (Optional)</Text>
-        <TouchableOpacity
-          style={styles.selectInput}
-          onPress={() => setShowLeaguePicker(true)}
-        >
-          <Text style={styles.selectInputText}>{selectedLeagueName}</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.label}>Home Team</Text>
-        <TouchableOpacity
-          style={styles.selectInput}
-          onPress={() => setShowHomeTeamPicker(true)}
-        >
-          <Text style={styles.selectInputText}>{selectedHomeTeamName}</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.label}>Opponent Setup</Text>
-        <View style={styles.rowWrap}>
-          <TouchableOpacity
-            style={[
-              styles.chipBtn,
-              opponentMode === "EXTERNAL" && styles.chipBtnSelected,
-            ]}
-            onPress={() => {
-              setOpponentMode("EXTERNAL");
-              setAwayTeamId(null);
-            }}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                opponentMode === "EXTERNAL" && styles.chipTextSelected,
-              ]}
-            >
-              Outside Opponent
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.chipBtn,
-              opponentMode === "CLUB" && styles.chipBtnSelected,
-            ]}
-            onPress={() => {
-              setOpponentMode("CLUB");
-              setExternalOpponentName("");
-            }}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                opponentMode === "CLUB" && styles.chipTextSelected,
-              ]}
-            >
-              Club vs Club
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {opponentMode === "EXTERNAL" && (
-          <>
-            <Text style={styles.label}>Outside Opponent Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter outside opponent name"
-              placeholderTextColor="#7a7a7a"
-              value={externalOpponentName}
-              onChangeText={setExternalOpponentName}
-            />
-          </>
-        )}
-
-        {opponentMode === "CLUB" && (
-          <>
-            <Text style={styles.label}>Away Team</Text>
-            <TouchableOpacity
-              style={styles.selectInput}
-              onPress={() => setShowAwayTeamPicker(true)}
-            >
-              <Text style={styles.selectInputText}>{selectedAwayTeamName}</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        <Text style={styles.label}>Match Date & Time</Text>
-        <TouchableOpacity
-          style={styles.selectInput}
-          onPress={() => setShowDatePicker(true)}
-        >
-          <Text style={styles.selectInputText}>
-            {matchDate ? matchDate.toLocaleString() : "Select match date & time"}
-          </Text>
-        </TouchableOpacity>
-
-        {showDatePicker && (
-          <DateTimePicker
-            value={matchDate || new Date()}
-            mode="datetime"
-            display={Platform.OS === "ios" ? "inline" : "default"}
-            onChange={(event, selectedDate) => {
-              setShowDatePicker(false);
-              if (selectedDate) setMatchDate(selectedDate);
-            }}
-          />
-        )}
-
-        <Text style={styles.label}>Venue</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter venue"
-          placeholderTextColor="#7a7a7a"
-          value={venue}
-          onChangeText={setVenue}
-        />
-
-        <Text style={styles.label}>Match Fee ($)</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter match fee in dollars"
-          placeholderTextColor="#7a7a7a"
-          value={matchFee}
-          onChangeText={setMatchFee}
-          keyboardType="numeric"
-        />
-
-        <Text style={styles.label}>Notes</Text>
-        <TextInput
-          style={[styles.input, styles.notesInput]}
-          placeholder="Optional notes"
-          placeholderTextColor="#7a7a7a"
-          value={notes}
-          onChangeText={setNotes}
-          multiline
-        />
-
-        <Text style={styles.label}>Status</Text>
-        <View style={styles.rowWrap}>
-          {(["UPCOMING", "COMPLETED", "CANCELLED"] as MatchStatus[]).map(
-            (item) => (
+          <Text style={styles.label}>Match Type</Text>
+          <View style={styles.rowWrap}>
+            {MATCH_TYPES.map((item) => (
               <TouchableOpacity
                 key={item}
                 style={[
                   styles.chipBtn,
-                  status === item && styles.chipBtnSelected,
+                  matchType === item && styles.chipBtnSelected,
                 ]}
-                onPress={() => setStatus(item)}
+                onPress={() => setMatchType(item)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    status === item && styles.chipTextSelected,
+                    matchType === item && styles.chipTextSelected,
                   ]}
                 >
                   {item}
                 </Text>
               </TouchableOpacity>
-            )
+            ))}
+          </View>
+
+          <Text style={styles.label}>Match Format</Text>
+          <TouchableOpacity
+            style={styles.selectInput}
+            onPress={() => setShowFormatPicker(true)}
+          >
+            <Text style={styles.selectInputText}>
+              {matchFormat === "CUSTOM"
+                ? customFormat || "Custom format"
+                : matchFormat}
+            </Text>
+          </TouchableOpacity>
+
+          {matchFormat === "CUSTOM" && (
+            <TextInput
+              style={styles.input}
+              placeholder="Enter custom format"
+              placeholderTextColor="#7a7a7a"
+              value={customFormat}
+              onChangeText={setCustomFormat}
+            />
           )}
-        </View>
 
-        <TouchableOpacity
-          style={styles.submitBtn}
-          onPress={handleUpdateMatch}
-          disabled={submitting}
-        >
-          <Text style={styles.submitBtnText}>
-            {submitting ? "Updating..." : "Update Match"}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
+          <Text style={styles.label}>League (Optional)</Text>
+          <TouchableOpacity
+            style={styles.selectInput}
+            onPress={() => setShowLeaguePicker(true)}
+          >
+            <Text style={styles.selectInputText}>{selectedLeagueName}</Text>
+          </TouchableOpacity>
 
-      {/* League Picker */}
+          <Text style={styles.label}>Home Team</Text>
+          <TouchableOpacity
+            style={styles.selectInput}
+            onPress={() => setShowHomeTeamPicker(true)}
+          >
+            <Text style={styles.selectInputText}>{selectedHomeTeamName}</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.label}>Opponent Setup</Text>
+          <View style={styles.rowWrap}>
+            <TouchableOpacity
+              style={[
+                styles.chipBtn,
+                opponentMode === "EXTERNAL" && styles.chipBtnSelected,
+              ]}
+              onPress={() => {
+                setOpponentMode("EXTERNAL");
+                setAwayTeamId(null);
+              }}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  opponentMode === "EXTERNAL" && styles.chipTextSelected,
+                ]}
+              >
+                Outside Opponent
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.chipBtn,
+                opponentMode === "CLUB" && styles.chipBtnSelected,
+              ]}
+              onPress={() => {
+                setOpponentMode("CLUB");
+                setExternalOpponentName("");
+              }}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  opponentMode === "CLUB" && styles.chipTextSelected,
+                ]}
+              >
+                Club vs Club
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {opponentMode === "EXTERNAL" && (
+            <>
+              <Text style={styles.label}>Outside Opponent Name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter outside opponent name"
+                placeholderTextColor="#7a7a7a"
+                value={externalOpponentName}
+                onChangeText={setExternalOpponentName}
+              />
+            </>
+          )}
+
+          {opponentMode === "CLUB" && (
+            <>
+              <Text style={styles.label}>Away Team</Text>
+              <TouchableOpacity
+                style={styles.selectInput}
+                onPress={() => setShowAwayTeamPicker(true)}
+              >
+                <Text style={styles.selectInputText}>{selectedAwayTeamName}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          <Text style={styles.label}>Match Date & Time</Text>
+          <TouchableOpacity
+            style={styles.selectInput}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.selectInputText}>
+              {matchDate ? matchDate.toLocaleString() : "Select match date & time"}
+            </Text>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={matchDate || new Date()}
+              mode="datetime"
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(false);
+                if (selectedDate) setMatchDate(selectedDate);
+              }}
+            />
+          )}
+
+          <Text style={styles.label}>Venue</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter venue"
+            placeholderTextColor="#7a7a7a"
+            value={venue}
+            onChangeText={setVenue}
+          />
+
+          <Text style={styles.label}>Match Fee Amount (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter fee amount"
+            placeholderTextColor="#7a7a7a"
+            value={matchFeeAmount}
+            onChangeText={setMatchFeeAmount}
+            keyboardType="numeric"
+          />
+
+          <Text style={styles.label}>Match Fee Due Date (Optional)</Text>
+          <TouchableOpacity
+            style={styles.selectInput}
+            onPress={() => setShowFeeDueDatePicker(true)}
+          >
+            <Text style={styles.selectInputText}>
+              {matchFeeDueDate
+                ? matchFeeDueDate.toLocaleString()
+                : "Select fee due date & time"}
+            </Text>
+          </TouchableOpacity>
+
+          {showFeeDueDatePicker && (
+            <DateTimePicker
+              value={matchFeeDueDate || new Date()}
+              mode="datetime"
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={(event, selectedDate) => {
+                setShowFeeDueDatePicker(false);
+                if (selectedDate) setMatchFeeDueDate(selectedDate);
+              }}
+            />
+          )}
+
+          <Text style={styles.label}>Match Fee Note (Optional)</Text>
+          <TextInput
+            style={[styles.input, styles.notesInput]}
+            placeholder="Example: Only squad players will pay"
+            placeholderTextColor="#7a7a7a"
+            value={matchFeeDescription}
+            onChangeText={setMatchFeeDescription}
+            multiline
+            textAlignVertical="top"
+          />
+
+          <Text style={styles.label}>Notes</Text>
+          <TextInput
+            style={[styles.input, styles.notesInput]}
+            placeholder="Optional notes"
+            placeholderTextColor="#7a7a7a"
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            textAlignVertical="top"
+          />
+
+          <Text style={styles.label}>Status</Text>
+          <View style={styles.rowWrap}>
+            {(["UPCOMING", "COMPLETED", "CANCELLED"] as MatchStatus[]).map(
+              (item) => (
+                <TouchableOpacity
+                  key={item}
+                  style={[
+                    styles.chipBtn,
+                    status === item && styles.chipBtnSelected,
+                  ]}
+                  onPress={() => setStatus(item)}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      status === item && styles.chipTextSelected,
+                    ]}
+                  >
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={styles.submitBtn}
+            onPress={handleUpdateMatch}
+            disabled={submitting}
+          >
+            <Text style={styles.submitBtnText}>
+              {submitting ? "Updating..." : "Update Match"}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* League picker */}
       <Modal visible={showLeaguePicker} transparent animationType="fade">
         <Pressable
           style={styles.modalOverlay}
@@ -522,7 +611,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         </Pressable>
       </Modal>
 
-      {/* Home Team Picker */}
+      {/* Home team picker */}
       <Modal visible={showHomeTeamPicker} transparent animationType="fade">
         <Pressable
           style={styles.modalOverlay}
@@ -550,7 +639,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         </Pressable>
       </Modal>
 
-      {/* Away Team Picker */}
+      {/* Away team picker */}
       <Modal visible={showAwayTeamPicker} transparent animationType="fade">
         <Pressable
           style={styles.modalOverlay}
@@ -577,7 +666,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
         </Pressable>
       </Modal>
 
-      {/* Format Picker */}
+      {/* Format picker */}
       <Modal visible={showFormatPicker} transparent animationType="fade">
         <Pressable
           style={styles.modalOverlay}
@@ -611,10 +700,15 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
 export default EditMatchScreen;
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#f8f5fb",
+  },
   container: {
     padding: 20,
     backgroundColor: "#f8f5fb",
     flexGrow: 1,
+    paddingBottom: 120,
   },
   center: {
     flex: 1,

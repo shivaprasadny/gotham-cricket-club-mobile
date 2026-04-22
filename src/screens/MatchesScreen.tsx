@@ -49,20 +49,20 @@ type PickerType = "STATUS" | "TEAM" | "LEAGUE" | null;
 const MatchesScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
 
-  const [matches, setMatches] = useState<Match[]>([]); // all matches
-  const [loading, setLoading] = useState(true); // page loading
-  const [refreshing, setRefreshing] = useState(false); // pull refresh
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [filter, setFilter] = useState<MatchFilter>("UPCOMING"); // status filter
-  const [teamFilter, setTeamFilter] = useState<TeamFilter>("ALL_TEAMS"); // team filter
-  const [leagueFilter, setLeagueFilter] = useState<LeagueFilter>("ALL_LEAGUES"); // league filter
+  const [filter, setFilter] = useState<MatchFilter>("UPCOMING");
+  const [teamFilter, setTeamFilter] = useState<TeamFilter>("ALL_TEAMS");
+  const [leagueFilter, setLeagueFilter] = useState<LeagueFilter>("ALL_LEAGUES");
 
-  const [pickerVisible, setPickerVisible] = useState(false); // popup open/close
-  const [pickerType, setPickerType] = useState<PickerType>(null); // current popup type
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerType, setPickerType] = useState<PickerType>(null);
 
-  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN"; // admin/captain actions
+  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
 
-  // Load matches from backend
+  // Load matches
   const loadMatches = async () => {
     try {
       const data = await getMatches();
@@ -78,7 +78,7 @@ const MatchesScreen = ({ navigation }: Props) => {
     }
   };
 
-  // Reload on screen focus
+  // Reload when screen opens
   useFocusEffect(
     useCallback(() => {
       void loadMatches();
@@ -91,7 +91,7 @@ const MatchesScreen = ({ navigation }: Props) => {
     await loadMatches();
   };
 
-  // Build readable match title
+  // Build title
   const getMatchTitle = (item: Match) => {
     if (item.awayTeamName) {
       return `${item.homeTeamName || "Team"} vs ${item.awayTeamName}`;
@@ -102,37 +102,30 @@ const MatchesScreen = ({ navigation }: Props) => {
     }`;
   };
 
-  // Build unique team options
+  // Team options
   const teamOptions = useMemo(() => {
     const teams = new Set<string>();
 
     matches.forEach((match) => {
-      if (match.homeTeamName) {
-        teams.add(match.homeTeamName);
-      }
-
-      if (match.awayTeamName) {
-        teams.add(match.awayTeamName);
-      }
+      if (match.homeTeamName) teams.add(match.homeTeamName);
+      if (match.awayTeamName) teams.add(match.awayTeamName);
     });
 
     return ["ALL_TEAMS", ...Array.from(teams)];
   }, [matches]);
 
-  // Build unique league options
+  // League options
   const leagueOptions = useMemo(() => {
     const leagues = new Set<string>();
 
     matches.forEach((match) => {
-      if (match.leagueName) {
-        leagues.add(match.leagueName);
-      }
+      if (match.leagueName) leagues.add(match.leagueName);
     });
 
     return ["ALL_LEAGUES", ...Array.from(leagues)];
   }, [matches]);
 
-  // Apply status/team/league filters
+  // Apply filters
   const filteredMatches = useMemo(() => {
     const now = new Date();
 
@@ -141,25 +134,15 @@ const MatchesScreen = ({ navigation }: Props) => {
       const isPast = matchDate < now;
       const isCancelled = match.status === "CANCELLED";
 
-      if (filter === "UPCOMING" && (isPast || isCancelled)) {
-        return false;
-      }
-
-      if (filter === "PAST" && (!isPast || isCancelled)) {
-        return false;
-      }
-
-      if (filter === "CANCELLED" && !isCancelled) {
-        return false;
-      }
+      if (filter === "UPCOMING" && (isPast || isCancelled)) return false;
+      if (filter === "PAST" && (!isPast || isCancelled)) return false;
+      if (filter === "CANCELLED" && !isCancelled) return false;
 
       if (teamFilter !== "ALL_TEAMS") {
         const teamMatch =
           match.homeTeamName === teamFilter || match.awayTeamName === teamFilter;
 
-        if (!teamMatch) {
-          return false;
-        }
+        if (!teamMatch) return false;
       }
 
       if (leagueFilter !== "ALL_LEAGUES" && match.leagueName !== leagueFilter) {
@@ -182,8 +165,13 @@ const MatchesScreen = ({ navigation }: Props) => {
       case "INJURED":
         return { color: "#9ca3af" };
       default:
-        return { color: "#15803d" };
+        return { color: "#d1d5db" };
     }
+  };
+
+  // Availability text
+  const getAvailabilityText = (status?: string) => {
+    return status || "NOT MARKED";
   };
 
   // Delete match
@@ -196,12 +184,14 @@ const MatchesScreen = ({ navigation }: Props) => {
         onPress: async () => {
           try {
             const response = await deleteMatch(id);
+
             Alert.alert(
               "Success",
               typeof response === "string"
                 ? response
                 : "Match deleted successfully"
             );
+
             await loadMatches();
           } catch (error: any) {
             Alert.alert(
@@ -214,13 +204,13 @@ const MatchesScreen = ({ navigation }: Props) => {
     ]);
   };
 
-  // Open selector modal
+  // Open popup filter
   const openPicker = (type: PickerType) => {
     setPickerType(type);
     setPickerVisible(true);
   };
 
-  // Close selector modal
+  // Close popup filter
   const closePicker = () => {
     setPickerVisible(false);
     setPickerType(null);
@@ -234,7 +224,7 @@ const MatchesScreen = ({ navigation }: Props) => {
     return "Select";
   };
 
-  // Modal items
+  // Modal options
   const pickerOptions = useMemo(() => {
     if (pickerType === "STATUS") {
       return ["UPCOMING", "PAST", "ALL", "CANCELLED"];
@@ -251,7 +241,7 @@ const MatchesScreen = ({ navigation }: Props) => {
     return [];
   }, [pickerType, teamOptions, leagueOptions]);
 
-  // Current selected label
+  // Current selected value
   const getCurrentSelectedValue = () => {
     if (pickerType === "STATUS") return filter;
     if (pickerType === "TEAM") return teamFilter;
@@ -259,129 +249,85 @@ const MatchesScreen = ({ navigation }: Props) => {
     return "";
   };
 
-  // Handle picker selection
+  // Apply picker value
   const handlePickerSelect = (value: string) => {
-    if (pickerType === "STATUS") {
-      setFilter(value as MatchFilter);
-    }
-
-    if (pickerType === "TEAM") {
-      setTeamFilter(value);
-    }
-
-    if (pickerType === "LEAGUE") {
-      setLeagueFilter(value);
-    }
+    if (pickerType === "STATUS") setFilter(value as MatchFilter);
+    if (pickerType === "TEAM") setTeamFilter(value);
+    if (pickerType === "LEAGUE") setLeagueFilter(value);
 
     closePicker();
   };
 
-  // Team button label
   const teamButtonLabel =
     teamFilter === "ALL_TEAMS" ? "All Teams" : teamFilter;
 
-  // League button label
   const leagueButtonLabel =
     leagueFilter === "ALL_LEAGUES" ? "All Leagues" : leagueFilter;
 
-  // Render one match card
+  // Compact match card
   const renderItem = ({ item }: { item: Match }) => {
-    const isAvailabilityLocked =
-      new Date(item.matchDate).getTime() < new Date().getTime();
-
     return (
-      <View style={styles.card}>
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate("MatchDetails", {
-              matchId: item.id,
-            })
-          }
-        >
-          <Text style={styles.title}>{getMatchTitle(item)}</Text>
-
-          {item.leagueName ? (
-            <Text style={styles.detail}>League: {item.leagueName}</Text>
-          ) : null}
-
-          <Text style={styles.detail}>Type: {item.matchType}</Text>
-
-          <Text style={styles.detail}>
-            Fee Per Player:{" "}
-            {item.matchFeeAmount !== null && item.matchFeeAmount !== undefined
-              ? `$${item.matchFeeAmount}`
-              : "N/A"}
+      <TouchableOpacity
+        style={styles.compactCard}
+        activeOpacity={0.9}
+        onPress={() =>
+          navigation.navigate("MatchDetails", {
+            matchId: item.id,
+          })
+        }
+      >
+        {/* Line 1 */}
+        <View style={styles.lineOne}>
+          <Text style={styles.compactTitle} numberOfLines={1}>
+            {getMatchTitle(item)}
           </Text>
 
-          <Text style={styles.detail}>Venue: {item.venue}</Text>
+          <Text style={styles.compactStatus}>{item.status || "UPCOMING"}</Text>
+        </View>
 
-          <Text style={styles.detail}>
-            Date: {new Date(item.matchDate).toLocaleString()}
+        {/* Line 2 */}
+        <Text style={styles.compactMeta} numberOfLines={1}>
+          {new Date(item.matchDate).toLocaleString()}
+        </Text>
+
+        {/* Line 3 */}
+        <View style={styles.lineThree}>
+          <Text style={styles.compactMetaSmall} numberOfLines={1}>
+            {item.venue}
           </Text>
 
-          <Text style={styles.detail}>Format: {item.matchFormat || "N/A"}</Text>
-
-          <Text style={styles.detail}>
-            Status: {item.status || "UPCOMING"}
-          </Text>
-        </TouchableOpacity>
-
-        {item.myAvailability ? (
-          <View style={styles.availabilityDone}>
-            <Text
-              style={[
-                styles.availabilityDoneText,
-                getAvailabilityColor(item.myAvailability),
-              ]}
-            >
-              Availability Marked ✅ ({item.myAvailability})
-            </Text>
-          </View>
-        ) : isAvailabilityLocked ? (
-          <View style={styles.availabilityLocked}>
-            <Text style={styles.availabilityLockedText}>
-              Availability Locked
-            </Text>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.availabilityBtn}
-            onPress={() =>
-              navigation.navigate("Availability", {
-                matchId: item.id,
-                opponentName: item.awayTeamName || item.externalOpponentName,
-                matchDate: item.matchDate,
-                venue: item.venue,
-                matchType: item.matchType,
-              })
-            }
+          <Text
+            style={[styles.compactAvailability, getAvailabilityColor(item.myAvailability)]}
+            numberOfLines={1}
           >
-            <Text style={styles.availabilityText}>Mark Availability</Text>
-          </TouchableOpacity>
-        )}
+            {getAvailabilityText(item.myAvailability)}
+          </Text>
+        </View>
 
+        {/* Small admin/captain actions */}
         {canManage && (
-          <View style={styles.actionRow}>
+          <View style={styles.smallActionRow}>
             <TouchableOpacity
-              style={[styles.actionBtn, styles.editBtn]}
-              onPress={() => navigation.navigate("EditMatch", { matchId: item.id })}
+              style={[styles.smallActionBtn, styles.editBtn]}
+              onPress={() =>
+                navigation.navigate("EditMatch", { matchId: item.id })
+              }
             >
-              <Text style={styles.actionText}>Edit</Text>
+              <Text style={styles.smallActionText}>Edit</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionBtn, styles.deleteBtn]}
+              style={[styles.smallActionBtn, styles.deleteBtn]}
               onPress={() => handleDelete(item.id)}
             >
-              <Text style={styles.actionText}>Delete</Text>
+              <Text style={styles.smallActionText}>Delete</Text>
             </TouchableOpacity>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
-  // Loading UI
   if (loading) {
     return (
       <View style={styles.center}>
@@ -419,27 +365,21 @@ const MatchesScreen = ({ navigation }: Props) => {
                 style={styles.topFilterBtn}
                 onPress={() => openPicker("STATUS")}
               >
-                <Text style={styles.topFilterBtnText}>
-                  {filter}
-                </Text>
+                <Text style={styles.topFilterBtnText}>{filter}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.topFilterBtn}
                 onPress={() => openPicker("TEAM")}
               >
-                <Text style={styles.topFilterBtnText}>
-                  {teamButtonLabel}
-                </Text>
+                <Text style={styles.topFilterBtnText}>{teamButtonLabel}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.topFilterBtn}
                 onPress={() => openPicker("LEAGUE")}
               >
-                <Text style={styles.topFilterBtnText}>
-                  {leagueButtonLabel}
-                </Text>
+                <Text style={styles.topFilterBtnText}>{leagueButtonLabel}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -528,6 +468,7 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#4B1D6B",
   },
+
   topFilterRow: {
     flexDirection: "row",
     gap: 8,
@@ -548,6 +489,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 12,
   },
+
   createBtn: {
     backgroundColor: "#F4B400",
     paddingVertical: 12,
@@ -559,6 +501,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#000",
   },
+
   resetBtn: {
     backgroundColor: "#F4B400",
     borderRadius: 10,
@@ -572,64 +515,71 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 12,
   },
-  card: {
+
+  compactCard: {
     backgroundColor: "#5A257A",
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 14,
-    marginBottom: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#6d3890",
   },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 8,
-    color: "#fff",
-  },
-  detail: {
-    fontSize: 15,
-    marginBottom: 4,
-    color: "#ddd",
-  },
-  availabilityBtn: {
-    backgroundColor: "#16a34a",
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  availabilityText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "700",
-  },
-  availabilityDone: {
-    backgroundColor: "#e6f9ed",
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  availabilityDoneText: {
-    textAlign: "center",
-    fontWeight: "700",
-  },
-  availabilityLocked: {
-    backgroundColor: "#6b7280",
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  availabilityLockedText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "700",
-  },
-  actionRow: {
+  lineOne: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 14,
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
   },
-  actionBtn: {
+  compactTitle: {
     flex: 1,
-    paddingVertical: 10,
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  compactStatus: {
+    color: "#F4B400",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  compactMeta: {
+    color: "#ddd",
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  lineThree: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  compactMetaSmall: {
+    flex: 1,
+    color: "#d1d5db",
+    fontSize: 12,
+  },
+  compactAvailability: {
+    fontSize: 11,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+
+  smallActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
+  },
+  smallActionBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     borderRadius: 8,
+    minWidth: 70,
+  },
+  smallActionText: {
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "700",
+    fontSize: 11,
   },
   editBtn: {
     backgroundColor: "#111",
@@ -637,11 +587,7 @@ const styles = StyleSheet.create({
   deleteBtn: {
     backgroundColor: "#c0392b",
   },
-  actionText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "700",
-  },
+
   loadingText: {
     color: "#fff",
     marginTop: 10,
@@ -657,6 +603,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#4B1D6B",
     padding: 20,
   },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.45)",

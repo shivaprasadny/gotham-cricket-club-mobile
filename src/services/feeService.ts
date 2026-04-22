@@ -92,3 +92,33 @@ export const waiveFee = async (
   );
   return response.data;
 };
+
+// Update fee definition
+export const updateFee = async (feeId: number, data: any) => {
+  const response = await api.put(`/fees/${feeId}`, data);
+  return response.data;
+};
+
+// Delete fee definition
+export const deleteFeeById = async (feeId: number) => {
+  const response = await api.delete(`/fees/${feeId}`);
+  return response.data;
+};
+// Create fee with custom split amounts
+export const createSplitFee = async (data: {
+  title: string;
+  feeType: string;
+  dueDate: string;
+  description?: string;
+  matchId?: number | null;
+  eventId?: number | null;
+  teamId?: number | null;
+  season?: string | null;
+  splits: {
+    userId: number;
+    amount: number;
+  }[];
+}) => {
+  const response = await api.post("/fees/split", data);
+  return response.data;
+};

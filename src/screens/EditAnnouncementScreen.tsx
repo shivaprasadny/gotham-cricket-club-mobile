@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +14,7 @@ import {
   deleteAnnouncement,
   updateAnnouncement,
 } from "../services/announcementService";
+import { addNotification } from "../services/notificationService";
 
 type Props = {
   route: any;
@@ -28,13 +31,18 @@ type Announcement = {
 };
 
 const EditAnnouncementScreen = ({ route, navigation }: Props) => {
+  // Get announcement passed from previous screen
   const announcement: Announcement | undefined = route?.params?.announcement;
 
+  // Form fields
   const [title, setTitle] = useState(announcement?.title || "");
   const [message, setMessage] = useState(announcement?.message || "");
+
+  // Loading states for update and delete actions
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // If announcement is missing, show fallback UI
   if (!announcement) {
     return (
       <View style={styles.center}>
@@ -43,6 +51,7 @@ const EditAnnouncementScreen = ({ route, navigation }: Props) => {
     );
   }
 
+  // Update announcement handler
   const handleUpdate = async () => {
     if (!title.trim()) {
       Alert.alert("Error", "Please enter title");
@@ -60,6 +69,13 @@ const EditAnnouncementScreen = ({ route, navigation }: Props) => {
       const response = await updateAnnouncement(announcement.id, {
         title: title.trim(),
         message: message.trim(),
+      });
+
+      await addNotification({
+        title: "Announcement Updated",
+        message: title.trim(),
+        type: "ANNOUNCEMENT",
+        targetScreen: "Announcements",
       });
 
       Alert.alert(
@@ -88,6 +104,7 @@ const EditAnnouncementScreen = ({ route, navigation }: Props) => {
     }
   };
 
+  // Delete announcement with confirmation
   const handleDelete = () => {
     Alert.alert(
       "Delete Announcement",
@@ -137,58 +154,74 @@ const EditAnnouncementScreen = ({ route, navigation }: Props) => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Edit Announcement</Text>
-
-      <Text style={styles.label}>Title</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter title"
-        placeholderTextColor="#7a7a7a"
-        value={title}
-        onChangeText={setTitle}
-      />
-
-      <Text style={styles.label}>Message</Text>
-      <TextInput
-        style={[styles.input, styles.messageInput]}
-        placeholder="Enter message"
-        placeholderTextColor="#7a7a7a"
-        multiline
-        value={message}
-        onChangeText={setMessage}
-      />
-
-      <TouchableOpacity
-        style={styles.updateBtn}
-        onPress={handleUpdate}
-        disabled={submitting}
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.updateBtnText}>
-          {submitting ? "Updating..." : "Update Announcement"}
-        </Text>
-      </TouchableOpacity>
+        <Text style={styles.title}>Edit Announcement</Text>
 
-      <TouchableOpacity
-        style={styles.deleteBtn}
-        onPress={handleDelete}
-        disabled={deleting}
-      >
-        <Text style={styles.deleteBtnText}>
-          {deleting ? "Deleting..." : "Delete Announcement"}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <Text style={styles.label}>Title</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter title"
+          placeholderTextColor="#7a7a7a"
+          value={title}
+          onChangeText={setTitle}
+        />
+
+        <Text style={styles.label}>Message</Text>
+        <TextInput
+          style={[styles.input, styles.messageInput]}
+          placeholder="Enter message"
+          placeholderTextColor="#7a7a7a"
+          multiline
+          value={message}
+          onChangeText={setMessage}
+          textAlignVertical="top"
+        />
+
+        <TouchableOpacity
+          style={styles.updateBtn}
+          onPress={handleUpdate}
+          disabled={submitting}
+        >
+          <Text style={styles.updateBtnText}>
+            {submitting ? "Updating..." : "Update Announcement"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={handleDelete}
+          disabled={deleting}
+        >
+          <Text style={styles.deleteBtnText}>
+            {deleting ? "Deleting..." : "Delete Announcement"}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 export default EditAnnouncementScreen;
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#f8f5fb",
+  },
   container: {
     padding: 20,
     backgroundColor: "#f8f5fb",
     flexGrow: 1,
+    paddingBottom: 40,
   },
   center: {
     flex: 1,

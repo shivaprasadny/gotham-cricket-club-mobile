@@ -71,6 +71,12 @@ const TeamDetailsScreen = ({ route }: Props) => {
   const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("ALL");
   const [searchText, setSearchText] = useState("");
+  const isAdmin = user?.role === "ADMIN";
+const isCaptain = user?.role === "CAPTAIN";
+const isPlayer = user?.role === "PLAYER";
+
+const canManagePlayers = isAdmin || isCaptain;
+const canManageTeamInfo = isAdmin;
 
   const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
 

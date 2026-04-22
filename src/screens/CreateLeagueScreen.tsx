@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -39,7 +40,7 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
 
-  // Date picker control
+  // Date picker visibility controls
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
@@ -47,7 +48,7 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
   const [submitting, setSubmitting] = useState(false);
 
   /**
-   * Format date nicely for UI display
+   * Format date for UI display
    */
   const formatDate = (date: Date | null) => {
     if (!date) return "Select date";
@@ -109,142 +110,164 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Screen title */}
-      <Text style={styles.title}>Create League</Text>
+    // KeyboardAvoidingView keeps inputs visible above keyboard
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
+    >
+      {/* ScrollView lets form stay usable when keyboard opens */}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Screen title */}
+        <Text style={styles.title}>Create League</Text>
 
-      {/* League name */}
-      <Text style={styles.label}>League Name</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter league name"
-        placeholderTextColor="#7a7a7a"
-        value={name}
-        onChangeText={setName}
-      />
+        {/* League name */}
+        <Text style={styles.label}>League Name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter league name"
+          placeholderTextColor="#7a7a7a"
+          value={name}
+          onChangeText={setName}
+        />
 
-      {/* Season */}
-      <Text style={styles.label}>Season</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter season (example: 2026)"
-        placeholderTextColor="#7a7a7a"
-        value={season}
-        onChangeText={setSeason}
-      />
+        {/* Season */}
+        <Text style={styles.label}>Season</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter season (example: 2026)"
+          placeholderTextColor="#7a7a7a"
+          value={season}
+          onChangeText={setSeason}
+        />
 
-      {/* Type selection */}
-      <Text style={styles.label}>Type</Text>
-      <View style={styles.typeRow}>
-        {LEAGUE_TYPES.map((item) => (
-          <TouchableOpacity
-            key={item}
-            style={[
-              styles.typeBtn,
-              type === item && styles.typeBtnSelected,
-            ]}
-            onPress={() => setType(item)}
-          >
-            <Text
+        {/* Type selection */}
+        <Text style={styles.label}>Type</Text>
+        <View style={styles.typeRow}>
+          {LEAGUE_TYPES.map((item) => (
+            <TouchableOpacity
+              key={item}
               style={[
-                styles.typeBtnText,
-                type === item && styles.typeBtnTextSelected,
+                styles.typeBtn,
+                type === item && styles.typeBtnSelected,
               ]}
+              onPress={() => setType(item)}
             >
-              {item}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <Text
+                style={[
+                  styles.typeBtnText,
+                  type === item && styles.typeBtnTextSelected,
+                ]}
+              >
+                {item}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      {/* Description */}
-      <Text style={styles.label}>Description</Text>
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Enter description (optional)"
-        placeholderTextColor="#7a7a7a"
-        value={description}
-        onChangeText={setDescription}
-        multiline
-      />
-
-      {/* Start date */}
-      <Text style={styles.label}>Start Date</Text>
-      <TouchableOpacity
-        style={styles.input}
-        onPress={() => setShowStartDatePicker(true)}
-      >
-        <Text style={styles.inputText}>{formatDate(startDate)}</Text>
-      </TouchableOpacity>
-
-      {showStartDatePicker && (
-        <DateTimePicker
-          value={startDate || new Date()}
-          mode="datetime"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          onChange={(event, selectedDate) => {
-            setShowStartDatePicker(false);
-            if (selectedDate) {
-              setStartDate(selectedDate);
-            }
-          }}
+        {/* Description */}
+        <Text style={styles.label}>Description</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Enter description (optional)"
+          placeholderTextColor="#7a7a7a"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          textAlignVertical="top"
         />
-      )}
 
-      {/* End date */}
-      <Text style={styles.label}>End Date</Text>
-      <TouchableOpacity
-        style={styles.input}
-        onPress={() => setShowEndDatePicker(true)}
-      >
-        <Text style={styles.inputText}>{formatDate(endDate)}</Text>
-      </TouchableOpacity>
+        {/* Start date */}
+        <Text style={styles.label}>Start Date</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowStartDatePicker(true)}
+        >
+          <Text style={styles.inputText}>{formatDate(startDate)}</Text>
+        </TouchableOpacity>
 
-      {showEndDatePicker && (
-        <DateTimePicker
-          value={endDate || new Date()}
-          mode="datetime"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          onChange={(event, selectedDate) => {
-            setShowEndDatePicker(false);
-            if (selectedDate) {
-              setEndDate(selectedDate);
-            }
-          }}
-        />
-      )}
+        {showStartDatePicker && (
+          <DateTimePicker
+            value={startDate || new Date()}
+            mode="datetime"
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            onChange={(event, selectedDate) => {
+              setShowStartDatePicker(false);
+              if (selectedDate) {
+                setStartDate(selectedDate);
+              }
+            }}
+          />
+        )}
 
-      {/* Active switch */}
-      <Text style={styles.label}>Active</Text>
-      <View style={styles.switchRow}>
-        <Text style={styles.switchText}>
-          {active ? "League is active" : "League is inactive"}
-        </Text>
-        <Switch value={active} onValueChange={setActive} />
-      </View>
+        {/* End date */}
+        <Text style={styles.label}>End Date</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowEndDatePicker(true)}
+        >
+          <Text style={styles.inputText}>{formatDate(endDate)}</Text>
+        </TouchableOpacity>
 
-      {/* Submit button */}
-      <TouchableOpacity
-        style={styles.submitBtn}
-        onPress={handleCreateLeague}
-        disabled={submitting}
-      >
-        <Text style={styles.submitBtnText}>
-          {submitting ? "Creating..." : "Create League"}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {showEndDatePicker && (
+          <DateTimePicker
+            value={endDate || new Date()}
+            mode="datetime"
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            onChange={(event, selectedDate) => {
+              setShowEndDatePicker(false);
+              if (selectedDate) {
+                setEndDate(selectedDate);
+              }
+            }}
+          />
+        )}
+
+        {/* Active switch */}
+        <Text style={styles.label}>Active</Text>
+        <View style={styles.switchRow}>
+          <Text style={styles.switchText}>
+            {active ? "League is active" : "League is inactive"}
+          </Text>
+          <Switch value={active} onValueChange={setActive} />
+        </View>
+
+        {/* Submit button */}
+        <TouchableOpacity
+          style={styles.submitBtn}
+          onPress={handleCreateLeague}
+          disabled={submitting}
+        >
+          <Text style={styles.submitBtnText}>
+            {submitting ? "Creating..." : "Create League"}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 export default CreateLeagueScreen;
 
 const styles = StyleSheet.create({
+  // Full-screen wrapper for keyboard behavior
+  screen: {
+    flex: 1,
+    backgroundColor: "#f8f5fb",
+  },
+
+  // Scroll content container
   container: {
     flexGrow: 1,
     backgroundColor: "#f8f5fb",
     padding: 20,
+    paddingBottom: 40,
   },
+
   title: {
     fontSize: 30,
     fontWeight: "700",
@@ -252,6 +275,7 @@ const styles = StyleSheet.create({
     color: "#2b0540",
     marginBottom: 24,
   },
+
   label: {
     fontSize: 16,
     fontWeight: "700",
@@ -259,6 +283,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 10,
   },
+
   input: {
     backgroundColor: "#fff",
     borderWidth: 1,
@@ -268,19 +293,23 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 6,
   },
+
   inputText: {
     color: "#111",
   },
+
   textArea: {
     minHeight: 110,
     textAlignVertical: "top",
   },
+
   typeRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
     marginBottom: 10,
   },
+
   typeBtn: {
     borderWidth: 1,
     borderColor: "#d9d2e1",
@@ -289,17 +318,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
+
   typeBtnSelected: {
     backgroundColor: "#2b0540",
     borderColor: "#2b0540",
   },
+
   typeBtnText: {
     color: "#2b0540",
     fontWeight: "600",
   },
+
   typeBtnTextSelected: {
     color: "#fff",
   },
+
   switchRow: {
     backgroundColor: "#fff",
     borderWidth: 1,
@@ -312,16 +345,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   switchText: {
     color: "#2b0540",
     fontWeight: "600",
   },
+
   submitBtn: {
     backgroundColor: "#da9306",
     paddingVertical: 16,
     borderRadius: 14,
     marginTop: 10,
   },
+
   submitBtnText: {
     textAlign: "center",
     color: "#2b0540",

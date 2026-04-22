@@ -24,8 +24,6 @@ type Props = {
   navigation: any;
 };
 
-
-// Match shape used on home screen
 type Match = {
   id: number;
   homeTeamId?: number | null;
@@ -51,8 +49,6 @@ type PendingMember = {
   status: "PENDING" | "APPROVED" | "REJECTED" | "INACTIVE";
 };
 
-
-// Announcement shape used on home screen
 type Announcement = {
   id: number;
   title: string;
@@ -62,7 +58,6 @@ type Announcement = {
   pinned?: boolean;
 };
 
-// Motivational quotes for hero section
 const QUOTES = [
   "Play for the badge. Fight for each other.",
   "Discipline, unity, and consistency win matches.",
@@ -73,35 +68,22 @@ const QUOTES = [
 const HomeScreen = ({ navigation }: Props) => {
   const { user, logout } = useAuth();
 
-  // Controls popup menu visibility
   const [menuVisible, setMenuVisible] = useState(false);
 
-  // Upcoming matches preview
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([]);
-
-  // Latest announcements preview
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-
-  // One pinned announcement for home screen
   const [pinnedAnnouncement, setPinnedAnnouncement] =
     useState<Announcement | null>(null);
+  const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
 
-  // Screen loading and pull-to-refresh state
   const [loadingHome, setLoadingHome] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Pending members preview for admin home screen
-const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
 
   const isAdmin = user?.role === "ADMIN";
   const isCaptain = user?.role === "CAPTAIN";
   const canManage = isAdmin || isCaptain;
 
-  /**
-   * Builds readable match title for both:
-   * 1. club vs outside opponent
-   * 2. club vs club
-   */
+  // Build readable match title
   const getMatchTitle = (match: Match) => {
     if (match.awayTeamName) {
       return `${match.homeTeamName || "Team"} vs ${match.awayTeamName}`;
@@ -112,89 +94,25 @@ const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
     }`;
   };
 
-  /**
-   * Returns opponent name only
-   * This is useful for Availability screen params
-   */
+  // Get opponent name only
   const getOpponentName = (match: Match) => {
     return match.awayTeamName || match.externalOpponentName || "Opponent";
   };
 
-  /**
-   * Load matches, announcements, and pinned announcement together.
-   * Uses Promise.allSettled so one failing API does not break the whole home screen.
-   */
+  // Load home data
   const loadHomeData = async () => {
     try {
-      const results = await Promise.allSettled([
+      const requests: Promise<any>[] = [
         getMatches(),
         getAnnouncements(),
         getPinnedAnnouncement(),
-      ]);
+      ];
 
+      if (isAdmin) {
+        requests.push(getPendingMembers());
+      }
 
-
-/**
- * Load matches, announcements, pinned announcement,
- * and pending members for admin.
- */
-const loadHomeData = async () => {
-  try {
-    const requests: Promise<any>[] = [
-      getMatches(),
-      getAnnouncements(),
-      getPinnedAnnouncement(),
-    ];
-
-    // Only admin needs pending members
-    if (isAdmin) {
-      requests.push(getPendingMembers());
-    }
-
-    const results = await Promise.allSettled(requests);
-
-    const matchesData =
-      results[0].status === "fulfilled" ? results[0].value : [];
-
-    const announcementData =
-      results[1].status === "fulfilled" ? results[1].value : [];
-
-    const pinnedData =
-      results[2].status === "fulfilled" ? results[2].value : null;
-
-    const pendingData =
-      isAdmin && results[3] && results[3].status === "fulfilled"
-        ? results[3].value
-        : [];
-
-    // Keep only upcoming matches
-    const upcoming = Array.isArray(matchesData)
-      ? matchesData
-          .filter((m) => (m.status || "UPCOMING") === "UPCOMING")
-          .sort(
-            (a, b) =>
-              new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
-          )
-          .slice(0, 3)
-      : [];
-
-    // Show only latest few announcements
-    const latestAnnouncements = Array.isArray(announcementData)
-      ? announcementData.slice(0, 3)
-      : [];
-
-    setUpcomingMatches(upcoming);
-    setAnnouncements(latestAnnouncements);
-    setPinnedAnnouncement(pinnedData || null);
-    setPendingMembers(Array.isArray(pendingData) ? pendingData : []);
-  } catch (error) {
-    console.log("HOME LOAD ERROR:", error);
-  } finally {
-    setLoadingHome(false);
-    setRefreshing(false);
-  }
-};
-
+      const results = await Promise.allSettled(requests);
 
       const matchesData =
         results[0].status === "fulfilled" ? results[0].value : [];
@@ -205,7 +123,11 @@ const loadHomeData = async () => {
       const pinnedData =
         results[2].status === "fulfilled" ? results[2].value : null;
 
-      // Keep only upcoming matches
+      const pendingData =
+        isAdmin && results[3] && results[3].status === "fulfilled"
+          ? results[3].value
+          : [];
+
       const upcoming = Array.isArray(matchesData)
         ? matchesData
             .filter((m) => (m.status || "UPCOMING") === "UPCOMING")
@@ -213,10 +135,8 @@ const loadHomeData = async () => {
               (a, b) =>
                 new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
             )
-            .slice(0, 3)
         : [];
 
-      // Show only latest few announcements
       const latestAnnouncements = Array.isArray(announcementData)
         ? announcementData.slice(0, 3)
         : [];
@@ -224,6 +144,7 @@ const loadHomeData = async () => {
       setUpcomingMatches(upcoming);
       setAnnouncements(latestAnnouncements);
       setPinnedAnnouncement(pinnedData || null);
+      setPendingMembers(Array.isArray(pendingData) ? pendingData : []);
     } catch (error) {
       console.log("HOME LOAD ERROR:", error);
     } finally {
@@ -232,42 +153,63 @@ const loadHomeData = async () => {
     }
   };
 
-  /**
-   * Refresh home every time the screen becomes active again.
-   * This fixes the issue where user had to restart app after updates.
-   */
+  // Reload home on focus
   useFocusEffect(
     useCallback(() => {
       void loadHomeData();
-    }, [])
+    }, [isAdmin])
   );
 
-  /**
-   * Pull-to-refresh handler
-   */
+  // Pull to refresh
   const onRefresh = async () => {
     setRefreshing(true);
     await loadHomeData();
   };
 
-  // Pick a rotating quote based on current user id
+  // Rotating quote
   const quote = useMemo(() => {
     const index = (user?.id || 0) % QUOTES.length;
     return QUOTES[index];
   }, [user?.id]);
 
-  // First upcoming match is highlighted as next match
-  const nextMatch = useMemo(() => {
-    if (!upcomingMatches.length) return null;
-    return upcomingMatches[0];
+  // Get current week range
+  const getWeekRange = () => {
+    const now = new Date();
+    const day = now.getDay(); // 0 sunday, 1 monday
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+
+    const start = new Date(now);
+    start.setDate(now.getDate() + diffToMonday);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+
+    return { start, end };
+  };
+
+  // Matches of current week only
+  const weeklyMatches = useMemo(() => {
+    const { start, end } = getWeekRange();
+
+    return upcomingMatches.filter((match) => {
+      const matchDate = new Date(match.matchDate);
+      return matchDate >= start && matchDate <= end;
+    });
   }, [upcomingMatches]);
 
-  // True when next match exists and current user has not marked availability yet
-  const needsAvailabilityReminder = useMemo(() => {
-    return !!nextMatch && !nextMatch.myAvailability;
-  }, [nextMatch]);
+  // First match this week
+  const nextWeeklyMatch = useMemo(() => {
+    return weeklyMatches.length > 0 ? weeklyMatches[0] : null;
+  }, [weeklyMatches]);
 
-  // Return style for availability text color
+  // Reminder if first weekly match not marked
+  const needsAvailabilityReminder = useMemo(() => {
+    return !!nextWeeklyMatch && !nextWeeklyMatch.myAvailability;
+  }, [nextWeeklyMatch]);
+
+  // Availability color
   const getAvailabilityColor = (status?: string) => {
     switch (status) {
       case "AVAILABLE":
@@ -283,39 +225,38 @@ const loadHomeData = async () => {
     }
   };
 
-  // Build countdown text for next match
+  // Compact availability label
+  const getAvailabilityText = (status?: string) => {
+    return status || "Not Marked";
+  };
+
+  // Countdown for small card
   const getCountdownText = (matchDate: string) => {
     const now = new Date().getTime();
     const target = new Date(matchDate).getTime();
     const diff = target - now;
 
     if (diff <= 0) {
-      return "Match time reached";
+      return "Live / Started";
     }
 
     const totalMinutes = Math.floor(diff / (1000 * 60));
     const days = Math.floor(totalMinutes / (60 * 24));
     const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-    const minutes = totalMinutes % 60;
 
-    if (days > 0) {
-      return `Starts in ${days}d ${hours}h ${minutes}m`;
-    }
+    if (days > 0) return `${days}d ${hours}h left`;
+    if (hours > 0) return `${hours}h left`;
 
-    if (hours > 0) {
-      return `Starts in ${hours}h ${minutes}m`;
-    }
-
-    return `Starts in ${minutes}m`;
+    return `${totalMinutes}m left`;
   };
 
-  // Close popup menu and navigate
+  // Close menu and navigate
   const closeMenuAndNavigate = (screen: string, params?: any) => {
     setMenuVisible(false);
     navigation.navigate(screen, params);
   };
 
-  // Logout action from popup menu
+  // Logout
   const handleLogout = async () => {
     setMenuVisible(false);
     await logout();
@@ -330,20 +271,16 @@ const loadHomeData = async () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Top header area */}
+        {/* Header */}
         <View style={styles.topRow}>
           <View style={{ flex: 1 }}>
-
-
-<HomeFeeCard navigation={navigation} />
-
+            <HomeFeeCard navigation={navigation} />
 
             <Text style={styles.heading}>Welcome back</Text>
             <Text style={styles.name}>{user?.fullName}</Text>
             <Text style={styles.roleText}>{user?.role}</Text>
           </View>
 
-          {/* Burger menu button */}
           <TouchableOpacity
             style={styles.menuBtn}
             onPress={() => setMenuVisible(true)}
@@ -352,138 +289,119 @@ const loadHomeData = async () => {
           </TouchableOpacity>
         </View>
 
-        {/* Main hero card */}
+        {/* Hero */}
         <View style={styles.heroCard}>
           <Text style={styles.heroTitle}>Gotham Cricket Club</Text>
           <Text style={styles.heroSub}>One club. One standard.</Text>
           <Text style={styles.heroQuote}>{quote}</Text>
         </View>
 
+        {/* Pending approvals */}
+        {isAdmin && (
+          <>
+            <Text style={styles.sectionTitle}>Pending Approvals</Text>
 
+            {pendingMembers.length === 0 ? (
+              <View style={styles.infoCard}>
+                <Text style={styles.infoText}>No pending member approvals.</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.pendingCard}
+                onPress={() => navigation.navigate("AdminApproval")}
+              >
+                <Text style={styles.pendingTitle}>
+                  {pendingMembers.length} member(s) waiting for approval
+                </Text>
 
-        {/* Pending approvals section for admin */}
-{isAdmin && (
-  <>
-    <Text style={styles.sectionTitle}>Pending Approvals</Text>
+                {pendingMembers.slice(0, 3).map((member) => (
+                  <View key={member.id} style={styles.pendingMemberRow}>
+                    <Text style={styles.pendingMemberName}>{member.fullName}</Text>
+                    <Text style={styles.pendingMemberEmail}>{member.email}</Text>
+                  </View>
+                ))}
 
-    {pendingMembers.length === 0 ? (
-      <View style={styles.infoCard}>
-        <Text style={styles.infoText}>No pending member approvals.</Text>
-      </View>
-    ) : (
-      <TouchableOpacity
-        style={styles.pendingCard}
-        onPress={() => navigation.navigate("AdminApproval")}
-      >
-        <Text style={styles.pendingTitle}>
-          {pendingMembers.length} member(s) waiting for approval
-        </Text>
+                <View style={styles.pendingBtn}>
+                  <Text style={styles.pendingBtnText}>Review Approvals</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
 
-        {pendingMembers.slice(0, 3).map((member) => (
-          <View key={member.id} style={styles.pendingMemberRow}>
-            <Text style={styles.pendingMemberName}>{member.fullName}</Text>
-            <Text style={styles.pendingMemberEmail}>{member.email}</Text>
-          </View>
-        ))}
-
-        <View style={styles.pendingBtn}>
-          <Text style={styles.pendingBtnText}>Review Approvals</Text>
-        </View>
-      </TouchableOpacity>
-    )}
-  </>
-)}
-
-
-
-
-        {/* Next Match section */}
-        <Text style={styles.sectionTitle}>Next Match</Text>
+        {/* This week matches */}
+        <Text style={styles.sectionTitle}>This Week’s Matches</Text>
 
         {loadingHome ? (
           <View style={styles.infoCard}>
             <Text style={styles.infoText}>Loading home screen...</Text>
           </View>
-        ) : !nextMatch ? (
+        ) : weeklyMatches.length === 0 ? (
           <View style={styles.infoCard}>
-            <Text style={styles.infoText}>No upcoming matches right now.</Text>
+            <Text style={styles.infoText}>No matches this week.</Text>
           </View>
         ) : (
-          <TouchableOpacity
-            style={styles.nextMatchCard}
-            onPress={() =>
-              navigation.navigate("MatchDetails", {
-                matchId: nextMatch.id,
-              })
-            }
-          >
-            <Text style={styles.nextMatchTitle}>{getMatchTitle(nextMatch)}</Text>
-
-            <Text style={styles.countdownText}>
-              ⏳ {getCountdownText(nextMatch.matchDate)}
-            </Text>
-
-            {nextMatch.leagueName ? (
-              <Text style={styles.nextMatchDetail}>
-                🏆 {nextMatch.leagueName}
-              </Text>
-            ) : null}
-
-            <Text style={styles.nextMatchDetail}>📍 {nextMatch.venue}</Text>
-            <Text style={styles.nextMatchDetail}>
-              🗓 {new Date(nextMatch.matchDate).toLocaleString()}
-            </Text>
-            <Text style={styles.nextMatchDetail}>🏏 {nextMatch.matchType}</Text>
-
-            <Text style={styles.nextMatchDetail}>
-              👥 {nextMatch.homeTeamName || "No team assigned"}
-            </Text>
-
-            {nextMatch.matchFee !== null && nextMatch.matchFee !== undefined ? (
-              <Text style={styles.nextMatchDetail}>
-                💵 Match Fee: ${nextMatch.matchFee}
-              </Text>
-            ) : null}
-
-            {/* Current user's availability */}
-            <View style={styles.availabilityStatusBox}>
-              <Text style={styles.availabilityStatusLabel}>
-                Your Availability:
-              </Text>
-              <Text
-                style={[
-                  styles.availabilityStatusValue,
-                  getAvailabilityColor(nextMatch.myAvailability),
-                ]}
+          <View style={styles.weeklyWrap}>
+            {weeklyMatches.slice(0, 3).map((match) => (
+              <TouchableOpacity
+                key={match.id}
+                style={styles.weekMatchCard}
+                onPress={() =>
+                  navigation.navigate("MatchDetails", {
+                    matchId: match.id,
+                  })
+                }
               >
-                {nextMatch.myAvailability || "Not marked yet"}
-              </Text>
-            </View>
+                <View style={styles.weekMatchTopRow}>
+                  <Text style={styles.weekMatchTitle} numberOfLines={1}>
+                    {getMatchTitle(match)}
+                  </Text>
 
-            {/* Quick CTA */}
-            <TouchableOpacity
-              style={styles.nextMatchButton}
-              onPress={() =>
-                navigation.navigate("Availability", {
-                  matchId: nextMatch.id,
-                  opponentName: getOpponentName(nextMatch),
-                  matchDate: nextMatch.matchDate,
-                  venue: nextMatch.venue,
-                  matchType: nextMatch.matchType,
-                })
-              }
-            >
-              <Text style={styles.nextMatchButtonText}>
-                {nextMatch.myAvailability
-                  ? "Update Availability"
-                  : "Mark Availability"}
-              </Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
+                  <Text style={styles.weekMatchCountdown}>
+                    {getCountdownText(match.matchDate)}
+                  </Text>
+                </View>
+
+                <Text style={styles.weekMatchMeta} numberOfLines={1}>
+                  {new Date(match.matchDate).toLocaleString()}
+                </Text>
+
+                <Text style={styles.weekMatchMeta} numberOfLines={1}>
+                  {match.venue}
+                </Text>
+
+                <View style={styles.weekMatchBottomRow}>
+                  <Text style={styles.weekMatchType}>{match.matchType}</Text>
+
+                  <TouchableOpacity
+                    style={styles.weekAvailabilityBtn}
+                    onPress={() =>
+                      navigation.navigate("Availability", {
+                        matchId: match.id,
+                        opponentName: getOpponentName(match),
+                        matchDate: match.matchDate,
+                        venue: match.venue,
+                        matchType: match.matchType,
+                      })
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.weekAvailabilityText,
+                        getAvailabilityColor(match.myAvailability),
+                      ]}
+                    >
+                      {getAvailabilityText(match.myAvailability)}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
 
-        {/* Availability reminder card */}
-        {needsAvailabilityReminder && nextMatch && (
+        {/* Reminder */}
+        {needsAvailabilityReminder && nextWeeklyMatch && (
           <>
             <Text style={styles.sectionTitle}>Reminder</Text>
 
@@ -493,19 +411,19 @@ const loadHomeData = async () => {
               </Text>
 
               <Text style={styles.reminderText}>
-                Please update your availability for the next match vs{" "}
-                {getOpponentName(nextMatch)}.
+                Please update your availability for this week’s match vs{" "}
+                {getOpponentName(nextWeeklyMatch)}.
               </Text>
 
               <TouchableOpacity
                 style={styles.reminderBtn}
                 onPress={() =>
                   navigation.navigate("Availability", {
-                    matchId: nextMatch.id,
-                    opponentName: getOpponentName(nextMatch),
-                    matchDate: nextMatch.matchDate,
-                    venue: nextMatch.venue,
-                    matchType: nextMatch.matchType,
+                    matchId: nextWeeklyMatch.id,
+                    opponentName: getOpponentName(nextWeeklyMatch),
+                    matchDate: nextWeeklyMatch.matchDate,
+                    venue: nextWeeklyMatch.venue,
+                    matchType: nextWeeklyMatch.matchType,
                   })
                 }
               >
@@ -515,7 +433,7 @@ const loadHomeData = async () => {
           </>
         )}
 
-        {/* Pinned Announcement section */}
+        {/* Pinned announcement */}
         {pinnedAnnouncement && (
           <>
             <Text style={styles.sectionTitle}>Pinned Announcement</Text>
@@ -533,158 +451,79 @@ const loadHomeData = async () => {
           </>
         )}
 
-        {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.quickGrid}>
+        {/* Quick actions - only unique ones, not bottom tabs */}
+       {/* Quick Actions */}
+<Text style={styles.sectionTitle}>Quick Actions</Text>
+<View style={styles.quickGrid}>
+  {/* Everyone can view members */}
+  <TouchableOpacity
+    style={styles.quickCard}
+    onPress={() => navigation.navigate("Members")}
+  >
+    <Ionicons name="people-outline" size={22} color="#da9306" />
+    <Text style={styles.quickText}>Members</Text>
+  </TouchableOpacity>
 
+  {/* Everyone can view leagues */}
+  <TouchableOpacity
+    style={styles.quickCard}
+    onPress={() => navigation.navigate("Leagues")}
+  >
+    <Ionicons name="trophy-outline" size={22} color="#da9306" />
+    <Text style={styles.quickText}>Leagues</Text>
+  </TouchableOpacity>
 
-          <TouchableOpacity
+  {/* Everyone can view announcements/notifications */}
+  <TouchableOpacity
+    style={styles.quickCard}
+    onPress={() => navigation.navigate("Notifications")}
+  >
+    <Ionicons name="notifications-outline" size={22} color="#da9306" />
+    <Text style={styles.quickText}>Notifications</Text>
+  </TouchableOpacity>
+
+  {/* Everyone can see own fees */}
+  <TouchableOpacity
+    style={styles.quickCard}
+    onPress={() => navigation.navigate("MyFees")}
+  >
+    <Ionicons name="card-outline" size={22} color="#F4B400" />
+    <Text style={styles.quickText}>My Fees</Text>
+  </TouchableOpacity>
+
+  {/* Captain/Admin can manage team players */}
+  <TouchableOpacity
   style={styles.quickCard}
-  onPress={() => navigation.navigate("MyFees")}
+  onPress={() => navigation.navigate("Teams")}
 >
-  <Ionicons name="card-outline" size={22} color="#F4B400" />
-  <Text style={styles.quickText}>My Fees</Text>
+  <Ionicons name="shield-outline" size={22} color="#da9306" />
+  <Text style={styles.quickText}>Teams</Text>
 </TouchableOpacity>
 
+  {/* Admin only */}
+  {isAdmin && (
+    <TouchableOpacity
+      style={styles.quickCard}
+      onPress={() => navigation.navigate("AdminApproval")}
+    >
+      <Ionicons name="checkmark-circle-outline" size={22} color="#da9306" />
+      <Text style={styles.quickText}>Approvals</Text>
+    </TouchableOpacity>
+  )}
 
-{canManage && (
-  <TouchableOpacity
-    style={styles.quickCard}
-    onPress={() => navigation.navigate("FeeList")}
-  >
-    <Ionicons name="wallet-outline" size={22} color="#F4B400" />
-    <Text style={styles.quickText}>Fees Admin</Text>
-  </TouchableOpacity>
-)}
+  {/* Admin only */}
+  {canManage && (
+    <TouchableOpacity
+      style={styles.quickCard}
+      onPress={() => navigation.navigate("FeeList")}
+    >
+      <Ionicons name="wallet-outline" size={22} color="#F4B400" />
+      <Text style={styles.quickText}>Fees Admin</Text>
+    </TouchableOpacity>
+  )}
+</View>
 
-
-{isAdmin && (
-  <TouchableOpacity
-    style={styles.quickCard}
-    onPress={() => navigation.navigate("AdminApproval")}
-  >
-    <Ionicons name="checkmark-circle-outline" size={22} color="#da9306" />
-    <Text style={styles.quickText}>Approvals</Text>
-  </TouchableOpacity>
-)}
-
-
-
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate("Matches")}
-          >
-            <Ionicons name="calendar-outline" size={22} color="#da9306" />
-            <Text style={styles.quickText}>Matches</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate("Leagues")}
-          >
-            <Ionicons name="trophy-outline" size={22} color="#da9306" />
-            <Text style={styles.quickText}>Leagues</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate("Events")}
-          >
-            <Ionicons name="people-circle-outline" size={22} color="#da9306" />
-            <Text style={styles.quickText}>Events</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate("Announcements")}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={22}
-              color="#da9306"
-            />
-            <Text style={styles.quickText}>Announcements</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate("Profile")}
-          >
-            <Ionicons name="person-outline" size={22} color="#da9306" />
-            <Text style={styles.quickText}>Profile</Text>
-          </TouchableOpacity>
-
-          {canManage ? (
-            <TouchableOpacity
-              style={styles.quickCard}
-              onPress={() => navigation.navigate("Teams")}
-            >
-              <Ionicons name="shield-outline" size={22} color="#da9306" />
-              <Text style={styles.quickText}>Teams</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={styles.quickCard}
-              onPress={() => navigation.navigate("Matches")}
-            >
-              <Ionicons
-                name="checkmark-done-outline"
-                size={22}
-                color="#da9306"
-              />
-              <Text style={styles.quickText}>Availability</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Upcoming matches preview */}
-        <Text style={styles.sectionTitle}>Upcoming Matches</Text>
-        {upcomingMatches.length === 0 ? (
-          <View style={styles.infoCard}>
-            <Text style={styles.infoText}>No upcoming matches right now.</Text>
-          </View>
-        ) : (
-          upcomingMatches.map((match) => (
-            <TouchableOpacity
-              key={match.id}
-              style={styles.infoCard}
-              onPress={() =>
-                navigation.navigate("MatchDetails", {
-                  matchId: match.id,
-                })
-              }
-            >
-              <Text style={styles.cardTitle}>{getMatchTitle(match)}</Text>
-
-              {match.leagueName ? (
-                <Text style={styles.cardText}>League: {match.leagueName}</Text>
-              ) : null}
-
-              <Text style={styles.cardText}>Venue: {match.venue}</Text>
-
-              <Text style={styles.cardText}>
-                Date: {new Date(match.matchDate).toLocaleString()}
-              </Text>
-
-              {match.matchFee !== null && match.matchFee !== undefined ? (
-                <Text style={styles.cardText}>Match Fee: ${match.matchFee}</Text>
-              ) : null}
-
-              <Text
-                style={[
-                  styles.cardHighlight,
-                  match.myAvailability ? getAvailabilityColor(match.myAvailability) : null,
-                ]}
-              >
-                {match.myAvailability
-                  ? `Availability: ${match.myAvailability}`
-                  : "Please mark your availability"}
-              </Text>
-            </TouchableOpacity>
-          ))
-        )}
-
-        {/* Latest announcements preview */}
+        {/* Latest announcements */}
         <Text style={styles.sectionTitle}>Latest Announcements</Text>
         {announcements.length === 0 ? (
           <View style={styles.infoCard}>
@@ -708,7 +547,7 @@ const loadHomeData = async () => {
         )}
       </ScrollView>
 
-      {/* Popup burger menu */}
+      {/* Burger menu - only extra items, not repeated bottom tabs */}
       <Modal
         visible={menuVisible}
         animationType="fade"
@@ -722,95 +561,79 @@ const loadHomeData = async () => {
               <Text style={styles.menuRole}>{user?.role}</Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => closeMenuAndNavigate("Home")}
-            >
-              <Ionicons name="home-outline" size={20} color="#da9306" />
-              <Text style={styles.menuItemText}>Home</Text>
-            </TouchableOpacity>
+            {/* Everyone can view members */}
+<TouchableOpacity
+  style={styles.menuItem}
+  onPress={() => closeMenuAndNavigate("Members")}
+>
+  <Ionicons name="people-outline" size={20} color="#da9306" />
+  <Text style={styles.menuItemText}>Members</Text>
+</TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => closeMenuAndNavigate("Matches")}
-            >
-              <Ionicons name="calendar-outline" size={20} color="#da9306" />
-              <Text style={styles.menuItemText}>Matches</Text>
-            </TouchableOpacity>
+{/* Everyone can view leagues */}
+<TouchableOpacity
+  style={styles.menuItem}
+  onPress={() => closeMenuAndNavigate("Leagues")}
+>
+  <Ionicons name="trophy-outline" size={20} color="#da9306" />
+  <Text style={styles.menuItemText}>Leagues</Text>
+</TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => closeMenuAndNavigate("Announcements")}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={20}
-                color="#da9306"
-              />
-              <Text style={styles.menuItemText}>Announcements</Text>
-            </TouchableOpacity>
+{/* Everyone can view notifications */}
+<TouchableOpacity
+  style={styles.menuItem}
+  onPress={() => closeMenuAndNavigate("Notifications")}
+>
+  <Ionicons name="notifications-outline" size={20} color="#da9306" />
+  <Text style={styles.menuItemText}>Notifications</Text>
+</TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => closeMenuAndNavigate("Leagues")}
-            >
-              <Ionicons name="trophy-outline" size={20} color="#da9306" />
-              <Text style={styles.menuItemText}>Leagues</Text>
-            </TouchableOpacity>
+{/* Everyone can view own fees */}
+<TouchableOpacity
+  style={styles.menuItem}
+  onPress={() => closeMenuAndNavigate("MyFees")}
+>
+  <Ionicons name="card-outline" size={20} color="#da9306" />
+  <Text style={styles.menuItemText}>My Fees</Text>
+</TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => closeMenuAndNavigate("Events")}
-            >
-              <Ionicons
-                name="people-circle-outline"
-                size={20}
-                color="#da9306"
-              />
-              <Text style={styles.menuItemText}>Events</Text>
-            </TouchableOpacity>
+{/* Captain/Admin can manage team players */}
+{canManage && (
+  <TouchableOpacity
+    style={styles.menuItem}
+    onPress={() => closeMenuAndNavigate("Teams")}
+  >
+    <Ionicons name="shield-outline" size={20} color="#da9306" />
+    <Text style={styles.menuItemText}>Teams</Text>
+  </TouchableOpacity>
+)}
 
-            {canManage && (
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => closeMenuAndNavigate("Teams")}
-              >
-                <Ionicons name="shield-outline" size={20} color="#da9306" />
-                <Text style={styles.menuItemText}>Teams</Text>
-              </TouchableOpacity>
-            )}
+{/* Admin only */}
+{isAdmin && (
+  <TouchableOpacity
+    style={styles.menuItem}
+    onPress={() => closeMenuAndNavigate("AdminApproval")}
+  >
+    <Ionicons
+      name="checkmark-circle-outline"
+      size={20}
+      color="#da9306"
+    />
+    <Text style={styles.menuItemText}>Approve Members</Text>
+  </TouchableOpacity>
+)}
 
-            {canManage && (
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => closeMenuAndNavigate("Members")}
-              >
-                <Ionicons name="people-outline" size={20} color="#da9306" />
-                <Text style={styles.menuItemText}>Members</Text>
-              </TouchableOpacity>
-            )}
-
-            {isAdmin && (
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => closeMenuAndNavigate("AdminApproval")}
-              >
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={20}
-                  color="#da9306"
-                />
-                <Text style={styles.menuItemText}>Approve Members</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => closeMenuAndNavigate("Profile")}
-            >
-              <Ionicons name="person-outline" size={20} color="#da9306" />
-              <Text style={styles.menuItemText}>Profile</Text>
-            </TouchableOpacity>
+{/* Admin and captain */}
+{canManage && (
+  <TouchableOpacity
+    style={styles.menuItem}
+    onPress={() => closeMenuAndNavigate("FeeList")}
+  >
+    <Ionicons name="wallet-outline" size={20} color="#da9306" />
+    <Text style={styles.menuItemText}>Fees Admin</Text>
+  </TouchableOpacity>
+)}
+            
 
             <TouchableOpacity
               style={[styles.menuItem, styles.logoutMenuItem]}
@@ -893,58 +716,59 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 6,
   },
-  nextMatchCard: {
-    backgroundColor: "#3a0a57",
-    padding: 18,
-    borderRadius: 18,
+  weeklyWrap: {
     marginBottom: 18,
+  },
+  weekMatchCard: {
+    backgroundColor: "#3a0a57",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: "#4d1670",
   },
-  nextMatchTitle: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 8,
+  weekMatchTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 6,
   },
-  countdownText: {
+  weekMatchTitle: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  weekMatchCountdown: {
     color: "#da9306",
-    fontSize: 15,
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-  nextMatchDetail: {
-    color: "#ddd",
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  availabilityStatusBox: {
-    backgroundColor: "#2b0540",
-    padding: 12,
-    borderRadius: 12,
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  availabilityStatusLabel: {
-    color: "#ccc",
     fontSize: 12,
-    marginBottom: 4,
-  },
-  availabilityStatusValue: {
-    color: "#fff",
-    fontSize: 15,
     fontWeight: "700",
   },
-  nextMatchButton: {
-    backgroundColor: "#da9306",
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 4,
+  weekMatchMeta: {
+    color: "#d6d6d6",
+    fontSize: 13,
+    marginBottom: 3,
   },
-  nextMatchButtonText: {
-    color: "#2b0540",
-    textAlign: "center",
+  weekMatchBottomRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  weekMatchType: {
+    color: "#da9306",
     fontWeight: "700",
+    fontSize: 12,
+  },
+  weekAvailabilityBtn: {
+    backgroundColor: "#2b0540",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  weekAvailabilityText: {
+    fontWeight: "700",
+    fontSize: 12,
   },
   pinnedCard: {
     backgroundColor: "#3a0a57",
@@ -1005,11 +829,6 @@ const styles = StyleSheet.create({
   cardText: {
     color: "#ddd",
     marginBottom: 4,
-  },
-  cardHighlight: {
-    color: "#da9306",
-    marginTop: 6,
-    fontWeight: "700",
   },
   overlay: {
     flex: 1,
@@ -1095,49 +914,43 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   pendingCard: {
-  backgroundColor: "#fff7e6",
-  borderWidth: 1,
-  borderColor: "#da9306",
-  padding: 16,
-  borderRadius: 16,
-  marginBottom: 18,
-},
-
-pendingTitle: {
-  color: "#8a5b00",
-  fontSize: 16,
-  fontWeight: "700",
-  marginBottom: 12,
-},
-
-pendingMemberRow: {
-  paddingVertical: 8,
-  borderBottomWidth: 1,
-  borderBottomColor: "#f1d8a6",
-},
-
-pendingMemberName: {
-  color: "#2b0540",
-  fontSize: 15,
-  fontWeight: "700",
-},
-
-pendingMemberEmail: {
-  color: "#6b7280",
-  fontSize: 13,
-  marginTop: 2,
-},
-
-pendingBtn: {
-  backgroundColor: "#da9306",
-  paddingVertical: 12,
-  borderRadius: 10,
-  marginTop: 14,
-},
-
-pendingBtnText: {
-  textAlign: "center",
-  color: "#2b0540",
-  fontWeight: "700",
-},
+    backgroundColor: "#fff7e6",
+    borderWidth: 1,
+    borderColor: "#da9306",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 18,
+  },
+  pendingTitle: {
+    color: "#8a5b00",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  pendingMemberRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1d8a6",
+  },
+  pendingMemberName: {
+    color: "#2b0540",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  pendingMemberEmail: {
+    color: "#6b7280",
+    fontSize: 13,
+    marginTop: 2,
+  },
+  pendingBtn: {
+    backgroundColor: "#da9306",
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 14,
+  },
+  pendingBtnText: {
+    textAlign: "center",
+    color: "#2b0540",
+    fontWeight: "700",
+  },
 });

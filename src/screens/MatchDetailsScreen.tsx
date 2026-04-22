@@ -14,6 +14,7 @@ import { useAuth } from "../context/AuthContext";
 import { getMatchById } from "../services/matchService";
 import { getAvailabilityByMatch } from "../services/availabilityService";
 
+
 type Props = {
   route: any;
   navigation: any;
@@ -58,6 +59,11 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
   const [responses, setResponses] = useState<AvailabilityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+
+const isAdmin = user?.role === "ADMIN";
+const isCaptain = user?.role === "CAPTAIN";
+const canManageSquad = isAdmin || isCaptain;
 
   const isAdminOrCaptain =
     user?.role === "ADMIN" || user?.role === "CAPTAIN";
@@ -239,30 +245,25 @@ const MatchDetailsScreen = ({ route, navigation }: Props) => {
           </View>
         )}
 
-        {isAdminOrCaptain && (
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() =>
-              navigation.navigate("SquadSelection", {
-                matchId: match.id,
-                 teamId: match.homeTeamId,
-                opponentName:
-                  match.awayTeamName || match.externalOpponentName || "Opponent",
-                teamName: match.homeTeamName || "No team assigned",
-                matchDate: match.matchDate,
-                venue: match.venue,
-                matchType: match.matchType,
-                matchFee: match.matchFee,
-                 matchFormat: match.matchFormat,
-                 matchFeeAmount:match.matchFeeAmount,
-                 matchFeeDueDate: match.matchFeeDueDate,
-                 matchFeeDiscription: match.matchFeeDescription,
-              })
-            }
-          >
-            <Text style={styles.secondaryButtonText}>Open Squad Selection</Text>
-          </TouchableOpacity>
-        )}
+       {canManageSquad && (
+  <TouchableOpacity
+    style={styles.squadBtn}
+    onPress={() =>
+      navigation.navigate("SquadSelection", {
+        matchId: match.id,
+        teamId: match.homeTeamId,
+        opponentName: match.awayTeamName || match.externalOpponentName,
+        teamName: match.homeTeamName,
+        matchDate: match.matchDate,
+        venue: match.venue,
+        matchType: match.matchType,
+        matchFormat: match.matchFormat,
+      })
+    }
+  >
+    <Text style={styles.squadBtnText}>Open Squad Selection</Text>
+  </TouchableOpacity>
+)}
       </View>
 
       {/* Availability summary */}
@@ -497,4 +498,17 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 8,
   },
+  squadBtn: {
+  backgroundColor: "#da9306",
+  paddingVertical: 12,
+  borderRadius: 10,
+  marginTop: 14,
+},
+
+squadBtnText: {
+  textAlign: "center",
+  color: "#2b0540",
+  fontWeight: "700",
+  fontSize: 15,
+},
 });

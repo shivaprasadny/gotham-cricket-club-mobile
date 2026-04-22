@@ -13,10 +13,11 @@ import {
 import { useAuth } from "../context/AuthContext";
 import {
   ApprovalRole,
-  getAllMembers,
+
   updateMemberRole,
 } from "../services/adminService";
 import { deactivateMember,activateMember } from "../services/adminService";
+import { getAllMembers } from "../services/memberService";
 
 type Member = {
   id?: number;
@@ -42,17 +43,24 @@ const MembersScreen = () => {
   const [sortBy, setSortBy] = useState<SortType>("NAME");
 
   const loadMembers = async () => {
-    try {
-      const data = await getAllMembers();
-      setMembers(Array.isArray(data) ? data : []);
-    } catch (error: any) {
-      console.log("MEMBERS ERROR:", error?.response?.data || error?.message);
-      setMembers([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  try {
+    const data = await getAllMembers();
+    console.log("MEMBERS DATA:", data);
+    setMembers(Array.isArray(data) ? data : []);
+  } catch (error: any) {
+    console.log("LOAD MEMBERS FULL ERROR:", error);
+    console.log("LOAD MEMBERS STATUS:", error?.response?.status);
+    console.log("LOAD MEMBERS DATA:", error?.response?.data);
+
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Failed to load members"
+    );
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
   useEffect(() => {
     void loadMembers();

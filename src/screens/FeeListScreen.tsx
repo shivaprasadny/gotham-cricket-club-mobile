@@ -10,7 +10,8 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { getAllFees } from "../services/feeService";
+import { useAuth } from "../context/AuthContext";
+import { deleteFeeById, getAllFees } from "../services/feeService";
 
 type Props = {
   navigation: any;
@@ -37,6 +38,9 @@ const FeeListScreen = ({ navigation }: Props) => {
   const [fees, setFees] = useState<FeeItem[]>([]); // store fee definitions
   const [loading, setLoading] = useState(true); // page loading
   const [refreshing, setRefreshing] = useState(false); // pull refresh
+
+  const { user } = useAuth(); // current user
+  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN"; // edit/delete access
 
   // Load all fee definitions
   const loadFees = async () => {
@@ -114,46 +118,92 @@ const FeeListScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Delete one fee definition
+  const handleDelete = (feeId: number) => {
+    Alert.alert("Delete Fee", "Are you sure you want to delete this fee?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const response = await deleteFeeById(feeId);
+
+            Alert.alert(
+              "Success",
+              typeof response === "string"
+                ? response
+                : "Fee deleted successfully"
+            );
+
+            await loadFees();
+          } catch (error: any) {
+            Alert.alert(
+              "Error",
+              error?.response?.data?.message || "Failed to delete fee"
+            );
+          }
+        },
+      },
+    ]);
+  };
+
   // Card for one fee definition
   const renderItem = ({ item }: { item: FeeItem }) => (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.85}
-      onPress={() => navigation.navigate("FeeDetails", { feeId: item.id })}
-    >
-      <View style={styles.cardTopRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>{item.title}</Text>
-          <Text style={styles.cardSubText}>
-            {formatFeeType(item.feeType)} • {formatAssignmentType(item.assignmentType)}
-          </Text>
+    <View style={styles.card}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => navigation.navigate("FeeDetails", { feeId: item.id })}
+      >
+        <View style={styles.cardTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.cardSubText}>
+              {formatFeeType(item.feeType)} •{" "}
+              {formatAssignmentType(item.assignmentType)}
+            </Text>
+          </View>
+
+          <Text style={styles.amountText}>${item.amount?.toFixed(2)}</Text>
         </View>
 
-        <Text style={styles.amountText}>${item.amount?.toFixed(2)}</Text>
-      </View>
+        <Text style={styles.cardText}>Due: {formatDate(item.dueDate)}</Text>
 
-      <Text style={styles.cardText}>Due: {formatDate(item.dueDate)}</Text>
+        {item.description ? (
+          <Text style={styles.cardText}>Description: {item.description}</Text>
+        ) : null}
 
-      {item.description ? (
-        <Text style={styles.cardText}>Description: {item.description}</Text>
-      ) : null}
+        {item.season ? (
+          <Text style={styles.cardText}>Season: {item.season}</Text>
+        ) : null}
 
-      {item.season ? (
-        <Text style={styles.cardText}>Season: {item.season}</Text>
-      ) : null}
+        {item.createdBy ? (
+          <Text style={styles.cardText}>Created By: {item.createdBy}</Text>
+        ) : null}
 
-      {item.createdBy ? (
-        <Text style={styles.cardText}>Created By: {item.createdBy}</Text>
-      ) : null}
+        <View style={styles.footerRow}>
+          <Text style={styles.viewText}>Tap to view assigned users</Text>
+        </View>
+      </TouchableOpacity>
 
-      {item.createdAt ? (
-        <Text style={styles.cardText}>Created At: {formatDate(item.createdAt)}</Text>
-      ) : null}
+      {canManage && (
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.editBtn]}
+            onPress={() => navigation.navigate("EditFee", { feeId: item.id })}
+          >
+            <Text style={styles.actionText}>Edit</Text>
+          </TouchableOpacity>
 
-      <View style={styles.footerRow}>
-        <Text style={styles.viewText}>Tap to view assigned users</Text>
-      </View>
-    </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.deleteBtn]}
+            onPress={() => handleDelete(item.id)}
+          >
+            <Text style={styles.actionText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 
   // Loading UI
@@ -176,13 +226,19 @@ const FeeListScreen = ({ navigation }: Props) => {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
       ListHeaderComponent={
-        <TouchableOpacity
-          style={styles.createBtn}
-          onPress={() => navigation.navigate("CreateFee")}
-        >
-          <Text style={styles.createBtnText}>Create Fee</Text>
-        </TouchableOpacity>
-      }
+  canManage ? (
+    <View style={styles.headerActions}>
+      <TouchableOpacity
+        style={styles.createBtn}
+        onPress={() => navigation.navigate("CreateFee")}
+      >
+        <Text style={styles.createBtnText}>Create Fee</Text>
+      </TouchableOpacity>
+
+
+    </View>
+  ) : null
+}
       ListEmptyComponent={
         <Text style={styles.emptyText}>No fees created yet.</Text>
       }
@@ -210,11 +266,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   createBtn: {
-    backgroundColor: "#da9306",
-    paddingVertical: 14,
-    borderRadius: 10,
-    marginBottom: 16,
-  },
+  backgroundColor: "#da9306",
+  paddingVertical: 14,
+  borderRadius: 10,
+},
   createBtnText: {
     color: "#2b0540",
     textAlign: "center",
@@ -269,4 +324,40 @@ const styles = StyleSheet.create({
     color: "#6b7280",
     fontWeight: "600",
   },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  actionBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  editBtn: {
+    backgroundColor: "#111",
+  },
+  deleteBtn: {
+    backgroundColor: "#c0392b",
+  },
+  actionText: {
+    color: "#fff",
+    textAlign: "center",
+    fontWeight: "700",
+  },
+  headerActions: {
+  gap: 10,
+  marginBottom: 16,
+},
+splitBtn: {
+  backgroundColor: "#2b0540",
+  paddingVertical: 14,
+  borderRadius: 10,
+},
+splitBtnText: {
+  color: "#fff",
+  textAlign: "center",
+  fontWeight: "700",
+  fontSize: 16,
+},
 });

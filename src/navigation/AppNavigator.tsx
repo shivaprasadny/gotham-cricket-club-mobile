@@ -34,6 +34,11 @@ import MyFeesScreen from "../screens/MyFeesScreen";
 import CreateFeeScreen from "../screens/CreateFeeScreen";
 import FeeListScreen from "../screens/FeeListScreen";
 import FeeDetailsScreen from "../screens/FeeDetailsScreen";
+import EditFeeScreen from "../screens/EditFeeScreen";
+import TeamsScreen from "../screens/TeamsScreen";
+import MembersScreen from "../screens/MembersScreen";
+
+
 
 const Stack = createNativeStackNavigator();
 
@@ -87,8 +92,11 @@ const AppNavigator = () => {
 <Stack.Screen name="CreateFee" component={CreateFeeScreen} />
 <Stack.Screen name="FeeList" component={FeeListScreen} />
 <Stack.Screen name="FeeDetails" component={FeeDetailsScreen} /> 
-
+<Stack.Screen name="EditFee" component={EditFeeScreen} />
 <Stack.Screen name="EditEvent" component={EditEventScreen} />
+<Stack.Screen name="Teams" component={TeamsScreen} />
+<Stack.Screen name="Members" component={MembersScreen} />
+
           <Stack.Screen
             name="Splash"
             component={SplashScreen}
