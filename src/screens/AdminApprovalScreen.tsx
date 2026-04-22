@@ -14,7 +14,7 @@ import {
   rejectMember,
   ApprovalRole,
 } from "../services/adminService";
-import { addNotification } from "../services/notificationService";
+
 
 type PendingUser = {
   id: number;
@@ -78,14 +78,7 @@ const AdminApprovalScreen = () => {
 
     const response = await approveMember(userId, selectedRole);
 
-    await addNotification({
-      title: "Member Approved",
-      message: approvedUser
-        ? `${approvedUser.fullName} approved as ${selectedRole}`
-        : `A member was approved as ${selectedRole}`,
-      type: "MEMBER",
-      targetScreen: "Members",
-    });
+  
 
     Alert.alert(
       "Success",

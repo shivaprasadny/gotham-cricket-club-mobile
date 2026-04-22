@@ -16,7 +16,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { createMatch } from "../services/matchService";
 import { getTeams } from "../services/teamService";
 import { getLeagues } from "../services/leagueService";
-import { addNotification } from "../services/notificationService";
+
 
 type Props = {
   navigation: any;
@@ -232,13 +232,7 @@ const notificationOpponentName =
     ? selectedAwayTeamName
     : externalOpponentName.trim();
 
-await addNotification({
-  title: "New Match Added",
-  message: `${selectedHomeTeamName} vs ${notificationOpponentName}`,
-  type: "MATCH",
-  targetScreen: "MatchDetails",
-  targetId: response?.id ?? null,
-});
+
 
 Alert.alert(
   "Success",

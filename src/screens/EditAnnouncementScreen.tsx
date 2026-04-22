@@ -14,7 +14,7 @@ import {
   deleteAnnouncement,
   updateAnnouncement,
 } from "../services/announcementService";
-import { addNotification } from "../services/notificationService";
+
 
 type Props = {
   route: any;
@@ -71,12 +71,7 @@ const EditAnnouncementScreen = ({ route, navigation }: Props) => {
         message: message.trim(),
       });
 
-      await addNotification({
-        title: "Announcement Updated",
-        message: title.trim(),
-        type: "ANNOUNCEMENT",
-        targetScreen: "Announcements",
-      });
+      
 
       Alert.alert(
         "Success",

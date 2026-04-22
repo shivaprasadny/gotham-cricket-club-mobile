@@ -20,7 +20,7 @@ import { createFee, createSplitFee } from "../services/feeService";
 import { getTeamMembers, getTeams } from "../services/teamService";
 import { getMatches } from "../services/matchService";
 import { getSquadByMatch } from "../services/squadService";
-import { addNotification } from "../services/notificationService";
+
 import { getAllMembers } from "../services/memberService";
 
 type Props = {
@@ -501,12 +501,7 @@ const response = await createSplitFee({
   splits: fixedSplits,
 });
 
-await addNotification({
-  title: "New Fee Assigned",
-  message: title.trim(),
-  type: "FEE",
-  targetScreen: "MyFees",
-});
+
 
 Alert.alert(
   "Success",
@@ -582,12 +577,7 @@ return;
         splits: validSplits,
       });
 
-      await addNotification({
-  title: "New Fee Assigned",
-  message: `${title} - $${amount}`,
-  type: "FEE",
-  targetScreen: "MyFees",
-});
+    
 
       Alert.alert(
         "Success",

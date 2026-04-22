@@ -10,7 +10,7 @@ import {
   TextInput,
 } from "react-native";
 import { createAnnouncement } from "../services/announcementService";
-import { addNotification } from "../services/notificationService";
+
 
 type Props = {
   navigation: any;
@@ -43,13 +43,6 @@ const CreateAnnouncementScreen = ({ navigation }: Props) => {
         message: message.trim(),
       });
 
-      // Also add app notification after successful announcement
-    await addNotification({
-  title: "New Announcement",
-  message: title.trim(),
-  type: "ANNOUNCEMENT",
-  targetScreen: "Announcements",
-});
 
       Alert.alert(
         "Success",
