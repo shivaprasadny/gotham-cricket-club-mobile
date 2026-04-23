@@ -17,6 +17,7 @@ import {
   submitEventAvailability,
 } from "../services/eventService";
 
+
 type Props = {
   route: any;
   navigation: any;
@@ -40,35 +41,31 @@ const EventDetailsScreen = ({ route, navigation }: Props) => {
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
-  const canViewAll = canManage;
 
-  const loadResponses = async () => {
-    if (!canViewAll) {
-      setRefreshing(false);
-      return;
-    }
 
-    try {
-      const data = await getEventAvailability(event.id);
-      setResponses(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.log("EVENT RESPONSES ERROR:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+ const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
 
-  useFocusEffect(
-    useCallback(() => {
-      void loadResponses();
-    }, [event.id, canViewAll])
-  );
+const loadResponses = async () => {
+  try {
+    const data = await getEventAvailability(event.id);
+    setResponses(Array.isArray(data) ? data : []);
+  } catch (error) {
+    console.log("EVENT RESPONSES ERROR:", error);
+  } finally {
+    setRefreshing(false);
+  }
+};
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadResponses();
-  };
+useFocusEffect(
+  useCallback(() => {
+    void loadResponses();
+  }, [event.id])
+);
+
+const onRefresh = async () => {
+  setRefreshing(true);
+  await loadResponses();
+};
 
   const handleSubmit = async () => {
     try {
@@ -140,7 +137,7 @@ const EventDetailsScreen = ({ route, navigation }: Props) => {
 
   return (
     <FlatList
-      data={canViewAll ? responses : []}
+      data={responses}
       keyExtractor={(item) => item.id.toString()}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -154,27 +151,7 @@ const EventDetailsScreen = ({ route, navigation }: Props) => {
           </Text>
           <Text style={styles.text}>Location: {event.location}</Text>
 
-          {canManage && (
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.editBtn]}
-                onPress={() =>
-                  navigation.navigate("EditEvent", {
-                    event,
-                  })
-                }
-              >
-                <Text style={styles.actionBtnText}>Edit Event</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.deleteBtn]}
-                onPress={handleDelete}
-              >
-                <Text style={styles.actionBtnText}>Delete Event</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+        
 
           <Text style={styles.sectionTitle}>Your Response</Text>
 
@@ -220,20 +197,18 @@ const EventDetailsScreen = ({ route, navigation }: Props) => {
             </Text>
           </TouchableOpacity>
 
-          {canViewAll && <Text style={styles.sectionTitle}>All Responses</Text>}
+         <Text style={styles.sectionTitle}>All Responses</Text>
         </View>
       }
-      renderItem={({ item }) =>
-        canViewAll ? (
-          <View style={styles.responseCard}>
-            <Text style={styles.responseName}>{item.fullName}</Text>
-            <Text style={styles.responseText}>Status: {item.status}</Text>
-            {item.message ? (
-              <Text style={styles.responseText}>Note: {item.message}</Text>
-            ) : null}
-          </View>
-        ) : null
-      }
+      renderItem={({ item }) => (
+  <View style={styles.responseCard}>
+    <Text style={styles.responseName}>{item.fullName}</Text>
+    <Text style={styles.responseText}>Status: {item.status}</Text>
+    {item.message ? (
+      <Text style={styles.responseText}>Note: {item.message}</Text>
+    ) : null}
+  </View>
+)}
       contentContainerStyle={styles.listContent}
     />
   );

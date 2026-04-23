@@ -48,3 +48,7 @@ export const submitEventAvailability = async (
   const response = await api.post(`/events/${eventId}/availability`, payload);
   return response.data;
 };
+export const getEventById = async (id: number) => {
+  const response = await api.get(`/events/${id}`);
+  return response.data;
+};

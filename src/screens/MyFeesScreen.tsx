@@ -13,7 +13,11 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { getMyFeeSummary, getMyFees, submitPayment } from "../services/feeService";
+import {
+  getMyFeeSummary,
+  getMyFees,
+  submitPayment,
+} from "../services/feeService";
 
 type Props = {
   navigation: any;
@@ -64,24 +68,35 @@ type FeeTypeFilter =
   | "ANNUAL_MEMBERSHIP_FEE"
   | "OTHER";
 
-type FilterType = "UNPAID" | "OVERDUE" | "SUBMITTED" | "PAID" | "WAIVED" | "ALL";
+// Pending = unpaid + overdue together
+type FilterType = "PENDING" | "SUBMITTED" | "PAID" | "WAIVED" | "ALL";
 
 const MyFeesScreen = ({ navigation }: Props) => {
+  // All fee rows for current logged-in user
   const [fees, setFees] = useState<FeeItem[]>([]);
+
+  // Top summary data
   const [summary, setSummary] = useState<FeeSummary | null>(null);
 
+  // Loading states
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [filter, setFilter] = useState<FilterType>("UNPAID");
+  // Current status filter
+  const [filter, setFilter] = useState<FilterType>("PENDING");
 
+  // Current fee type filter
+  const [feeTypeFilter, setFeeTypeFilter] =
+    useState<FeeTypeFilter>("ALL_TYPES");
+
+  // Payment modal state
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [selectedFee, setSelectedFee] = useState<FeeItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [paymentNote, setPaymentNote] = useState("");
   const [submittingPayment, setSubmittingPayment] = useState(false);
-  const [feeTypeFilter, setFeeTypeFilter] = useState<FeeTypeFilter>("ALL_TYPES"); // fee type filter
 
+  // Load both fee list and summary together
   const loadData = async () => {
     try {
       const [feeData, summaryData] = await Promise.all([
@@ -103,50 +118,85 @@ const MyFeesScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Reload every time screen comes into focus
   useFocusEffect(
     useCallback(() => {
       void loadData();
     }, [])
   );
 
+  // Pull to refresh
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
   };
 
+  // Check whether fee is overdue
+  // Backend stores UNPAID, but overdue is calculated by due date
   const isOverdue = (item: FeeItem) => {
-    return item.status === "UNPAID" && new Date(item.dueDate).getTime() < Date.now();
+    return (
+      item.status === "UNPAID" &&
+      item.dueDate &&
+      new Date(item.dueDate).getTime() < Date.now()
+    );
   };
 
+  // Build filtered + sorted fee list
   const filteredFees = useMemo(() => {
-  let result = [...fees];
+    let result = [...fees];
 
-  // Apply status filter
-  if (filter === "UNPAID") {
-    result = result.filter((item) => item.status === "UNPAID" && !isOverdue(item));
-  } else if (filter === "OVERDUE") {
-    result = result.filter((item) => isOverdue(item));
-  } else if (filter === "SUBMITTED") {
-    result = result.filter((item) => item.status === "PAYMENT_SUBMITTED");
-  } else if (filter === "PAID") {
-    result = result.filter((item) => item.status === "PAID");
-  } else if (filter === "WAIVED") {
-    result = result.filter((item) => item.status === "WAIVED");
-  }
+    // 1) Apply status filter
+    if (filter === "PENDING") {
+      // Pending = unpaid + overdue together
+      result = result.filter((item) => item.status === "UNPAID");
+    } else if (filter === "SUBMITTED") {
+      result = result.filter((item) => item.status === "PAYMENT_SUBMITTED");
+    } else if (filter === "PAID") {
+      result = result.filter((item) => item.status === "PAID");
+    } else if (filter === "WAIVED") {
+      result = result.filter((item) => item.status === "WAIVED");
+    }
 
-  // Apply fee type filter
-  if (feeTypeFilter !== "ALL_TYPES") {
-    result = result.filter((item) => item.feeType === feeTypeFilter);
-  }
+    // 2) Apply fee type filter
+    if (feeTypeFilter !== "ALL_TYPES") {
+      result = result.filter((item) => item.feeType === feeTypeFilter);
+    }
 
-  return result;
-}, [fees, filter, feeTypeFilter]);
+    // 3) Sort results
+    result.sort((a, b) => {
+      // For Pending filter:
+      // overdue first, unpaid second, then nearest due date first
+      if (filter === "PENDING") {
+        const aOverdue = isOverdue(a);
+        const bOverdue = isOverdue(b);
 
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
+
+        const aDate = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        const bDate = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+
+        return aDate - bDate;
+      }
+
+      // Submitted / Paid / Waived / All:
+      // sort by newest due date first
+      const aDate = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+      const bDate = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+
+      return bDate - aDate;
+    });
+
+    return result;
+  }, [fees, filter, feeTypeFilter]);
+
+  // Show label in UI
   const getStatusLabel = (item: FeeItem) => {
     if (isOverdue(item)) return "OVERDUE";
     return item.status;
   };
 
+  // Badge style based on real visible status
   const getStatusStyle = (item: FeeItem) => {
     if (isOverdue(item)) return styles.overdueBadge;
 
@@ -164,6 +214,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Open payment modal
   const openPaymentModal = (item: FeeItem) => {
     setSelectedFee(item);
     setPaymentMethod(item.paymentMethod || "");
@@ -171,6 +222,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
     setPaymentModalVisible(true);
   };
 
+  // Close payment modal and clear fields
   const closePaymentModal = () => {
     setPaymentModalVisible(false);
     setSelectedFee(null);
@@ -178,6 +230,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
     setPaymentNote("");
   };
 
+  // Submit payment note / update payment note
   const handleSubmitPayment = async () => {
     if (!selectedFee) return;
 
@@ -218,6 +271,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Render one fee card
   const renderFeeCard = ({ item }: { item: FeeItem }) => (
     <View style={styles.card}>
       <View style={styles.cardTopRow}>
@@ -267,6 +321,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
         </Text>
       ) : null}
 
+      {/* User can submit or update payment note if fee is unpaid/submitted */}
       {(item.status === "UNPAID" || item.status === "PAYMENT_SUBMITTED") && (
         <TouchableOpacity
           style={styles.payBtn}
@@ -282,6 +337,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
     </View>
   );
 
+  // Loading state
   if (loading) {
     return (
       <View style={styles.center}>
@@ -305,6 +361,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
           <View>
             <Text style={styles.screenTitle}>My Fees</Text>
 
+            {/* Top summary card */}
             <View style={styles.summaryCard}>
               <Text style={styles.summaryTitle}>Fee Summary</Text>
 
@@ -314,7 +371,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
               </Text>
 
               <Text style={styles.summaryText}>
-                Unpaid: {summary?.unpaidCount || 0}
+                Pending: {(summary?.unpaidCount || 0) + (summary?.overdueCount || 0)}
               </Text>
 
               <Text style={styles.summaryText}>
@@ -330,14 +387,14 @@ const MyFeesScreen = ({ navigation }: Props) => {
               </Text>
             </View>
 
+            {/* Status filter */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.filterRow}
             >
               {[
-                { label: "Unpaid", value: "UNPAID" },
-                { label: "Overdue", value: "OVERDUE" },
+                { label: "Pending", value: "PENDING" },
                 { label: "Submitted", value: "SUBMITTED" },
                 { label: "Paid", value: "PAID" },
                 { label: "Waived", value: "WAIVED" },
@@ -363,41 +420,42 @@ const MyFeesScreen = ({ navigation }: Props) => {
               ))}
             </ScrollView>
 
-
+            {/* Fee type filter */}
             <Text style={styles.filterSectionTitle}>Fee Type</Text>
 
-<ScrollView
-  horizontal
-  showsHorizontalScrollIndicator={false}
-  contentContainerStyle={styles.filterRow}
->
-  {[
-    { label: "All Types", value: "ALL_TYPES" },
-    { label: "Match", value: "MATCH_FEE" },
-    { label: "Event", value: "EVENT_FEE" },
-    { label: "Net", value: "NET_PRACTICE_FEE" },
-    { label: "Annual", value: "ANNUAL_MEMBERSHIP_FEE" },
-    { label: "Other", value: "OTHER" },
-  ].map((item) => (
-    <TouchableOpacity
-      key={item.value}
-      style={[
-        styles.filterBtn,
-        feeTypeFilter === item.value && styles.filterBtnSelected,
-      ]}
-      onPress={() => setFeeTypeFilter(item.value as FeeTypeFilter)}
-    >
-      <Text
-        style={[
-          styles.filterBtnText,
-          feeTypeFilter === item.value && styles.filterBtnTextSelected,
-        ]}
-      >
-        {item.label}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}
+            >
+              {[
+                { label: "All Types", value: "ALL_TYPES" },
+                { label: "Match", value: "MATCH_FEE" },
+                { label: "Event", value: "EVENT_FEE" },
+                { label: "Net", value: "NET_PRACTICE_FEE" },
+                { label: "Annual", value: "ANNUAL_MEMBERSHIP_FEE" },
+                { label: "Other", value: "OTHER" },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.value}
+                  style={[
+                    styles.filterBtn,
+                    feeTypeFilter === item.value && styles.filterBtnSelected,
+                  ]}
+                  onPress={() => setFeeTypeFilter(item.value as FeeTypeFilter)}
+                >
+                  <Text
+                    style={[
+                      styles.filterBtnText,
+                      feeTypeFilter === item.value &&
+                        styles.filterBtnTextSelected,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         }
         ListEmptyComponent={
@@ -405,6 +463,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
         }
       />
 
+      {/* Submit payment modal */}
       <Modal
         visible={paymentModalVisible}
         animationType="slide"
@@ -446,7 +505,10 @@ const MyFeesScreen = ({ navigation }: Props) => {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.cancelBtn} onPress={closePaymentModal}>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={closePaymentModal}
+            >
               <Text style={styles.cancelBtnText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -523,6 +585,13 @@ const styles = StyleSheet.create({
   },
   filterBtnTextSelected: {
     color: "#fff",
+  },
+  filterSectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2b0540",
+    marginBottom: 8,
+    marginTop: 4,
   },
   card: {
     backgroundColor: "#fff",
@@ -661,11 +730,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
   },
-  filterSectionTitle: {
-  fontSize: 15,
-  fontWeight: "700",
-  color: "#2b0540",
-  marginBottom: 8,
-  marginTop: 4,
-},
 });

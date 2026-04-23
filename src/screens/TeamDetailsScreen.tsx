@@ -129,10 +129,7 @@ const canManageTeamInfo = isAdmin;
     try {
       const response = await addMemberToTeam(teamId, userId);
 
-      Alert.alert(
-        "Success",
-        typeof response === "string" ? response : "Member added successfully"
-      );
+    
 
       await loadData();
     } catch (error: any) {
@@ -150,10 +147,7 @@ const canManageTeamInfo = isAdmin;
     try {
       const response = await removeMemberFromTeam(teamId, userId);
 
-      Alert.alert(
-        "Success",
-        typeof response === "string" ? response : "Member removed successfully"
-      );
+     
 
       await loadData();
     } catch (error: any) {

@@ -35,6 +35,7 @@ const EventsScreen = ({ navigation }: Props) => {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [eventFilter, setEventFilter] = useState<"UPCOMING" | "PAST" | "ALL">("UPCOMING");
 
   const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
 
@@ -140,26 +141,114 @@ const EventsScreen = ({ navigation }: Props) => {
     );
   }
 
+  const filteredEvents = [...events].filter((item) => {
+  const eventTime = new Date(item.eventDate).getTime();
+  const now = new Date().getTime();
+
+  if (eventFilter === "UPCOMING") return eventTime >= now;
+  if (eventFilter === "PAST") return eventTime < now;
+  return true;
+}).sort((a, b) => {
+  const aTime = new Date(a.eventDate).getTime();
+  const bTime = new Date(b.eventDate).getTime();
+  const now = new Date().getTime();
+
+  if (eventFilter === "UPCOMING") {
+    return aTime - bTime; // nearest future first
+  }
+
+  if (eventFilter === "PAST") {
+    return bTime - aTime; // latest past first
+  }
+
+  const aUpcoming = aTime >= now;
+  const bUpcoming = bTime >= now;
+
+  if (aUpcoming && !bUpcoming) return -1;
+  if (!aUpcoming && bUpcoming) return 1;
+
+  if (aUpcoming && bUpcoming) return aTime - bTime;
+
+  return bTime - aTime;
+});
+
   return (
     <FlatList
-      data={events}
+      data={filteredEvents}
       keyExtractor={(item) => item.id.toString()}
       renderItem={renderItem}
-      contentContainerStyle={events.length === 0 ? styles.center : styles.list}
+      contentContainerStyle={filteredEvents.length === 0 ? styles.center : styles.list}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
-      ListHeaderComponent={
-        canManage ? (
-          <TouchableOpacity
-            style={styles.createBtn}
-            onPress={() => navigation.navigate("CreateEvent")}
-          >
-            <Ionicons name="add-circle-outline" size={18} color="#2b0540" />
-            <Text style={styles.createBtnText}>Create Event</Text>
-          </TouchableOpacity>
-        ) : null
-      }
+
+      
+     ListHeaderComponent={
+  <View>
+    <View style={styles.filterRow}>
+      <TouchableOpacity
+        style={[
+          styles.filterBtn,
+          eventFilter === "UPCOMING" && styles.filterBtnSelected,
+        ]}
+        onPress={() => setEventFilter("UPCOMING")}
+      >
+        <Text
+          style={[
+            styles.filterBtnText,
+            eventFilter === "UPCOMING" && styles.filterBtnTextSelected,
+          ]}
+        >
+          Upcoming
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.filterBtn,
+          eventFilter === "PAST" && styles.filterBtnSelected,
+        ]}
+        onPress={() => setEventFilter("PAST")}
+      >
+        <Text
+          style={[
+            styles.filterBtnText,
+            eventFilter === "PAST" && styles.filterBtnTextSelected,
+          ]}
+        >
+          Past
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.filterBtn,
+          eventFilter === "ALL" && styles.filterBtnSelected,
+        ]}
+        onPress={() => setEventFilter("ALL")}
+      >
+        <Text
+          style={[
+            styles.filterBtnText,
+            eventFilter === "ALL" && styles.filterBtnTextSelected,
+          ]}
+        >
+          All
+        </Text>
+      </TouchableOpacity>
+    </View>
+
+    {canManage && (
+      <TouchableOpacity
+        style={styles.createBtn}
+        onPress={() => navigation.navigate("CreateEvent")}
+      >
+        <Ionicons name="add-circle-outline" size={18} color="#2b0540" />
+        <Text style={styles.createBtnText}>Create Event</Text>
+      </TouchableOpacity>
+    )}
+  </View>
+}
       ListEmptyComponent={<Text style={styles.emptyText}>No events found.</Text>}
     />
   );
@@ -249,4 +338,33 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
   },
+  filterRow: {
+  flexDirection: "row",
+  gap: 8,
+  marginBottom: 16,
+},
+
+filterBtn: {
+  flex: 1,
+  backgroundColor: "#fff",
+  borderWidth: 1,
+  borderColor: "#d9d2e1",
+  borderRadius: 10,
+  paddingVertical: 10,
+},
+
+filterBtnSelected: {
+  backgroundColor: "#da9306",
+  borderColor: "#da9306",
+},
+
+filterBtnText: {
+  textAlign: "center",
+  fontWeight: "700",
+  color: "#2b0540",
+},
+
+filterBtnTextSelected: {
+  color: "#2b0540",
+},
 });

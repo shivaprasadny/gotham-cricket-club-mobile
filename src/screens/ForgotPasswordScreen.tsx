@@ -25,6 +25,7 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   // Loading states
   const [sendingCode, setSendingCode] = useState(false);
@@ -62,20 +63,29 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
   // Reset password using email + code + new password
   const handleResetPassword = async () => {
     if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email");
-      return;
-    }
+  Alert.alert("Error", "Please enter your email");
+  return;
+}
 
-    if (!code.trim()) {
-      Alert.alert("Error", "Please enter reset code");
-      return;
-    }
+if (!code.trim()) {
+  Alert.alert("Error", "Please enter reset code");
+  return;
+}
 
-    if (!newPassword.trim()) {
-      Alert.alert("Error", "Please enter new password");
-      return;
-    }
+if (!newPassword.trim()) {
+  Alert.alert("Error", "Please enter new password");
+  return;
+}
 
+if (!confirmPassword.trim()) {
+  Alert.alert("Error", "Please confirm your password");
+  return;
+}
+
+if (newPassword.trim() !== confirmPassword.trim()) {
+  Alert.alert("Error", "Passwords do not match");
+  return;
+}
     try {
       setResetting(true);
 
@@ -167,16 +177,38 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
             secureTextEntry
           />
 
+          <TextInput
+  style={styles.input}
+  placeholder="Confirm Password"
+  placeholderTextColor="#7a7a7a"
+  value={confirmPassword}
+  onChangeText={setConfirmPassword}
+  secureTextEntry
+/>
+
           {/* Reset password button */}
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleResetPassword}
-            disabled={resetting}
-          >
-            <Text style={styles.primaryButtonText}>
-              {resetting ? "Resetting..." : "Reset Password"}
-            </Text>
-          </TouchableOpacity>
+         <TouchableOpacity
+  style={[
+    styles.primaryButton,
+    (resetting ||
+      !email.trim() ||
+      !code.trim() ||
+      !newPassword.trim() ||
+      !confirmPassword.trim()) && styles.buttonDisabled
+  ]}
+  onPress={handleResetPassword}
+  disabled={
+    resetting ||
+    !email.trim() ||
+    !code.trim() ||
+    !newPassword.trim() ||
+    !confirmPassword.trim()
+  }
+>
+  <Text style={styles.primaryButtonText}>
+    {resetting ? "Resetting..." : "Reset Password"}
+  </Text>
+</TouchableOpacity>
 
           {/* Back to login link */}
           <TouchableOpacity
@@ -295,4 +327,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600",
   },
+  buttonDisabled: {
+  opacity: 0.5,
+},
 });

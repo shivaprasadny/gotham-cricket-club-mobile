@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState,useEffect } from "react";
 import {
   Modal,
   Pressable,
@@ -24,6 +24,9 @@ import {
 } from "../services/notificationService";
 import HomeFeeCard from "../components/HomeFeeCard";
 import { getMyFees } from "../services/feeService";
+import { getEvents } from "../services/eventService";
+
+
 
 type Props = {
   navigation: any;
@@ -62,6 +65,14 @@ type Announcement = {
   createdAt?: string;
   pinned?: boolean;
 };
+type EventItem = {
+  id: number;
+  title: string;
+  description?: string;
+  location?: string;
+  eventDate: string;
+  myStatus?: "GOING" | "NOT_GOING" | "MAYBE";
+};
 
 const QUOTES = [
   "Play for the badge. Fight for each other.",
@@ -85,6 +96,7 @@ const HomeScreen = ({ navigation }: Props) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 const [unpaidCount, setUnpaidCount] = useState(0);
+const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
 
   // Local hidden matches for current session
   const [dismissedMatchIds, setDismissedMatchIds] = useState<number[]>([]);
@@ -97,6 +109,26 @@ const [unpaidCount, setUnpaidCount] = useState(0);
   const isAdmin = user?.role === "ADMIN";
   const isCaptain = user?.role === "CAPTAIN";
   const canManage = isAdmin || isCaptain;
+
+
+
+
+const loadUnreadCount = async () => {
+  try {
+    const data = await getNotifications();
+    const unread = data.filter((n: any) => !n.isRead).length;
+    setUnreadCount(unread);
+  } catch (e) {
+    console.log("UNREAD COUNT ERROR:", e);
+  }
+};
+
+useFocusEffect(
+  useCallback(() => {
+    loadUnreadCount();
+  }, [])
+);
+
 
   // Build readable match title
   const getMatchTitle = (match: Match) => {
@@ -118,20 +150,24 @@ const [unpaidCount, setUnpaidCount] = useState(0);
 // Load all home screen data
 const loadHomeData = async () => {
   try {
-    const requests: Promise<any>[] = [
-      getMatches(),              // results[0]
-      getAnnouncements(),        // results[1]
-      getPinnedAnnouncement(),   // results[2]
-      getNotifications(),        // results[3]
-      getMyFees(),               // results[4]
-    ];
+  const requests: Promise<any>[] = [
+  getMatches(),            // 0
+  getAnnouncements(),     // 1
+  getPinnedAnnouncement(),// 2
+  getNotifications(),     // 3
+  getMyFees(),            // 4
+  getEvents(),            // 5
+];
 
     // Admin only
     if (isAdmin) {
-      requests.push(getPendingMembers()); // results[5] if admin
+      requests.push(getPendingMembers()); // results[6] if admin
     }
 
     const results = await Promise.allSettled(requests);
+
+
+
 
     // Matches
     const matchesData =
@@ -153,11 +189,21 @@ const loadHomeData = async () => {
     const feesData =
       results[4].status === "fulfilled" ? results[4].value : [];
 
+      // event
+    const eventsData =
+    results[5].status === "fulfilled" ? results[5].value : [];
+
+
+    
+
     // Pending approvals only for admin
     const pendingData =
-      isAdmin && results[5] && results[5].status === "fulfilled"
-        ? results[5].value
-        : [];
+  isAdmin && results[6] && results[6].status === "fulfilled"
+    ? results[6].value
+    : [];
+
+
+   
 
     // Unread notifications count
     const unread = Array.isArray(notificationsData)
@@ -169,6 +215,17 @@ const loadHomeData = async () => {
       ? feesData.filter((f: any) => f.status === "UNPAID").length
       : 0;
 
+
+      const upcomingEventList = Array.isArray(eventsData)
+  ? eventsData
+      .filter((event) => new Date(event.eventDate).getTime() >= new Date().getTime())
+      .sort(
+        (a, b) =>
+          new Date(a.eventDate).getTime() - new Date(b.eventDate).getTime()
+      )
+      .slice(0, 3)
+  : [];
+setUpcomingEvents(upcomingEventList);
     setUnreadCount(unread);
     setUnpaidCount(unpaid);
 
@@ -293,6 +350,19 @@ const loadHomeData = async () => {
         return { color: "#fff" };
     }
   };
+  const getEventStatusColor = (status?: string) => {
+  switch (status) {
+    case "GOING":
+      return { color: "#22c55e" }; // green
+    case "NOT_GOING":
+      return { color: "#ef4444" }; // red
+    case "MAYBE":
+      return { color: "#facc15" }; // yellow
+    default:
+      return { color: "#fff" };
+  }
+};
+
 
   // Compact availability label
   const getAvailabilityText = (status?: string) => {
@@ -336,6 +406,27 @@ const loadHomeData = async () => {
     await logout();
   };
 
+  const getEventTimeLeft = (eventDate: string) => {
+  const now = new Date().getTime();
+  const target = new Date(eventDate).getTime();
+  const diff = target - now;
+
+  if (diff <= 0) {
+    return "Started";
+  }
+
+  const totalMinutes = Math.floor(diff / (1000 * 60));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return `${days}d ${hours}h left`;
+  if (hours > 0) return `${hours}h ${minutes}m left`;
+  return `${minutes}m left`;
+};
+
+
+
   return (
     <>
       <ScrollView
@@ -346,22 +437,41 @@ const loadHomeData = async () => {
         }
       >
         {/* Header */}
-        <View style={styles.topRow}>
-          <View style={{ flex: 1 }}>
-            <HomeFeeCard navigation={navigation} />
+       <View style={styles.topRow}>
+  <View style={{ flex: 1 }}>
+    <HomeFeeCard navigation={navigation} />
 
-            <Text style={styles.heading}>Welcome back</Text>
-            <Text style={styles.name}>{user?.fullName}</Text>
-            <Text style={styles.roleText}>{user?.role}</Text>
+    <Text style={styles.heading}>Welcome back</Text>
+    <Text style={styles.name}>{user?.fullName}</Text>
+    <Text style={styles.roleText}>{user?.role}</Text>
+  </View>
+
+  <View style={styles.topRightIcons}>
+    <TouchableOpacity
+      style={styles.bellBtn}
+      onPress={() => navigation.navigate("Notifications")}
+    >
+      <View>
+        <Ionicons name="notifications-outline" size={24} color="#da9306" />
+
+        {unreadNotificationCount > 0 && (
+          <View style={styles.bellBadge}>
+            <Text style={styles.bellBadgeText}>
+              {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+            </Text>
           </View>
+        )}
+      </View>
+    </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuBtn}
-            onPress={() => setMenuVisible(true)}
-          >
-            <Ionicons name="menu" size={26} color="#da9306" />
-          </TouchableOpacity>
-        </View>
+    <TouchableOpacity
+      style={styles.menuBtn}
+      onPress={() => setMenuVisible(true)}
+    >
+      <Ionicons name="menu" size={26} color="#da9306" />
+    </TouchableOpacity>
+  </View>
+</View>
 
 
 
@@ -575,6 +685,84 @@ const loadHomeData = async () => {
           </>
         )}
 
+
+  {/* events upcoming */}
+
+<Text style={styles.sectionTitle}>Upcoming Events</Text>
+
+{upcomingEvents.length === 0 ? (
+  <View style={styles.infoCard}>
+    <Text style={styles.infoText}>No upcoming events.</Text>
+  </View>
+) : (
+  <>
+    {upcomingEvents.map((item, index) => (
+      <TouchableOpacity
+        key={item.id}
+        style={[
+          styles.eventCard,
+          index === 0 && styles.nextEventCard // highlight first
+        ]}
+        onPress={() =>
+          navigation.navigate("EventDetails", { event: item })
+        }
+      >
+        {index === 0 && (
+          <Text style={styles.nextEventLabel}>Next Event</Text>
+        )}
+
+        <Text style={styles.eventTitle}>{item.title}</Text>
+
+        <Text style={styles.eventCountdown}>
+          {getEventTimeLeft(item.eventDate)}
+        </Text>
+
+        <Text style={styles.eventMeta}>
+          {new Date(item.eventDate).toLocaleString()}
+        </Text>
+
+        <Text style={styles.eventMeta}>
+          {item.location || "Location not set"}
+        </Text>
+
+
+<View style={styles.eventBottomRow}>
+  {item.myStatus ? (
+    <Text
+      style={[
+        styles.eventStatus,
+        getEventStatusColor(item.myStatus),
+      ]}
+    >
+      {item.myStatus}
+    </Text>
+  ) : (
+    <TouchableOpacity
+      style={styles.eventActionBtn}
+      onPress={() =>
+        navigation.navigate("EventDetails", { event: item })
+      }
+    >
+      <Text style={styles.eventActionText}>Mark Response</Text>
+    </TouchableOpacity>
+  )}
+</View>
+
+
+      </TouchableOpacity>
+      
+      
+    ))}
+    <TouchableOpacity
+      style={styles.seeAllBtn}
+      onPress={() => navigation.navigate("Events")}
+    >
+      <Text style={styles.seeAllBtnText}>View All Events</Text>
+    </TouchableOpacity>
+  </>
+)}
+
+
         {/* Quick actions */}
         <Text style={styles.sectionTitle}>Quick Actions</Text>
 
@@ -600,6 +788,14 @@ const loadHomeData = async () => {
 
             <Text style={styles.quickText}>Notifications</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+  style={styles.quickCard}
+  onPress={() => navigation.navigate("Events")}
+>
+  <Ionicons name="calendar-outline" size={22} color="#da9306" />
+  <Text style={styles.quickText}>Events</Text>
+</TouchableOpacity>
 
           {/* My fees */}
           <TouchableOpacity
@@ -682,6 +878,11 @@ const loadHomeData = async () => {
         )}
       </ScrollView>
 
+
+
+
+      
+
       {/* Burger menu */}
       <Modal
         visible={menuVisible}
@@ -703,6 +904,18 @@ const loadHomeData = async () => {
               <Ionicons name="notifications-outline" size={20} color="#da9306" />
               <Text style={styles.menuItemText}>Notifications</Text>
             </TouchableOpacity>
+            
+            
+            
+            <TouchableOpacity
+  style={styles.menuItem}
+  onPress={() => closeMenuAndNavigate("Events")}
+>
+  <Ionicons name="calendar-outline" size={20} color="#da9306" />
+  <Text style={styles.menuItemText}>Events</Text>
+</TouchableOpacity>
+
+
 
             <TouchableOpacity
               style={styles.menuItem}
@@ -1207,4 +1420,138 @@ statusPillLabelActive: {
 statusPillLabelWarning: {
   color: "#fff7e6",
 },
+eventCard: {
+  backgroundColor: "#3a0a57",
+  padding: 16,
+  borderRadius: 16,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: "#4d1670",
+},
+
+eventTitle: {
+  color: "#fff",
+  fontSize: 16,
+  fontWeight: "700",
+  marginBottom: 6,
+},
+
+eventMeta: {
+  color: "#da9306",
+  fontSize: 13,
+  fontWeight: "600",
+  marginBottom: 4,
+},
+
+eventDesc: {
+  color: "#ddd",
+  marginTop: 6,
+  lineHeight: 19,
+},
+
+
+nextEventCard: {
+  borderColor: "#da9306",
+  borderWidth: 2,
+},
+
+nextEventLabel: {
+  color: "#da9306",
+  fontWeight: "700",
+  marginBottom: 6,
+},
+
+
+
+eventCountdown: {
+  color: "#F4B400",
+  fontSize: 13,
+  fontWeight: "700",
+  marginVertical: 6,
+},
+seeAllBtn: {
+  backgroundColor: "#2b0540",
+  paddingVertical: 12,
+  borderRadius: 10,
+  marginTop: 4,
+  marginBottom: 18,
+},
+
+seeAllBtnText: {
+  color: "#fff",
+  textAlign: "center",
+  fontWeight: "700",
+},
+eventBottomRow: {
+  marginTop: 10,
+  flexDirection: "row",
+  justifyContent: "flex-end",
+},
+
+eventStatus: {
+  fontWeight: "700",
+  fontSize: 13,
+},
+
+eventActionBtn: {
+  backgroundColor: "#da9306",
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 20,
+},
+
+eventActionText: {
+  color: "#2b0540",
+  fontWeight: "700",
+  fontSize: 12,
+},
+badge: {
+  position: "absolute",
+  top: -4,
+  right: -6,
+  backgroundColor: "#da9306",
+  borderRadius: 10,
+  minWidth: 16,
+  height: 16,
+  justifyContent: "center",
+  alignItems: "center",
+  paddingHorizontal: 4,
+},
+
+badgeText: {
+  color: "#fff",
+  fontSize: 10,
+  fontWeight: "700",
+},
+topRightIcons: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 10,
+},
+
+bellBtn: {
+  backgroundColor: "#3a0a57",
+  padding: 10,
+  borderRadius: 14,
+},
+
+bellBadge: {
+  position: "absolute",
+  top: -4,
+  right: -6,
+  backgroundColor: "#da9306",
+  borderRadius: 10,
+  minWidth: 16,
+  height: 16,
+  justifyContent: "center",
+  alignItems: "center",
+  paddingHorizontal: 4,
+},
+
+bellBadgeText: {
+  color: "#2b0540",
+  fontSize: 10,
+  fontWeight: "800",
+},
+
 });

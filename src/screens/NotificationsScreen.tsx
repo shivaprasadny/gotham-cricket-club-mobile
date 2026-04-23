@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import {
   Alert,
   FlatList,
+  ListRenderItem,
   RefreshControl,
   StyleSheet,
   Text,
@@ -10,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+
 import {
   AppNotification,
   clearNotifications,
@@ -17,6 +19,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from "../services/notificationService";
+import { getEventById } from "../services/eventService";
 
 type Props = {
   navigation: any;
@@ -26,7 +29,7 @@ const NotificationsScreen = ({ navigation }: Props) => {
   // Notification list state
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-  // Pull-to-refresh loading state
+  // Pull-to-refresh state
   const [refreshing, setRefreshing] = useState(false);
 
   // Load notifications from backend
@@ -42,20 +45,20 @@ const NotificationsScreen = ({ navigation }: Props) => {
     }
   };
 
-  // Reload every time screen opens
+  // Reload every time screen comes into focus
   useFocusEffect(
     useCallback(() => {
       void loadNotifications();
     }, [])
   );
 
-  // Pull to refresh handler
+  // Pull-to-refresh handler
   const onRefresh = async () => {
     setRefreshing(true);
     await loadNotifications();
   };
 
-  // Clear all notifications from backend
+  // Clear all notifications
   const handleClear = async () => {
     Alert.alert(
       "Clear Notifications",
@@ -85,6 +88,7 @@ const NotificationsScreen = ({ navigation }: Props) => {
     try {
       await markAllNotificationsAsRead();
 
+      // Update local UI immediately
       setNotifications((prev) =>
         prev.map((item) => ({
           ...item,
@@ -96,54 +100,66 @@ const NotificationsScreen = ({ navigation }: Props) => {
       Alert.alert("Error", "Failed to mark all as read");
     }
   };
+const normalizeType = (type?: string) => (type || "").toUpperCase().trim();
 
-  // Pick icon based on notification type
-  const getNotificationIcon = (type?: string) => {
-    switch (type) {
-      case "MATCH":
-        return "calendar-outline";
-      case "ANNOUNCEMENT":
-        return "notifications-outline";
-      case "FEE":
-        return "card-outline";
-      case "TEAM":
-        return "shield-outline";
-      case "LEAGUE":
-        return "trophy-outline";
-      case "MEMBER":
-        return "people-outline";
-      default:
-        return "information-circle-outline";
-    }
-  };
+const isEventType = (type?: string) => {
+  const t = normalizeType(type);
+  return t === "EVENT" || t === "EVENT_NOTIFICATION" || t === "EVENTS";
+};
 
-  // Pick icon color based on type
-  const getNotificationIconColor = (type?: string) => {
-    switch (type) {
-      case "MATCH":
-        return "#22c55e";
-      case "ANNOUNCEMENT":
-        return "#da9306";
-      case "FEE":
-        return "#2563eb";
-      case "TEAM":
-        return "#8b5cf6";
-      case "LEAGUE":
-        return "#f59e0b";
-      case "MEMBER":
-        return "#ec4899";
-      default:
-        return "#6b7280";
-    }
-  };
+const getNotificationIcon = (
+  type?: string
+): keyof typeof Ionicons.glyphMap => {
+  if (isEventType(type)) return "calendar-outline";
 
-  // Open correct screen when notification is pressed
+  switch (normalizeType(type)) {
+    case "MATCH":
+      return "calendar-outline";
+    case "ANNOUNCEMENT":
+      return "notifications-outline";
+    case "FEE":
+      return "card-outline";
+    case "TEAM":
+      return "shield-outline";
+    case "LEAGUE":
+      return "trophy-outline";
+    case "MEMBER":
+      return "people-outline";
+    default:
+      console.log("UNKNOWN NOTIFICATION TYPE:", type);
+      return "information-circle-outline";
+  }
+};
+
+const getNotificationIconColor = (type?: string) => {
+  if (isEventType(type)) return "#06b6d4";
+
+  switch (normalizeType(type)) {
+    case "MATCH":
+      return "#22c55e";
+    case "ANNOUNCEMENT":
+      return "#da9306";
+    case "FEE":
+      return "#2563eb";
+    case "TEAM":
+      return "#8b5cf6";
+    case "LEAGUE":
+      return "#f59e0b";
+    case "MEMBER":
+      return "#ec4899";
+    default:
+      return "#6b7280";
+  }
+};
+
+  // Open the correct screen when notification is pressed
   const handleNotificationPress = async (item: AppNotification) => {
     try {
-      // Mark this notification as read in backend first
+      // Mark one notification as read first
       if (!item.isRead) {
         await markNotificationAsRead(item.recipientId);
 
+        // Update local UI immediately
         setNotifications((prev) =>
           prev.map((n) =>
             n.recipientId === item.recipientId ? { ...n, isRead: true } : n
@@ -154,7 +170,31 @@ const NotificationsScreen = ({ navigation }: Props) => {
       console.log("MARK READ ERROR:", error);
     }
 
-    // Direct match details route
+   // Handle event notifications first
+if (isEventType(item.type) && item.targetId) {
+  try {
+    console.log("EVENT NOTIFICATION CLICKED:", item);
+
+    const fullEvent = await getEventById(item.targetId);
+    console.log("FULL EVENT FROM API:", fullEvent);
+
+    navigation.navigate("EventDetails", {
+      event: fullEvent,
+    });
+  } catch (error) {
+    console.log("FETCH EVENT ERROR:", error);
+    navigation.navigate("MainTabs", { screen: "Events" });
+  }
+
+  return;
+}
+
+    // Direct navigation using targetScreen
+    if (item.targetScreen === "Events") {
+      navigation.navigate("MainTabs", { screen: "Events" });
+      return;
+    }
+
     if (item.targetScreen === "MatchDetails") {
       if (item.targetId) {
         navigation.navigate("MatchDetails", { matchId: item.targetId });
@@ -164,7 +204,7 @@ const NotificationsScreen = ({ navigation }: Props) => {
       return;
     }
 
-    // Tabs must go through MainTabs
+    // Tab screens
     if (item.targetScreen === "Announcements") {
       navigation.navigate("MainTabs", { screen: "Announcements" });
       return;
@@ -216,8 +256,8 @@ const NotificationsScreen = ({ navigation }: Props) => {
       return;
     }
 
-    // Fallback by type if targetScreen not set
-    switch (item.type) {
+    // Fallback by type if targetScreen is missing
+    switch (normalizeType(item.type)) {
       case "MATCH":
         if (item.targetId) {
           navigation.navigate("MatchDetails", { matchId: item.targetId });
@@ -246,6 +286,12 @@ const NotificationsScreen = ({ navigation }: Props) => {
         navigation.navigate("AdminApproval");
         return;
 
+      case "EVENT":
+      case "EVENT_NOTIFICATION":
+      case "EVENTS":
+        navigation.navigate("MainTabs", { screen: "Events" });
+        return;
+
       default:
         navigation.navigate("MainTabs", { screen: "Home" });
         return;
@@ -264,31 +310,27 @@ const NotificationsScreen = ({ navigation }: Props) => {
   };
 
   // Render one notification card
-  const renderItem = ({ item }: { item: AppNotification }) => {
+  const renderItem: ListRenderItem<AppNotification> = ({ item }) => {
     const iconName = getNotificationIcon(item.type);
     const iconColor = getNotificationIconColor(item.type);
 
     return (
       <TouchableOpacity
-        activeOpacity={0.9}
-        style={[
-          styles.card,
-          !item.isRead && styles.unreadCard,
-        ]}
+        style={[styles.card, !item.isRead && styles.unreadCard]}
         onPress={() => handleNotificationPress(item)}
       >
         <View style={styles.cardRow}>
+          {/* Left icon */}
           <View style={styles.iconWrap}>
-            <Ionicons name={iconName as any} size={22} color={iconColor} />
+            <Ionicons name={iconName} size={22} color={iconColor} />
           </View>
 
+          {/* Text content */}
           <View style={styles.textWrap}>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.message}>{item.message}</Text>
-            <Text style={styles.time}>{formatTime(item.createdAt)}</Text>
+            <Text style={styles.cardTitle}>{item.title}</Text>
+            <Text style={styles.cardMessage}>{item.message}</Text>
+            <Text style={styles.cardTime}>{formatTime(item.createdAt)}</Text>
           </View>
-
-          {!item.isRead && <View style={styles.unreadDot} />}
         </View>
       </TouchableOpacity>
     );
@@ -331,7 +373,8 @@ const NotificationsScreen = ({ navigation }: Props) => {
             />
             <Text style={styles.emptyTitle}>No notifications yet</Text>
             <Text style={styles.emptyText}>
-              Match updates, fee alerts, announcements, and club activity will appear here.
+              Match updates, fee alerts, announcements, and club activity will
+              appear here.
             </Text>
           </View>
         }
@@ -351,7 +394,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
 
-  // Top row with title and actions
+  // Header row
   headerRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -366,13 +409,13 @@ const styles = StyleSheet.create({
     color: "#2b0540",
   },
 
-  // Action buttons wrapper
+  // Header action group
   headerButtons: {
     flexDirection: "row",
     gap: 8,
   },
 
-  // Small action button
+  // Read all button
   smallBtn: {
     backgroundColor: "#4b5563",
     paddingVertical: 10,
@@ -380,7 +423,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
-  // Small action button text
   smallBtnText: {
     color: "#fff",
     fontWeight: "700",
@@ -394,7 +436,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
 
-  // Clear all button text
   clearBtnText: {
     color: "#fff",
     fontWeight: "700",
@@ -421,14 +462,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fffdf7",
   },
 
-  // Inner row
+  // Card content row
   cardRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
   },
 
-  // Icon circle wrapper
+  // Icon wrapper
   iconWrap: {
     width: 40,
     height: 40,
@@ -439,50 +480,41 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Text wrapper
+  // Text content wrapper
   textWrap: {
     flex: 1,
   },
 
   // Notification title
-  title: {
-    fontSize: 16,
-    fontWeight: "700",
+  cardTitle: {
     color: "#111827",
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 2,
   },
 
   // Notification message
-  message: {
-    fontSize: 14,
+  cardMessage: {
     color: "#374151",
-    lineHeight: 20,
-    marginBottom: 8,
+    fontSize: 14,
+    marginBottom: 4,
+    lineHeight: 18,
   },
 
   // Notification time
-  time: {
+  cardTime: {
+    color: "#9ca3af",
     fontSize: 12,
-    color: "#6b7280",
     fontWeight: "500",
   },
 
-  // Unread blue/orange dot
-  unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#da9306",
-    marginTop: 6,
-  },
-
-  // Empty container wrapper
+  // Empty container
   emptyContainer: {
     flexGrow: 1,
     justifyContent: "center",
   },
 
-  // Empty card UI
+  // Empty card
   emptyCard: {
     alignItems: "center",
     backgroundColor: "#fff",
@@ -500,7 +532,7 @@ const styles = StyleSheet.create({
     color: "#2b0540",
   },
 
-  // Empty description
+  // Empty text
   emptyText: {
     marginTop: 8,
     fontSize: 14,

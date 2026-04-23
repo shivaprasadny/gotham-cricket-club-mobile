@@ -17,7 +17,6 @@ import { getMatchById, updateMatch } from "../services/matchService";
 import { getTeams } from "../services/teamService";
 import { getLeagues } from "../services/leagueService";
 
-
 type Props = {
   route: any;
   navigation: any;
@@ -86,6 +85,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   const [venue, setVenue] = useState("");
   const [notes, setNotes] = useState("");
   const [matchDate, setMatchDate] = useState<Date | null>(null);
+  const [tempMatchDate, setTempMatchDate] = useState<Date>(new Date());
 
   const [matchType, setMatchType] = useState<MatchType>("LEAGUE");
   const [matchFormat, setMatchFormat] = useState<MatchFormat>("T20");
@@ -94,6 +94,9 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
 
   const [matchFeeAmount, setMatchFeeAmount] = useState("");
   const [matchFeeDueDate, setMatchFeeDueDate] = useState<Date | null>(null);
+  const [tempMatchFeeDueDate, setTempMatchFeeDueDate] = useState<Date>(
+    new Date()
+  );
   const [matchFeeDescription, setMatchFeeDescription] = useState("");
 
   const [opponentMode, setOpponentMode] = useState<"EXTERNAL" | "CLUB">(
@@ -248,39 +251,39 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
     try {
       setSubmitting(true);
 
-   const payload = {
-  homeTeamId,
-  awayTeamId: opponentMode === "CLUB" ? awayTeamId : null,
-  externalOpponentName:
-    opponentMode === "EXTERNAL" ? externalOpponentName.trim() : "",
-  leagueId,
-  matchDate: matchDate.toISOString(),
-  venue: venue.trim(),
-  matchType,
-  matchFormat: finalMatchFormat,
-  matchFee: null,
-  matchFeeAmount: matchFeeAmount.trim() ? Number(matchFeeAmount) : null,
-  matchFeeDueDate: matchFeeDueDate ? matchFeeDueDate.toISOString() : null,
-  matchFeeDescription: matchFeeDescription.trim(),
-  notes: notes.trim(),
-  status,
-};
+      const payload = {
+        homeTeamId,
+        awayTeamId: opponentMode === "CLUB" ? awayTeamId : null,
+        externalOpponentName:
+          opponentMode === "EXTERNAL" ? externalOpponentName.trim() : "",
+        leagueId,
+        matchDate: matchDate.toISOString(),
+        venue: venue.trim(),
+        matchType,
+        matchFormat: finalMatchFormat,
+        matchFee: null,
+        matchFeeAmount: matchFeeAmount.trim() ? Number(matchFeeAmount) : null,
+        matchFeeDueDate: matchFeeDueDate ? matchFeeDueDate.toISOString() : null,
+        matchFeeDescription: matchFeeDescription.trim(),
+        notes: notes.trim(),
+        status,
+      };
 
       const response = await updateMatch(matchId, payload);
 
-// Build correct opponent name for notification
-const notificationOpponentName =
-  opponentMode === "CLUB"
-    ? selectedAwayTeamName
-    : externalOpponentName.trim();
+      // Build correct opponent name for notification
+      const notificationOpponentName =
+        opponentMode === "CLUB"
+          ? selectedAwayTeamName
+          : externalOpponentName.trim();
 
-
-
-Alert.alert(
-  "Success",
-  typeof response === "string" ? response : "Match updated successfully",
-  [{ text: "OK", onPress: () => navigation.goBack() }]
-);
+      Alert.alert(
+        "Success",
+        typeof response === "string"
+          ? response
+          : "Match updated successfully",
+        [{ text: "OK", onPress: () => navigation.goBack() }]
+      );
     } catch (error: any) {
       console.log("UPDATE MATCH ERROR:", error?.response?.data || error);
 
@@ -449,7 +452,10 @@ Alert.alert(
           <Text style={styles.label}>Match Date & Time</Text>
           <TouchableOpacity
             style={styles.selectInput}
-            onPress={() => setShowDatePicker(true)}
+            onPress={() => {
+              setTempMatchDate(matchDate || new Date());
+              setShowDatePicker(true);
+            }}
           >
             <Text style={styles.selectInputText}>
               {matchDate ? matchDate.toLocaleString() : "Select match date & time"}
@@ -457,15 +463,44 @@ Alert.alert(
           </TouchableOpacity>
 
           {showDatePicker && (
-            <DateTimePicker
-              value={matchDate || new Date()}
-              mode="datetime"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={(event, selectedDate) => {
-                setShowDatePicker(false);
-                if (selectedDate) setMatchDate(selectedDate);
-              }}
-            />
+            <View style={styles.inlinePickerCard}>
+              <DateTimePicker
+                value={tempMatchDate}
+                mode="datetime"
+                display={Platform.OS === "ios" ? "inline" : "default"}
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    setTempMatchDate(selectedDate);
+                  }
+
+                  if (Platform.OS !== "ios" && selectedDate) {
+                    setMatchDate(selectedDate);
+                    setShowDatePicker(false);
+                  }
+                }}
+              />
+
+              {Platform.OS === "ios" && (
+                <View style={styles.pickerButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.cancelBtn}
+                    onPress={() => setShowDatePicker(false)}
+                  >
+                    <Text style={styles.cancelText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.confirmBtn}
+                    onPress={() => {
+                      setMatchDate(tempMatchDate);
+                      setShowDatePicker(false);
+                    }}
+                  >
+                    <Text style={styles.confirmText}>Confirm</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           )}
 
           <Text style={styles.label}>Venue</Text>
@@ -490,7 +525,10 @@ Alert.alert(
           <Text style={styles.label}>Match Fee Due Date (Optional)</Text>
           <TouchableOpacity
             style={styles.selectInput}
-            onPress={() => setShowFeeDueDatePicker(true)}
+            onPress={() => {
+              setTempMatchFeeDueDate(matchFeeDueDate || new Date());
+              setShowFeeDueDatePicker(true);
+            }}
           >
             <Text style={styles.selectInputText}>
               {matchFeeDueDate
@@ -500,15 +538,44 @@ Alert.alert(
           </TouchableOpacity>
 
           {showFeeDueDatePicker && (
-            <DateTimePicker
-              value={matchFeeDueDate || new Date()}
-              mode="datetime"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={(event, selectedDate) => {
-                setShowFeeDueDatePicker(false);
-                if (selectedDate) setMatchFeeDueDate(selectedDate);
-              }}
-            />
+            <View style={styles.inlinePickerCard}>
+              <DateTimePicker
+                value={tempMatchFeeDueDate}
+                mode="datetime"
+                display={Platform.OS === "ios" ? "inline" : "default"}
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) {
+                    setTempMatchFeeDueDate(selectedDate);
+                  }
+
+                  if (Platform.OS !== "ios" && selectedDate) {
+                    setMatchFeeDueDate(selectedDate);
+                    setShowFeeDueDatePicker(false);
+                  }
+                }}
+              />
+
+              {Platform.OS === "ios" && (
+                <View style={styles.pickerButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.cancelBtn}
+                    onPress={() => setShowFeeDueDatePicker(false)}
+                  >
+                    <Text style={styles.cancelText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.confirmBtn}
+                    onPress={() => {
+                      setMatchFeeDueDate(tempMatchFeeDueDate);
+                      setShowFeeDueDatePicker(false);
+                    }}
+                  >
+                    <Text style={styles.confirmText}>Confirm</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           )}
 
           <Text style={styles.label}>Match Fee Note (Optional)</Text>
@@ -817,5 +884,35 @@ const styles = StyleSheet.create({
     color: "#111",
     fontSize: 15,
     fontWeight: "600",
+  },
+  inlinePickerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  pickerButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  cancelBtn: {
+    padding: 10,
+  },
+  cancelText: {
+    color: "#888",
+    fontWeight: "600",
+  },
+  confirmBtn: {
+    backgroundColor: "#da9306",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  confirmText: {
+    color: "#2b0540",
+    fontWeight: "700",
   },
 });

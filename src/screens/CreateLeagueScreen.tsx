@@ -40,6 +40,10 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
 
+  // Temporary controlled picker states
+  const [tempStartDate, setTempStartDate] = useState<Date>(new Date());
+  const [tempEndDate, setTempEndDate] = useState<Date>(new Date());
+
   // Date picker visibility controls
   const [showStartDatePicker, setShowStartDatePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
@@ -185,46 +189,106 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
         <Text style={styles.label}>Start Date</Text>
         <TouchableOpacity
           style={styles.input}
-          onPress={() => setShowStartDatePicker(true)}
+          onPress={() => {
+            setTempStartDate(startDate || new Date());
+            setShowStartDatePicker(true);
+          }}
         >
           <Text style={styles.inputText}>{formatDate(startDate)}</Text>
         </TouchableOpacity>
 
         {showStartDatePicker && (
-          <DateTimePicker
-            value={startDate || new Date()}
-            mode="datetime"
-            display={Platform.OS === "ios" ? "inline" : "default"}
-            onChange={(event, selectedDate) => {
-              setShowStartDatePicker(false);
-              if (selectedDate) {
-                setStartDate(selectedDate);
-              }
-            }}
-          />
+          <View style={styles.inlinePickerCard}>
+            <DateTimePicker
+              value={tempStartDate}
+              mode="datetime"
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={(event, selectedDate) => {
+                if (selectedDate) {
+                  setTempStartDate(selectedDate);
+                }
+
+                if (Platform.OS !== "ios" && selectedDate) {
+                  setStartDate(selectedDate);
+                  setShowStartDatePicker(false);
+                }
+              }}
+            />
+
+            {Platform.OS === "ios" && (
+              <View style={styles.pickerButtonsRow}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setShowStartDatePicker(false)}
+                >
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.confirmBtn}
+                  onPress={() => {
+                    setStartDate(tempStartDate);
+                    setShowStartDatePicker(false);
+                  }}
+                >
+                  <Text style={styles.confirmText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         )}
 
         {/* End date */}
         <Text style={styles.label}>End Date</Text>
         <TouchableOpacity
           style={styles.input}
-          onPress={() => setShowEndDatePicker(true)}
+          onPress={() => {
+            setTempEndDate(endDate || new Date());
+            setShowEndDatePicker(true);
+          }}
         >
           <Text style={styles.inputText}>{formatDate(endDate)}</Text>
         </TouchableOpacity>
 
         {showEndDatePicker && (
-          <DateTimePicker
-            value={endDate || new Date()}
-            mode="datetime"
-            display={Platform.OS === "ios" ? "inline" : "default"}
-            onChange={(event, selectedDate) => {
-              setShowEndDatePicker(false);
-              if (selectedDate) {
-                setEndDate(selectedDate);
-              }
-            }}
-          />
+          <View style={styles.inlinePickerCard}>
+            <DateTimePicker
+              value={tempEndDate}
+              mode="datetime"
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={(event, selectedDate) => {
+                if (selectedDate) {
+                  setTempEndDate(selectedDate);
+                }
+
+                if (Platform.OS !== "ios" && selectedDate) {
+                  setEndDate(selectedDate);
+                  setShowEndDatePicker(false);
+                }
+              }}
+            />
+
+            {Platform.OS === "ios" && (
+              <View style={styles.pickerButtonsRow}>
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={() => setShowEndDatePicker(false)}
+                >
+                  <Text style={styles.cancelText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.confirmBtn}
+                  onPress={() => {
+                    setEndDate(tempEndDate);
+                    setShowEndDatePicker(false);
+                  }}
+                >
+                  <Text style={styles.confirmText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         )}
 
         {/* Active switch */}
@@ -363,5 +427,41 @@ const styles = StyleSheet.create({
     color: "#2b0540",
     fontWeight: "700",
     fontSize: 16,
+  },
+
+  inlinePickerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+
+  pickerButtonsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+
+  cancelBtn: {
+    padding: 10,
+  },
+
+  cancelText: {
+    color: "#888",
+    fontWeight: "600",
+  },
+
+  confirmBtn: {
+    backgroundColor: "#da9306",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+
+  confirmText: {
+    color: "#2b0540",
+    fontWeight: "700",
   },
 });
