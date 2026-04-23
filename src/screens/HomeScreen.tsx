@@ -767,28 +767,8 @@ setUpcomingEvents(upcomingEventList);
         <Text style={styles.sectionTitle}>Quick Actions</Text>
 
         <View style={styles.quickGrid}>
-          {/* Notifications */}
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate("Notifications")}
-          >
-            <View style={styles.quickIconRow}>
-              <Ionicons name="notifications-outline" size={22} color="#da9306" />
-
-              {unreadNotificationCount > 0 && (
-                <View style={styles.badgePill}>
-                  <Text style={styles.badgePillText}>
-                    {unreadNotificationCount > 99
-                      ? "99+"
-                      : unreadNotificationCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.quickText}>Notifications</Text>
-          </TouchableOpacity>
-
+          {/* events */}
+         
           <TouchableOpacity
   style={styles.quickCard}
   onPress={() => navigation.navigate("Events")}
@@ -806,23 +786,7 @@ setUpcomingEvents(upcomingEventList);
             <Text style={styles.quickText}>My Fees</Text>
           </TouchableOpacity>
 
-          {/* Teams */}
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate("Teams")}
-          >
-            <Ionicons name="shield-outline" size={22} color="#da9306" />
-            <Text style={styles.quickText}>Teams</Text>
-          </TouchableOpacity>
-
-          {/* Members */}
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => navigation.navigate("Members")}
-          >
-            <Ionicons name="people-outline" size={22} color="#da9306" />
-            <Text style={styles.quickText}>Members</Text>
-          </TouchableOpacity>
+         
 
           {/* Admin only */}
           {isAdmin && (
