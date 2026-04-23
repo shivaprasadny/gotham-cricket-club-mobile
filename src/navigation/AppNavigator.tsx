@@ -37,7 +37,7 @@ import FeeDetailsScreen from "../screens/FeeDetailsScreen";
 import EditFeeScreen from "../screens/EditFeeScreen";
 import TeamsScreen from "../screens/TeamsScreen";
 import MembersScreen from "../screens/MembersScreen";
-
+import EditProfileScreen from "../screens/EditProfileScreen";
 
 
 
@@ -97,6 +97,7 @@ const AppNavigator = () => {
 <Stack.Screen name="EditEvent" component={EditEventScreen} />
 <Stack.Screen name="Teams" component={TeamsScreen} />
 <Stack.Screen name="Members" component={MembersScreen} />
+<Stack.Screen name="EditProfile" component={EditProfileScreen} />
 
           <Stack.Screen
             name="Splash"

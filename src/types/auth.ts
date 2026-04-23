@@ -23,13 +23,34 @@ export type LoginResponse = {
  * Request body for register API
  */
 export type RegisterRequest = {
-  fullName: string;
-  nickname: string;
+  // =========================
+  // NEW NAME STRUCTURE
+  // =========================
+  firstName: string;
+  lastName: string;
+
+  // =========================
+  // AUTH FIELDS
+  // =========================
   email: string;
-  phone: string;
   password: string;
-  battingStyle: string;
-  bowlingStyle: string;
-  playerType: string;
-  jerseyNumber: number | null;
+
+  // =========================
+  // OPTIONAL PROFILE
+  // =========================
+  nickname?: string;
+  phone?: string;
+
+  // Must match backend (LocalDate)
+  dateOfBirth?: string | null;
+
+  gender?: string;
+
+  // =========================
+  // CRICKET PROFILE
+  // =========================
+  battingStyle?: string;
+  bowlingStyle?: string;
+  playerType?: string;
+  jerseyNumber?: number | null;
 };

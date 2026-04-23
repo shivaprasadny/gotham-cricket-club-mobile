@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,15 +12,15 @@ import {
   View,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { registerUser } from "../services/authService";
+import { getMyProfile, updateMyProfile } from "../services/profileService";
 
 type Props = {
   navigation: any;
 };
 
-const RegisterScreen = ({ navigation }: Props) => {
+const EditProfileScreen = ({ navigation }: Props) => {
   // =========================
-  // BASIC USER INFO
+  // BASIC INFO
   // =========================
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -30,20 +29,13 @@ const RegisterScreen = ({ navigation }: Props) => {
   // PROFILE INFO
   // =========================
   const [nickname, setNickname] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [gender, setGender] = useState("");
-
-  // DOB modal state
-  const [showDobPicker, setShowDobPicker] = useState(false);
-  const [tempDob, setTempDob] = useState<Date>(new Date(2000, 0, 1));
-
-  // =========================
-  // AUTH
-  // =========================
-  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [gender, setGender] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+
+  // DOB picker state
+  const [showDobPicker, setShowDobPicker] = useState(false);
+  const [tempDob, setTempDob] = useState(new Date(2000, 0, 1));
 
   // =========================
   // CRICKET INFO
@@ -53,10 +45,37 @@ const RegisterScreen = ({ navigation }: Props) => {
   const [playerType, setPlayerType] = useState("");
   const [jerseyNumber, setJerseyNumber] = useState("");
 
-  const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // =========================
-  // OPEN DOB PICKER
+  // LOAD PROFILE DATA
+  // =========================
+  const loadProfile = async () => {
+    try {
+      const data = await getMyProfile();
+
+      setFirstName(data.firstName || "");
+      setLastName(data.lastName || "");
+      setNickname(data.nickname || "");
+      setPhone(data.phone || "");
+      setGender(data.gender || "");
+      setDateOfBirth(data.dateOfBirth || "");
+
+      setBattingStyle(data.battingStyle || "");
+      setBowlingStyle(data.bowlingStyle || "");
+      setPlayerType(data.playerType || "");
+      setJerseyNumber(data.jerseyNumber ? String(data.jerseyNumber) : "");
+    } catch {
+      Alert.alert("Error", "Failed to load profile");
+    }
+  };
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  // =========================
+  // DOB HANDLERS
   // =========================
   const openDobPicker = () => {
     if (dateOfBirth) {
@@ -65,10 +84,7 @@ const RegisterScreen = ({ navigation }: Props) => {
     setShowDobPicker(true);
   };
 
-  // =========================
-  // SAVE DOB
-  // =========================
-  const handleSaveDob = () => {
+  const saveDob = () => {
     const y = tempDob.getFullYear();
     const m = String(tempDob.getMonth() + 1).padStart(2, "0");
     const d = String(tempDob.getDate()).padStart(2, "0");
@@ -78,44 +94,31 @@ const RegisterScreen = ({ navigation }: Props) => {
   };
 
   // =========================
-  // REGISTER HANDLER
+  // UPDATE PROFILE
   // =========================
-  const handleRegister = async () => {
-    if (!firstName.trim()) return Alert.alert("Error", "Enter first name");
-    if (!lastName.trim()) return Alert.alert("Error", "Enter last name");
-    if (!email.trim()) return Alert.alert("Error", "Enter email");
-    if (!password.trim()) return Alert.alert("Error", "Enter password");
-
-    if (password !== confirmPassword) {
-      return Alert.alert("Error", "Passwords do not match");
-    }
-
+  const handleSave = async () => {
     try {
-      setSubmitting(true);
+      setSaving(true);
 
-      const payload = {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        nickname: nickname.trim(),
-        dateOfBirth: dateOfBirth || null,
+      await updateMyProfile({
+        firstName,
+        lastName,
+        nickname,
+        phone,
         gender,
-        email: email.trim(),
-        phone: phone.trim(),
-        password: password.trim(),
-        battingStyle: battingStyle.trim(),
-        bowlingStyle: bowlingStyle.trim(),
-        playerType: playerType.trim(),
+        dateOfBirth,
+        battingStyle,
+        bowlingStyle,
+        playerType,
         jerseyNumber: jerseyNumber ? Number(jerseyNumber) : null,
-      };
+      });
 
-      const response = await registerUser(payload);
-
-      Alert.alert("Success", typeof response === "string" ? response : "Registered!");
-      navigation.navigate("Login");
-    } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.message || "Registration failed");
+      Alert.alert("Success", "Profile updated");
+      navigation.goBack();
+    } catch {
+      Alert.alert("Error", "Update failed");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
@@ -125,21 +128,17 @@ const RegisterScreen = ({ navigation }: Props) => {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView contentContainerStyle={styles.container}>
-        {/* LOGO */}
-        <Image source={require("../../assets/logo.png")} style={styles.logo} />
+        
+        <Text style={styles.title}>Edit Profile</Text>
 
-        {/* TITLE */}
-        <Text style={styles.title}>Join Gotham Cricket Club</Text>
-        <Text style={styles.subtitle}>Register and wait for approval</Text>
-
-        {/* FORM CARD */}
         <View style={styles.card}>
           {/* NAME */}
           <TextInput style={styles.input} placeholder="First Name" value={firstName} onChangeText={setFirstName} />
           <TextInput style={styles.input} placeholder="Last Name" value={lastName} onChangeText={setLastName} />
 
-          {/* NICKNAME */}
+          {/* BASIC */}
           <TextInput style={styles.input} placeholder="Nickname" value={nickname} onChangeText={setNickname} />
+          <TextInput style={styles.input} placeholder="Phone" value={phone} onChangeText={setPhone} />
 
           {/* DOB */}
           <TouchableOpacity style={styles.input} onPress={openDobPicker}>
@@ -164,30 +163,22 @@ const RegisterScreen = ({ navigation }: Props) => {
             ))}
           </View>
 
-          {/* EMAIL + PHONE */}
-          <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} />
-          <TextInput style={styles.input} placeholder="Phone" value={phone} onChangeText={setPhone} />
-
-          {/* PASSWORD */}
-          <TextInput style={styles.input} placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
-          <TextInput style={styles.input} placeholder="Confirm Password" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
-
           {/* CRICKET */}
           <TextInput style={styles.input} placeholder="Batting Style" value={battingStyle} onChangeText={setBattingStyle} />
           <TextInput style={styles.input} placeholder="Bowling Style" value={bowlingStyle} onChangeText={setBowlingStyle} />
           <TextInput style={styles.input} placeholder="Player Type" value={playerType} onChangeText={setPlayerType} />
           <TextInput style={styles.input} placeholder="Jersey Number" value={jerseyNumber} onChangeText={setJerseyNumber} />
 
-          {/* BUTTON */}
-          <TouchableOpacity style={styles.button} onPress={handleRegister}>
-            <Text style={styles.buttonText}>
-              {submitting ? "Registering..." : "Register"}
+          {/* SAVE BUTTON */}
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
+            <Text style={styles.saveText}>
+              {saving ? "Saving..." : "Save Changes"}
             </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
-      {/* DOB MODAL — FIXED */}
+      {/* DOB MODAL */}
       <Modal visible={showDobPicker} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -197,9 +188,8 @@ const RegisterScreen = ({ navigation }: Props) => {
               value={tempDob}
               mode="date"
               display="spinner"
-              textColor="#000000"
+              textColor="#000"
               maximumDate={new Date()}
-              style={styles.datePicker}
               onChange={(e, d) => d && setTempDob(d)}
             />
 
@@ -208,7 +198,7 @@ const RegisterScreen = ({ navigation }: Props) => {
                 <Text>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.doneBtn} onPress={handleSaveDob}>
+              <TouchableOpacity style={styles.doneBtn} onPress={saveDob}>
                 <Text style={{ color: "#2b0540", fontWeight: "700" }}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -219,16 +209,25 @@ const RegisterScreen = ({ navigation }: Props) => {
   );
 };
 
-export default RegisterScreen;
+export default EditProfileScreen;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#2b0540" },
   container: { padding: 20 },
-  logo: { width: 110, height: 110, alignSelf: "center" },
-  title: { color: "#fff", fontSize: 26, textAlign: "center", fontWeight: "700" },
-  subtitle: { color: "#da9306", textAlign: "center", marginBottom: 20 },
 
-  card: { backgroundColor: "#fff", borderRadius: 20, padding: 16 },
+  title: {
+    color: "#fff",
+    fontSize: 26,
+    textAlign: "center",
+    fontWeight: "700",
+    marginBottom: 20,
+  },
+
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 16,
+  },
 
   input: {
     borderWidth: 1,
@@ -254,12 +253,13 @@ const styles = StyleSheet.create({
   genderText: { color: "#2b0540" },
   genderTextSelected: { color: "#fff" },
 
-  button: {
+  saveBtn: {
     backgroundColor: "#da9306",
     padding: 14,
     borderRadius: 10,
+    marginTop: 10,
   },
-  buttonText: {
+  saveText: {
     textAlign: "center",
     fontWeight: "700",
     color: "#2b0540",
@@ -277,15 +277,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "700",
     textAlign: "center",
+    fontWeight: "700",
     marginBottom: 10,
-  },
-  datePicker: {
-    width: "100%",
-    height: 200,
-    backgroundColor: "#fff",
   },
   modalActions: { flexDirection: "row", marginTop: 10, gap: 10 },
   cancelBtn: { flex: 1, backgroundColor: "#eee", padding: 12, borderRadius: 10, alignItems: "center" },
