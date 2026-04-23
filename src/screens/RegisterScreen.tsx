@@ -164,8 +164,21 @@ const RegisterScreen = ({ navigation }: Props) => {
             ))}
           </View>
 
-          {/* EMAIL + PHONE */}
-          <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} />
+          {/* EMAIL*/}
+          
+
+<TextInput
+  style={styles.input}
+  placeholder="Email"
+  value={email}
+  onChangeText={setEmail}
+  keyboardType="email-address"
+  autoCapitalize="none"
+  autoCorrect={false}
+/>
+
+
+  {/* PHONE */}
           <TextInput style={styles.input} placeholder="Phone" value={phone} onChangeText={setPhone} />
 
           {/* PASSWORD */}

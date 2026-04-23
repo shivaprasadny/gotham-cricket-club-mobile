@@ -1,11 +1,11 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
-// Push notification code kept commented because Expo Go can cause issues
 import {
   registerForPushNotificationsAsync,
   savePushTokenToBackend,
 } from "../services/pushNotificationService";
+
 type UserType = {
   id: number;
   fullName: string;
@@ -15,7 +15,7 @@ type UserType = {
 };
 
 /**
- * All auth functions and values available through context
+ * All auth values and functions exposed through context
  */
 type AuthContextType = {
   user: UserType | null;
@@ -27,13 +27,10 @@ type AuthContextType = {
   loading: boolean;
 };
 
-/**
- * Create auth context
- */
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * Provider that wraps the app and exposes auth state
+ * Provider that wraps app and manages auth state
  */
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Logged-in user
@@ -42,11 +39,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // JWT token
   const [token, setToken] = useState<string | null>(null);
 
-  // Global loading during startup
+  // App startup loading state
   const [loading, setLoading] = useState(true);
 
   /**
-   * Load saved auth info once when app starts
+   * Run once on app startup
+   * Restores saved session if available
    */
   useEffect(() => {
     void initializeAuth();
@@ -64,8 +62,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   /**
-   * Load token and user from AsyncStorage
-   * Returns true if user session was restored
+   * Load token + user from AsyncStorage
+   * Returns true if session restored successfully
    */
   const loadUserFromStorage = async (): Promise<boolean> => {
     try {
@@ -78,15 +76,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return true;
       }
 
+      // If either one is missing, clear local state
+      setToken(null);
+      setUser(null);
       return false;
     } catch (error) {
       console.error("Failed to load auth from storage:", error);
+      setToken(null);
+      setUser(null);
       return false;
     }
   };
 
   /**
-   * Save login session after successful email/password login
+   * Save session after successful login
    */
   const login = async (newToken: string, newUser: UserType) => {
     try {
@@ -96,9 +99,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await AsyncStorage.setItem("token", newToken);
       await AsyncStorage.setItem("user", JSON.stringify(newUser));
 
-            /**
-       * Register push token after successful login
-       * This works properly in a development build on a real device
+      /**
+       * Register push notifications after successful login
+       * Safe to keep here for real-device builds
        */
       const pushToken = await registerForPushNotificationsAsync();
       if (pushToken) {
@@ -111,10 +114,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   /**
    * Biometric login:
-   * 1. Check device support
-   * 2. Check biometric is enrolled
-   * 3. Authenticate user
-   * 4. Restore saved session from AsyncStorage
+   * 1. Check hardware
+   * 2. Check enrolled biometrics
+   * 3. Authenticate
+   * 4. Restore saved session
    */
   const biometricLogin = async (): Promise<{
     success: boolean;
@@ -204,7 +207,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 /**
- * Custom hook for using auth context safely
+ * Safe custom hook for auth context usage
  */
 export const useAuth = () => {
   const context = useContext(AuthContext);

@@ -20,26 +20,15 @@ type Props = {
 
 const EditProfileScreen = ({ navigation }: Props) => {
   // =========================
-  // BASIC INFO
+  // STATE
   // =========================
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-
-  // =========================
-  // PROFILE INFO
-  // =========================
   const [nickname, setNickname] = useState("");
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
 
-  // DOB picker state
-  const [showDobPicker, setShowDobPicker] = useState(false);
-  const [tempDob, setTempDob] = useState(new Date(2000, 0, 1));
-
-  // =========================
-  // CRICKET INFO
-  // =========================
   const [battingStyle, setBattingStyle] = useState("");
   const [bowlingStyle, setBowlingStyle] = useState("");
   const [playerType, setPlayerType] = useState("");
@@ -47,8 +36,12 @@ const EditProfileScreen = ({ navigation }: Props) => {
 
   const [saving, setSaving] = useState(false);
 
+  // DOB Picker
+  const [showDobPicker, setShowDobPicker] = useState(false);
+  const [tempDob, setTempDob] = useState(new Date(2000, 0, 1));
+
   // =========================
-  // LOAD PROFILE DATA
+  // LOAD PROFILE
   // =========================
   const loadProfile = async () => {
     try {
@@ -75,15 +68,37 @@ const EditProfileScreen = ({ navigation }: Props) => {
   }, []);
 
   // =========================
-  // DOB HANDLERS
+  // FORMAT DOB (PRETTY)
   // =========================
-  const openDobPicker = () => {
-    if (dateOfBirth) {
-      setTempDob(new Date(dateOfBirth));
+  const formatPrettyDate = (date?: string) => {
+    if (!date) return "Select Date of Birth";
+
+    try {
+      const d = new Date(date);
+      const day = d.getDate();
+
+      const getSuffix = (n: number) => {
+        if (n >= 11 && n <= 13) return "th";
+        switch (n % 10) {
+          case 1: return "st";
+          case 2: return "nd";
+          case 3: return "rd";
+          default: return "th";
+        }
+      };
+
+      const month = d.toLocaleString("en-US", { month: "long" });
+      const year = d.getFullYear();
+
+      return `🎂 ${month} ${day}${getSuffix(day)}, ${year}`;
+    } catch {
+      return date;
     }
-    setShowDobPicker(true);
   };
 
+  // =========================
+  // DOB HANDLER
+  // =========================
   const saveDob = () => {
     const y = tempDob.getFullYear();
     const m = String(tempDob.getMonth() + 1).padStart(2, "0");
@@ -93,8 +108,10 @@ const EditProfileScreen = ({ navigation }: Props) => {
     setShowDobPicker(false);
   };
 
+ 
+
   // =========================
-  // UPDATE PROFILE
+  // SAVE PROFILE
   // =========================
   const handleSave = async () => {
     try {
@@ -122,33 +139,44 @@ const EditProfileScreen = ({ navigation }: Props) => {
     }
   };
 
+  // =========================
+  // UI
+  // =========================
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView contentContainerStyle={styles.container}>
-        
+
+        {/* HEADER */}
         <Text style={styles.title}>Edit Profile</Text>
 
         <View style={styles.card}>
           {/* NAME */}
-          <TextInput style={styles.input} placeholder="First Name" value={firstName} onChangeText={setFirstName} />
-          <TextInput style={styles.input} placeholder="Last Name" value={lastName} onChangeText={setLastName} />
+          <Label text="👤 First Name" />
+          <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} />
+
+          <Label text="👤 Last Name" />
+          <TextInput style={styles.input} value={lastName} onChangeText={setLastName} />
 
           {/* BASIC */}
-          <TextInput style={styles.input} placeholder="Nickname" value={nickname} onChangeText={setNickname} />
-          <TextInput style={styles.input} placeholder="Phone" value={phone} onChangeText={setPhone} />
+          <Label text="😎 Nickname" />
+          <TextInput style={styles.input} value={nickname} onChangeText={setNickname} />
+
+          <Label text="📱 Phone" />
+          <TextInput style={styles.input} value={phone} onChangeText={setPhone} />
 
           {/* DOB */}
-          <TouchableOpacity style={styles.input} onPress={openDobPicker}>
+          <Label text="🎂 Date of Birth" />
+          <TouchableOpacity style={styles.input} onPress={() => setShowDobPicker(true)}>
             <Text style={dateOfBirth ? styles.inputText : styles.placeholder}>
-              {dateOfBirth || "Date of Birth"}
+              {formatPrettyDate(dateOfBirth)}
             </Text>
           </TouchableOpacity>
 
           {/* GENDER */}
-          <Text style={styles.label}>Gender</Text>
+          <Label text="⚧️ Gender" />
           <View style={styles.genderRow}>
             {["Male", "Female", "Other"].map((g) => (
               <TouchableOpacity
@@ -164,10 +192,22 @@ const EditProfileScreen = ({ navigation }: Props) => {
           </View>
 
           {/* CRICKET */}
-          <TextInput style={styles.input} placeholder="Batting Style" value={battingStyle} onChangeText={setBattingStyle} />
-          <TextInput style={styles.input} placeholder="Bowling Style" value={bowlingStyle} onChangeText={setBowlingStyle} />
-          <TextInput style={styles.input} placeholder="Player Type" value={playerType} onChangeText={setPlayerType} />
-          <TextInput style={styles.input} placeholder="Jersey Number" value={jerseyNumber} onChangeText={setJerseyNumber} />
+          <Label text="🏏 Batting Style" />
+          <TextInput style={styles.input} value={battingStyle} onChangeText={setBattingStyle} />
+
+          <Label text="🎯 Bowling Style" />
+          <TextInput style={styles.input} value={bowlingStyle} onChangeText={setBowlingStyle} />
+
+          <Label text="🧢 Player Type" />
+          <TextInput style={styles.input} value={playerType} onChangeText={setPlayerType} />
+
+          <Label text="🔢 Jersey Number" />
+          <TextInput
+            style={styles.input}
+            value={jerseyNumber}
+            onChangeText={setJerseyNumber}
+            keyboardType="numeric"
+          />
 
           {/* SAVE BUTTON */}
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
@@ -182,16 +222,30 @@ const EditProfileScreen = ({ navigation }: Props) => {
       <Modal visible={showDobPicker} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Select Date of Birth</Text>
-
             <DateTimePicker
-              value={tempDob}
-              mode="date"
-              display="spinner"
-              textColor="#000"
-              maximumDate={new Date()}
-              onChange={(e, d) => d && setTempDob(d)}
-            />
+  value={tempDob}
+  mode="date"
+  display={Platform.OS === "ios" ? "spinner" : "default"}
+  maximumDate={new Date()}
+  style={Platform.OS === "ios" ? { height: 200 } : undefined}
+  textColor="#000"
+  onChange={(event, selectedDate) => {
+    if (!selectedDate) return;
+
+    if (Platform.OS === "android") {
+      // Android → save instantly
+      const y = selectedDate.getFullYear();
+      const m = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const d = String(selectedDate.getDate()).padStart(2, "0");
+
+      setDateOfBirth(`${y}-${m}-${d}`);
+      setShowDobPicker(false);
+    } else {
+      // iOS → only update temp
+      setTempDob(selectedDate);
+    }
+  }}
+/>
 
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowDobPicker(false)}>
@@ -199,7 +253,7 @@ const EditProfileScreen = ({ navigation }: Props) => {
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.doneBtn} onPress={saveDob}>
-                <Text style={{ color: "#2b0540", fontWeight: "700" }}>Done</Text>
+                <Text style={{ fontWeight: "700", color: "#2b0540" }}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -211,6 +265,16 @@ const EditProfileScreen = ({ navigation }: Props) => {
 
 export default EditProfileScreen;
 
+// =========================
+// LABEL COMPONENT
+// =========================
+const Label = ({ text }: { text: string }) => (
+  <Text style={styles.label}>{text}</Text>
+);
+
+// =========================
+// STYLES
+// =========================
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#2b0540" },
   container: { padding: 20 },
@@ -226,7 +290,13 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#fff",
     borderRadius: 20,
-    padding: 16,
+    padding: 18,
+  },
+
+  label: {
+    fontWeight: "700",
+    marginBottom: 4,
+    color: "#2b0540",
   },
 
   input: {
@@ -234,15 +304,13 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     padding: 12,
     borderRadius: 10,
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   inputText: { color: "#111" },
   placeholder: { color: "#888" },
 
-  label: { fontWeight: "700", marginBottom: 6 },
-
-  genderRow: { flexDirection: "row", marginBottom: 12 },
+  genderRow: { flexDirection: "row", marginBottom: 14 },
   genderChip: {
     padding: 10,
     borderRadius: 20,
@@ -259,6 +327,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginTop: 10,
   },
+
   saveText: {
     textAlign: "center",
     fontWeight: "700",
@@ -271,17 +340,33 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 20,
   },
+
+
+  modalActions: {
+    flexDirection: "row",
+    marginTop: 10,
+    gap: 10,
+  },
+
+  cancelBtn: {
+    flex: 1,
+    backgroundColor: "#eee",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+
+  doneBtn: {
+    flex: 1,
+    backgroundColor: "#da9306",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
   modalCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-  },
-  modalTitle: {
-    textAlign: "center",
-    fontWeight: "700",
-    marginBottom: 10,
-  },
-  modalActions: { flexDirection: "row", marginTop: 10, gap: 10 },
-  cancelBtn: { flex: 1, backgroundColor: "#eee", padding: 12, borderRadius: 10, alignItems: "center" },
-  doneBtn: { flex: 1, backgroundColor: "#da9306", padding: 12, borderRadius: 10, alignItems: "center" },
+  backgroundColor: "#fff",
+  borderRadius: 16,
+  padding: 16,
+  minHeight: 300, // ⭐ IMPORTANT (prevents collapse)
+},
 });
