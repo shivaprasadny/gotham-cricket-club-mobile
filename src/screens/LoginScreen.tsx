@@ -63,38 +63,38 @@ const LoginScreen = ({ navigation }: Props) => {
       role: response.role,
       status: response.status,
     });
-  } catch (error: any) {
-    console.log("LOGIN ERROR MESSAGE:", error?.message);
-    console.log("LOGIN ERROR CODE:", error?.code);
-    console.log("LOGIN ERROR STATUS:", error?.response?.status);
+  } 
+  
+  catch (error: any) {
+  const debugMessage =
+    `message: ${error?.message}\n` +
+    `code: ${error?.code}\n` +
+    `status: ${error?.response?.status}\n` +
+    `data: ${JSON.stringify(error?.response?.data)}`;
 
-    const status = error?.response?.status;
-    const message = error?.message || "";
+  Alert.alert("Login Debug", debugMessage);
 
-    if (
-      !error?.response ||
-      error?.code === "ERR_NETWORK" ||
-      error?.code === "ECONNABORTED" ||
-      message.includes("Network Error")
-    ) {
-      Alert.alert(
-        "No Internet",
-        "Please check your internet connection or make sure the server is running."
-      );
-      return;
-    }
-
-    if (status === 401 || status === 403) {
-      Alert.alert("Login Failed", "Wrong email or password");
-      return;
-    }
-
+  if (!error.response) {
     Alert.alert(
-      "Error",
-      error?.response?.data?.message ||
-        "Something went wrong. Please try again."
+      "No Internet",
+      "Please check your internet connection or make sure the server is running."
     );
-  } finally {
+    return;
+  }
+
+  if (error.response.status === 401 || error.response.status === 403) {
+    Alert.alert("Login Failed", "Wrong email or password");
+    return;
+  }
+
+  Alert.alert(
+    "Error",
+    error?.response?.data?.message ||
+      `Server error (${error.response.status})`
+  );
+}
+  
+  finally {
     setSubmitting(false);
   }
 };
