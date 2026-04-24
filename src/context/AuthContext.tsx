@@ -1,10 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
-import {
-  registerForPushNotificationsAsync,
-  savePushTokenToBackend,
-} from "../services/pushNotificationService";
+// import {
+//   registerForPushNotificationsAsync,
+//   savePushTokenToBackend,
+// } from "../services/pushNotificationService";
 
 type UserType = {
   id: number;
@@ -103,10 +103,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
        * Register push notifications after successful login
        * Safe to keep here for real-device builds
        */
-      const pushToken = await registerForPushNotificationsAsync();
-      if (pushToken) {
-        await savePushTokenToBackend(pushToken);
-      }
+      // const pushToken = await registerForPushNotificationsAsync();
+      // if (pushToken) {
+      //   await savePushTokenToBackend(pushToken);
+      // }
     } catch (error) {
       console.error("Error saving auth data:", error);
     }

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "gotham-cricket-mobile",
+    "name": "Gotham Cricket",
     "slug": "gotham-cricket-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,7 +13,11 @@
       "backgroundColor": "#2b0540"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.shivaprasadnyc.gothamcricketmobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +25,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.shivaprasadnyc.gothamcricketmobile"
     },
     "web": {
       "favicon": "./assets/logo.png"
@@ -32,8 +37,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "YOUR-EAS-PROJECT-ID"
+        "projectId": "cc31b874-cd6f-4142-93e6-519164925364"
       }
-    }
+    },
+    "owner": "shivaprasadnyc"
   }
 }
