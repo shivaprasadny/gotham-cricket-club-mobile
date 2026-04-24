@@ -182,8 +182,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setToken(null);
       setUser(null);
 
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("user");
+      // await AsyncStorage.removeItem("token");
+      // await AsyncStorage.removeItem("user");
     } catch (error) {
       console.error("Error clearing auth data:", error);
     }

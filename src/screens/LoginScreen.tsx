@@ -20,67 +20,101 @@ type Props = {
 const LoginScreen = ({ navigation }: Props) => {
   const { login, biometricLogin } = useAuth();
 
-  // Email input state
+  // =========================
+  // INPUT STATE
+  // =========================
   const [email, setEmail] = useState("");
-
-  // Password input state
   const [password, setPassword] = useState("");
 
-  // Show/hide password toggle
+  // Show/hide password
   const [showPassword, setShowPassword] = useState(false);
 
   // Loading states
   const [submitting, setSubmitting] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
 
-  // Handle normal email/password login
+  // =========================
+  // NORMAL LOGIN
+  // =========================
   const handleLogin = async () => {
-    if (!email.trim()) {
-      Alert.alert("Error", "Please enter email");
-      return;
-    }
+  // Basic validation
+  if (!email.trim()) {
+    Alert.alert("Error", "Please enter email");
+    return;
+  }
 
-    if (!password.trim()) {
-      Alert.alert("Error", "Please enter password");
-      return;
-    }
+  if (!password.trim()) {
+    Alert.alert("Error", "Please enter password");
+    return;
+  }
 
-    try {
-      setSubmitting(true);
+  try {
+    setSubmitting(true);
 
-      const response = await loginUser({
-        email: email.trim(),
-        password: password.trim(),
-      });
+    const response = await loginUser({
+      email: email.trim(),
+      password: password.trim(),
+    });
 
-      // Save session and user data in auth context
-      await login(response.token, {
-        id: response.id,
-        fullName: response.fullName,
-        email: response.email,
-        role: response.role,
-        status: response.status,
-      });
-    } catch (error: any) {
+    await login(response.token, {
+      id: response.id,
+      fullName: response.fullName,
+      email: response.email,
+      role: response.role,
+      status: response.status,
+    });
+  } catch (error: any) {
+    console.log("LOGIN ERROR MESSAGE:", error?.message);
+    console.log("LOGIN ERROR CODE:", error?.code);
+    console.log("LOGIN ERROR STATUS:", error?.response?.status);
+
+    const status = error?.response?.status;
+    const message = error?.message || "";
+
+    if (
+      !error?.response ||
+      error?.code === "ERR_NETWORK" ||
+      error?.code === "ECONNABORTED" ||
+      message.includes("Network Error")
+    ) {
       Alert.alert(
-        "Login Failed",
-        error?.response?.data?.message || "Invalid email or password"
+        "No Internet",
+        "Please check your internet connection or make sure the server is running."
       );
-    } finally {
-      setSubmitting(false);
+      return;
     }
-  };
 
-  // Handle biometric login
+    if (status === 401 || status === 403) {
+      Alert.alert("Login Failed", "Wrong email or password");
+      return;
+    }
+
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message ||
+        "Something went wrong. Please try again."
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+  // =========================
+  // BIOMETRIC LOGIN
+  // =========================
   const handleBiometricLogin = async () => {
     try {
       setBiometricLoading(true);
 
       const result = await biometricLogin();
 
+      // 🔹 If biometric fails, show message
       if (!result.success) {
         Alert.alert("Biometric Login", result.message || "Login failed");
       }
+
+      // 🔹 If success → AuthContext automatically logs in
+
     } catch (error) {
       Alert.alert("Error", "Biometric login failed");
     } finally {

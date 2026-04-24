@@ -19,15 +19,16 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.shivaprasadnyc.gothamcricketmobile"
-    },
+  "android": {
+  "usesCleartextTraffic": true,
+  "adaptiveIcon": {
+    "foregroundImage": "./assets/logo.png",
+    "backgroundColor": "#ffffff"
+  },
+  "edgeToEdgeEnabled": true,
+  "predictiveBackGestureEnabled": false,
+  "package": "com.shivaprasadnyc.gothamcricketmobile"
+},
     "web": {
       "favicon": "./assets/logo.png"
     },
