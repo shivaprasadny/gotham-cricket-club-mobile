@@ -19,23 +19,31 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-  "android": {
-  "usesCleartextTraffic": true,
-  "adaptiveIcon": {
-    "foregroundImage": "./assets/logo.png",
-    "backgroundColor": "#ffffff"
-  },
-  "edgeToEdgeEnabled": true,
-  "predictiveBackGestureEnabled": false,
-  "package": "com.shivaprasadnyc.gothamcricketmobile"
-},
+    "android": {
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.shivaprasadnyc.gothamcricketmobile"
+    },
     "web": {
       "favicon": "./assets/logo.png"
     },
     "plugins": [
-      "@react-native-community/datetimepicker",
-      "expo-notifications"
-    ],
+  "@react-native-community/datetimepicker",
+  "expo-notifications",
+  [
+    "expo-build-properties",
+    {
+      "android": {
+        "usesCleartextTraffic": true
+      }
+    }
+  ]
+],
     "extra": {
       "eas": {
         "projectId": "cc31b874-cd6f-4142-93e6-519164925364"

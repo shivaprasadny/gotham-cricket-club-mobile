@@ -50,10 +50,7 @@ const LoginScreen = ({ navigation }: Props) => {
 
   try {
     setSubmitting(true);
-
-
-
-    Alert.alert("API Test", "Login is using latest APK code");
+    
     const response = await loginUser({
       email: email.trim(),
       password: password.trim(),
