@@ -177,7 +177,7 @@ const EventsScreen = ({ navigation }: Props) => {
       data={filteredEvents}
       keyExtractor={(item) => item.id.toString()}
       renderItem={renderItem}
-      contentContainerStyle={filteredEvents.length === 0 ? styles.center : styles.list}
+      contentContainerStyle={styles.list}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -249,7 +249,19 @@ const EventsScreen = ({ navigation }: Props) => {
     )}
   </View>
 }
-      ListEmptyComponent={<Text style={styles.emptyText}>No events found.</Text>}
+      ListEmptyComponent={
+  <View style={styles.emptyCard}>
+    <Ionicons name="calendar-outline" size={34} color="#da9306" />
+    <Text style={styles.emptyTitle}>No events found</Text>
+    <Text style={styles.emptySubText}>
+      {eventFilter === "UPCOMING"
+        ? "No upcoming events yet."
+        : eventFilter === "PAST"
+        ? "No past events found."
+        : "No events have been created yet."}
+    </Text>
+  </View>
+}
     />
   );
 };
@@ -338,33 +350,61 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
   },
-  filterRow: {
+
+
+
+filterRow: {
   flexDirection: "row",
   gap: 8,
-  marginBottom: 16,
+  marginBottom: 10,
+  backgroundColor: "#3a0a57",
+  padding: 6,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: "#4d1670",
 },
 
 filterBtn: {
   flex: 1,
-  backgroundColor: "#fff",
-  borderWidth: 1,
-  borderColor: "#d9d2e1",
   borderRadius: 10,
   paddingVertical: 10,
 },
 
 filterBtnSelected: {
   backgroundColor: "#da9306",
-  borderColor: "#da9306",
 },
 
 filterBtnText: {
   textAlign: "center",
-  fontWeight: "700",
-  color: "#2b0540",
+  fontWeight: "800",
+  color: "#ddd",
 },
 
 filterBtnTextSelected: {
   color: "#2b0540",
+},
+
+emptyCard: {
+  backgroundColor: "#3a0a57",
+  borderRadius: 18,
+  padding: 22,
+  alignItems: "center",
+  marginTop: 16,
+  borderWidth: 1,
+  borderColor: "#4d1670",
+},
+
+emptyTitle: {
+  color: "#fff",
+  fontSize: 18,
+  fontWeight: "800",
+  marginTop: 10,
+},
+
+emptySubText: {
+  color: "#ddd",
+  marginTop: 6,
+  textAlign: "center",
+  fontWeight: "600",
 },
 });

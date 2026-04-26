@@ -13,7 +13,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { deleteTeam, getTeams } from "../services/teamService";
 import { useFocusEffect } from "@react-navigation/native";
-
+import { useLayoutEffect } from "react";
 type Props = {
   navigation: any;
 };
@@ -60,6 +60,22 @@ const TeamsScreen = ({ navigation }: Props) => {
       setRefreshing(false);
     }
   };
+
+useLayoutEffect(() => {
+  navigation.setOptions({
+    headerLeft: () => (
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={{ marginLeft: 12 }}
+      >
+        <Text style={{ fontSize: 16, color: "#2b0540", fontWeight: "700" }}>
+          ← Back
+        </Text>
+      </TouchableOpacity>
+    ),
+    title: "Teams",
+  });
+}, [navigation]);
 
   // Reload on focus
   useFocusEffect(
@@ -177,77 +193,113 @@ const TeamsScreen = ({ navigation }: Props) => {
     );
   }
 
-  return (
-    <FlatList
-      data={teams}
-      keyExtractor={(item) => item.id.toString()}
-      renderItem={renderItem}
-      contentContainerStyle={
-        teams.length === 0 ? styles.center : styles.container
-      }
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-      // Admin only create team
-      ListHeaderComponent={
-        canManageTeamInfo ? (
-          <TouchableOpacity
-            style={styles.createBtn}
-            onPress={() => navigation.navigate("CreateTeam")}
-          >
-            <Text style={styles.createBtnText}>Create Team</Text>
-          </TouchableOpacity>
-        ) : null
-      }
-      ListEmptyComponent={
-        <Text style={styles.emptyText}>No teams found.</Text>
-      }
-    />
-  );
-};
+ return (
+  <FlatList
+    data={teams}
+    keyExtractor={(item) => item.id.toString()}
+    renderItem={renderItem}
+    contentContainerStyle={
+      teams.length === 0 ? styles.center : styles.container
+    }
+    refreshControl={
+      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+    }
+   ListHeaderComponent={
+  canManageTeamInfo ? (
+    <TouchableOpacity
+      style={styles.createBtn}
+      onPress={() => navigation.navigate("CreateTeam")}
+    >
+      <Text style={styles.createBtnText}>Create Team</Text>
+    </TouchableOpacity>
+  ) : null
+}
+    ListEmptyComponent={
+      <Text style={styles.emptyText}>No teams found.</Text>
+    }
+  />
+);
+}
 
 export default TeamsScreen;
 
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    backgroundColor: "#f8f5fb",
+    backgroundColor: "#2b0540",
+  },
+
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#2b0540",
+    padding: 20,
+  },
+
+  loadingText: {
+    marginTop: 10,
+    color: "#fff",
+    fontWeight: "700",
+  },
+
+  emptyText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  createBtn: {
+    backgroundColor: "#da9306",
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  createBtnText: {
+    color: "#2b0540",
+    textAlign: "center",
+    fontWeight: "800",
+    fontSize: 16,
   },
 
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#3a0a57",
+    borderRadius: 18,
     padding: 16,
-    borderRadius: 14,
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: "#4d1670",
   },
 
   teamLogo: {
-    width: 60,
-    height: 60,
+    width: 64,
+    height: 64,
     resizeMode: "contain",
     alignSelf: "center",
     marginBottom: 10,
   },
 
   title: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 20,
+    fontWeight: "800",
     marginBottom: 8,
-    color: "#2b0540",
+    color: "#fff",
     textAlign: "center",
   },
 
   detailText: {
-    color: "#374151",
-    marginBottom: 4,
+    color: "#ddd",
+    marginBottom: 6,
     fontWeight: "500",
+    lineHeight: 20,
   },
 
   viewOnlyText: {
     marginTop: 10,
-    color: "#6b7280",
+    color: "#ddd",
     fontWeight: "600",
     fontSize: 12,
   },
@@ -262,59 +314,26 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 12,
+    marginTop: 14,
   },
 
   actionBtn: {
     flex: 1,
+    borderRadius: 10,
     paddingVertical: 10,
-    borderRadius: 8,
   },
 
   editBtn: {
-    backgroundColor: "#111",
+    backgroundColor: "#da9306",
   },
 
   deleteBtn: {
-    backgroundColor: "#c0392b",
+    backgroundColor: "#b91c1c",
   },
 
   actionText: {
     color: "#fff",
     textAlign: "center",
     fontWeight: "700",
-  },
-
-  createBtn: {
-    backgroundColor: "#2b0540",
-    paddingVertical: 14,
-    borderRadius: 10,
-    marginBottom: 16,
-  },
-
-  createBtnText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "700",
-  },
-
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f8f5fb",
-    padding: 20,
-  },
-
-  loadingText: {
-    marginTop: 10,
-    color: "#2b0540",
-    fontWeight: "700",
-  },
-
-  emptyText: {
-    color: "#6b7280",
-    fontSize: 15,
-    fontWeight: "600",
   },
 });

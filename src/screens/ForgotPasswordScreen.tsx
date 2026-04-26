@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   Alert,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,6 +10,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import {
@@ -21,17 +23,23 @@ type Props = {
 };
 
 const ForgotPasswordScreen = ({ navigation }: Props) => {
-  // Form fields
+  // =========================
+  // FORM FIELD STATE
+  // =========================
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Loading states
+  // =========================
+  // LOADING STATES
+  // =========================
   const [sendingCode, setSendingCode] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  // Request reset code
+  // =========================
+  // SEND RESET CODE
+  // =========================
   const handleSendCode = async () => {
     if (!email.trim()) {
       Alert.alert("Error", "Please enter your email");
@@ -60,32 +68,35 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
     }
   };
 
-  // Reset password using email + code + new password
+  // =========================
+  // RESET PASSWORD
+  // =========================
   const handleResetPassword = async () => {
     if (!email.trim()) {
-  Alert.alert("Error", "Please enter your email");
-  return;
-}
+      Alert.alert("Error", "Please enter your email");
+      return;
+    }
 
-if (!code.trim()) {
-  Alert.alert("Error", "Please enter reset code");
-  return;
-}
+    if (!code.trim()) {
+      Alert.alert("Error", "Please enter reset code");
+      return;
+    }
 
-if (!newPassword.trim()) {
-  Alert.alert("Error", "Please enter new password");
-  return;
-}
+    if (!newPassword.trim()) {
+      Alert.alert("Error", "Please enter new password");
+      return;
+    }
 
-if (!confirmPassword.trim()) {
-  Alert.alert("Error", "Please confirm your password");
-  return;
-}
+    if (!confirmPassword.trim()) {
+      Alert.alert("Error", "Please confirm your password");
+      return;
+    }
 
-if (newPassword.trim() !== confirmPassword.trim()) {
-  Alert.alert("Error", "Passwords do not match");
-  return;
-}
+    if (newPassword.trim() !== confirmPassword.trim()) {
+      Alert.alert("Error", "Passwords do not match");
+      return;
+    }
+
     try {
       setResetting(true);
 
@@ -113,112 +124,130 @@ if (newPassword.trim() !== confirmPassword.trim()) {
     }
   };
 
-  return (
-    // KeyboardAvoidingView helps keep fields visible above keyboard
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      {/* ScrollView keeps form usable on smaller screens */}
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Club logo */}
-        <Image
-          source={require("../../assets/logo.png")}
-          style={styles.logo}
-        />
-
-        {/* Heading */}
-        <Text style={styles.title}>Reset Password</Text>
-        <Text style={styles.subtitle}>
-          Request a code and set a new password
-        </Text>
-
-        {/* Reset form card */}
-        <View style={styles.card}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#7a7a7a"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-
-          {/* Send reset code button */}
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={handleSendCode}
-            disabled={sendingCode}
-          >
-            <Text style={styles.secondaryButtonText}>
-              {sendingCode ? "Sending..." : "Send Reset Code"}
-            </Text>
-          </TouchableOpacity>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Reset Code"
-            placeholderTextColor="#7a7a7a"
-            value={code}
-            onChangeText={setCode}
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="New Password"
-            placeholderTextColor="#7a7a7a"
-            value={newPassword}
-            onChangeText={setNewPassword}
-            secureTextEntry
-          />
-
-          <TextInput
-  style={styles.input}
-  placeholder="Confirm Password"
-  placeholderTextColor="#7a7a7a"
-  value={confirmPassword}
-  onChangeText={setConfirmPassword}
-  secureTextEntry
-/>
-
-          {/* Reset password button */}
-         <TouchableOpacity
-  style={[
-    styles.primaryButton,
-    (resetting ||
-      !email.trim() ||
-      !code.trim() ||
-      !newPassword.trim() ||
-      !confirmPassword.trim()) && styles.buttonDisabled
-  ]}
-  onPress={handleResetPassword}
-  disabled={
+  // =========================
+  // DISABLE RESET BUTTON CHECK
+  // =========================
+  const isResetDisabled =
     resetting ||
     !email.trim() ||
     !code.trim() ||
     !newPassword.trim() ||
-    !confirmPassword.trim()
-  }
->
-  <Text style={styles.primaryButtonText}>
-    {resetting ? "Resetting..." : "Reset Password"}
-  </Text>
-</TouchableOpacity>
+    !confirmPassword.trim();
 
-          {/* Back to login link */}
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate("Login")}
-          >
-            <Text style={styles.linkText}>Back to Login</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+  // =========================
+  // UI
+  // =========================
+  return (
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 20}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Club logo */}
+          <Image source={require("../../assets/logo.png")} style={styles.logo} />
+
+          {/* Heading */}
+          <Text style={styles.title}>Reset Password</Text>
+          <Text style={styles.subtitle}>
+            Request a code and set a new password
+          </Text>
+
+          {/* Reset form card */}
+          <View style={styles.card}>
+            {/* Email input */}
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              placeholderTextColor="#7a7a7a"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
+            />
+
+            {/* Send reset code button */}
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleSendCode}
+              disabled={sendingCode}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {sendingCode ? "Sending..." : "Send Reset Code"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Reset code input */}
+            <TextInput
+              style={styles.input}
+              placeholder="Reset Code"
+              placeholderTextColor="#7a7a7a"
+              value={code}
+              onChangeText={setCode}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            {/* New password input */}
+            <TextInput
+              style={styles.input}
+              placeholder="New Password"
+              placeholderTextColor="#7a7a7a"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="newPassword"
+              autoComplete="new-password"
+            />
+
+            {/* Confirm password input */}
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#7a7a7a"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="newPassword"
+              autoComplete="new-password"
+            />
+
+            {/* Reset password button */}
+            <TouchableOpacity
+              style={[
+                styles.primaryButton,
+                isResetDisabled && styles.buttonDisabled,
+              ]}
+              onPress={handleResetPassword}
+              disabled={isResetDisabled}
+            >
+              <Text style={styles.primaryButtonText}>
+                {resetting ? "Resetting..." : "Reset Password"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Back to login link */}
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => navigation.navigate("Login")}
+            >
+              <Text style={styles.linkText}>Back to Login</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 };
@@ -232,12 +261,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#2b0540",
   },
 
-  // Scroll container
+  // Scroll container - extra bottom padding keeps button above keyboard
   container: {
     flexGrow: 1,
     padding: 20,
     justifyContent: "center",
-    paddingBottom: 40,
+    paddingBottom: 140,
+    backgroundColor: "#2b0540",
   },
 
   // Club logo
@@ -287,7 +317,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fafafa",
   },
 
-  // Primary action button
+  // Primary reset button
   primaryButton: {
     backgroundColor: "#da9306",
     paddingVertical: 14,
@@ -295,6 +325,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+  // Primary reset button text
   primaryButtonText: {
     color: "#2b0540",
     fontWeight: "700",
@@ -302,7 +333,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // Secondary action button
+  // Send code button
   secondaryButton: {
     backgroundColor: "#2b0540",
     paddingVertical: 14,
@@ -310,6 +341,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  // Send code button text
   secondaryButtonText: {
     color: "#fff",
     fontWeight: "700",
@@ -317,17 +349,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 
-  // Bottom link button
+  // Back/login link wrapper
   linkButton: {
     marginTop: 14,
   },
 
+  // Back/login link text
   linkText: {
     color: "#2b0540",
     textAlign: "center",
     fontWeight: "600",
   },
+
+  // Disabled button style
   buttonDisabled: {
-  opacity: 0.5,
-},
+    opacity: 0.5,
+  },
 });

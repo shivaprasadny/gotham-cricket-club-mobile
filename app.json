@@ -39,7 +39,8 @@
     "expo-build-properties",
     {
       "android": {
-        "usesCleartextTraffic": true
+        "usesCleartextTraffic": true,
+         "softwareKeyboardLayoutMode": "resize"
       }
     }
   ]

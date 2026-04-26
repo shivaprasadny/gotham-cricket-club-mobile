@@ -95,7 +95,13 @@ const AppNavigator = () => {
 <Stack.Screen name="FeeDetails" component={FeeDetailsScreen} /> 
 <Stack.Screen name="EditFee" component={EditFeeScreen} />
 <Stack.Screen name="EditEvent" component={EditEventScreen} />
-<Stack.Screen name="Teams" component={TeamsScreen} />
+<Stack.Screen
+  name="Teams"
+  component={TeamsScreen}
+  options={{
+    headerShown: true, // ✅ must be true
+  }}
+/>
 <Stack.Screen name="Members" component={MembersScreen} />
 <Stack.Screen name="EditProfile" component={EditProfileScreen} />
 

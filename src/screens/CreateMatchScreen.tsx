@@ -12,10 +12,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+
 import { createMatch } from "../services/matchService";
 import { getTeams } from "../services/teamService";
 import { getLeagues } from "../services/leagueService";
+// 👇 IMPORTANT: add DateTimePickerAndroid
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
+import { Keyboard, TouchableWithoutFeedback } from "react-native";
 
 type Props = {
   navigation: any;
@@ -117,7 +122,8 @@ const CreateMatchScreen = ({ navigation }: Props) => {
   const [tempMatchFeeDueDate, setTempMatchFeeDueDate] = useState<Date>(
     new Date()
   );
-
+const [pickerTarget, setPickerTarget] = useState<"MATCH" | "FEE" | null>(null);
+const [pickerMode, setPickerMode] = useState<"date" | "time">("date");
   const [showMatchFeeDueDatePicker, setShowMatchFeeDueDatePicker] =
     useState(false);
 
@@ -257,6 +263,48 @@ const CreateMatchScreen = ({ navigation }: Props) => {
       setSubmitting(false);
     }
   };
+  // =========================
+// ANDROID SAFE DATE PICKER
+// =========================
+
+// Reusable function to open Date + Time picker (Android only)
+const openAndroidDateTimePicker = (
+  currentDate: Date | null,
+  onFinalDate: (date: Date) => void
+) => {
+  const baseDate = currentDate || new Date();
+
+  // STEP 1: Pick DATE
+  DateTimePickerAndroid.open({
+    value: baseDate,
+    mode: "date",
+    is24Hour: false,
+    onChange: (event, selectedDate) => {
+      // If user cancels → do nothing
+      if (event.type !== "set" || !selectedDate) return;
+
+      // STEP 2: Pick TIME
+      DateTimePickerAndroid.open({
+        value: selectedDate,
+        mode: "time",
+        is24Hour: false,
+        onChange: (timeEvent, selectedTime) => {
+          if (timeEvent.type !== "set" || !selectedTime) return;
+
+          // Combine date + time
+          const finalDate = new Date(selectedDate);
+          finalDate.setHours(selectedTime.getHours());
+          finalDate.setMinutes(selectedTime.getMinutes());
+          finalDate.setSeconds(0);
+          finalDate.setMilliseconds(0);
+
+          // Send back final value
+          onFinalDate(finalDate);
+        },
+      });
+    },
+  });
+};
 
   return (
     <>
@@ -267,7 +315,8 @@ const CreateMatchScreen = ({ navigation }: Props) => {
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
       >
         {/* ScrollView lets user scroll when keyboard is open */}
-        <ScrollView
+       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+  <ScrollView
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -408,10 +457,14 @@ const CreateMatchScreen = ({ navigation }: Props) => {
           <Text style={styles.label}>Match Date & Time</Text>
           <TouchableOpacity
             style={styles.selectInput}
-            onPress={() => {
-              setTempMatchDate(matchDate || new Date());
-              setShowDatePicker(true);
-            }}
+          onPress={() => {
+  if (Platform.OS === "android") {
+    openAndroidDateTimePicker(matchDate, setMatchDate);
+  } else {
+    setTempMatchDate(matchDate || new Date());
+    setShowDatePicker(true);
+  }
+}}
           >
             <Text style={styles.selectInputText}>
               {matchDate
@@ -420,46 +473,42 @@ const CreateMatchScreen = ({ navigation }: Props) => {
             </Text>
           </TouchableOpacity>
 
-          {showDatePicker && (
-            <View style={styles.inlinePickerCard}>
-              <DateTimePicker
-                value={tempMatchDate}
-                mode="datetime"
-                display={Platform.OS === "ios" ? "inline" : "default"}
-                onChange={(event, selectedDate) => {
-                  if (selectedDate) {
-                    setTempMatchDate(selectedDate);
-                  }
 
-                  if (Platform.OS !== "ios" && selectedDate) {
-                    setMatchDate(selectedDate);
-                    setShowDatePicker(false);
-                  }
-                }}
-              />
 
-              {Platform.OS === "ios" && (
-                <View style={styles.pickerButtonsRow}>
-                  <TouchableOpacity
-                    style={styles.cancelBtn}
-                    onPress={() => setShowDatePicker(false)}
-                  >
-                    <Text style={styles.cancelText}>Cancel</Text>
-                  </TouchableOpacity>
+{/* ================= iOS ONLY PICKER ================= */}
+{Platform.OS === "ios" && showDatePicker && (
+  <View style={styles.inlinePickerCard}>
+    <DateTimePicker
+      value={tempMatchDate}
+      mode="datetime"
+      display="inline"
+      onChange={(event, selectedDate) => {
+        if (selectedDate) {
+          setTempMatchDate(selectedDate);
+        }
+      }}
+    />
 
-                  <TouchableOpacity
-                    style={styles.confirmBtn}
-                    onPress={() => {
-                      setMatchDate(tempMatchDate);
-                      setShowDatePicker(false);
-                    }}
-                  >
-                    <Text style={styles.confirmText}>Confirm</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          )}
+    <View style={styles.pickerButtonsRow}>
+      <TouchableOpacity
+        style={styles.cancelBtn}
+        onPress={() => setShowDatePicker(false)}
+      >
+        <Text style={styles.cancelText}>Cancel</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.confirmBtn}
+        onPress={() => {
+          setMatchDate(tempMatchDate);
+          setShowDatePicker(false);
+        }}
+      >
+        <Text style={styles.confirmText}>Confirm</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
 
           <Text style={styles.label}>Venue</Text>
           <TextInput
@@ -484,9 +533,13 @@ const CreateMatchScreen = ({ navigation }: Props) => {
           <TouchableOpacity
             style={styles.input}
             onPress={() => {
-              setTempMatchFeeDueDate(matchFeeDueDate || new Date());
-              setShowMatchFeeDueDatePicker(true);
-            }}
+  if (Platform.OS === "android") {
+    openAndroidDateTimePicker(matchFeeDueDate, setMatchFeeDueDate);
+  } else {
+    setTempMatchFeeDueDate(matchFeeDueDate || new Date());
+    setShowMatchFeeDueDatePicker(true);
+  }
+}}
           >
             <Text style={styles.inputText}>
               {matchFeeDueDate
@@ -495,46 +548,39 @@ const CreateMatchScreen = ({ navigation }: Props) => {
             </Text>
           </TouchableOpacity>
 
-          {showMatchFeeDueDatePicker && (
-            <View style={styles.inlinePickerCard}>
-              <DateTimePicker
-                value={tempMatchFeeDueDate}
-                mode="datetime"
-                display={Platform.OS === "ios" ? "inline" : "default"}
-                onChange={(event, selectedDate) => {
-                  if (selectedDate) {
-                    setTempMatchFeeDueDate(selectedDate);
-                  }
+         {Platform.OS === "ios" && showMatchFeeDueDatePicker && (
+  <View style={styles.inlinePickerCard}>
+    <DateTimePicker
+      value={tempMatchFeeDueDate}
+      mode="datetime"
+      display="inline"
+      onChange={(event, selectedDate) => {
+        if (selectedDate) {
+          setTempMatchFeeDueDate(selectedDate);
+        }
+      }}
+    />
 
-                  if (Platform.OS !== "ios" && selectedDate) {
-                    setMatchFeeDueDate(selectedDate);
-                    setShowMatchFeeDueDatePicker(false);
-                  }
-                }}
-              />
+    <View style={styles.pickerButtonsRow}>
+      <TouchableOpacity
+        style={styles.cancelBtn}
+        onPress={() => setShowMatchFeeDueDatePicker(false)}
+      >
+        <Text style={styles.cancelText}>Cancel</Text>
+      </TouchableOpacity>
 
-              {Platform.OS === "ios" && (
-                <View style={styles.pickerButtonsRow}>
-                  <TouchableOpacity
-                    style={styles.cancelBtn}
-                    onPress={() => setShowMatchFeeDueDatePicker(false)}
-                  >
-                    <Text style={styles.cancelText}>Cancel</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.confirmBtn}
-                    onPress={() => {
-                      setMatchFeeDueDate(tempMatchFeeDueDate);
-                      setShowMatchFeeDueDatePicker(false);
-                    }}
-                  >
-                    <Text style={styles.confirmText}>Confirm</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          )}
+      <TouchableOpacity
+        style={styles.confirmBtn}
+        onPress={() => {
+          setMatchFeeDueDate(tempMatchFeeDueDate);
+          setShowMatchFeeDueDatePicker(false);
+        }}
+      >
+        <Text style={styles.confirmText}>Confirm</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+)}
 
           <Text style={styles.label}>Match Fee Description (Optional)</Text>
           <TextInput
@@ -590,7 +636,8 @@ const CreateMatchScreen = ({ navigation }: Props) => {
               {submitting ? "Creating..." : "Create Match"}
             </Text>
           </TouchableOpacity>
-        </ScrollView>
+         </ScrollView>
+</TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
       {/* League Picker */}
@@ -728,7 +775,7 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#f8f5fb",
     flexGrow: 1,
-    paddingBottom: 40,
+    paddingBottom: 140,
   },
 
   title: {

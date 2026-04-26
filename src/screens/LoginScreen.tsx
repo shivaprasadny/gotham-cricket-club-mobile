@@ -2,12 +2,15 @@ import React, { useState } from "react";
 import {
   Alert,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
@@ -36,8 +39,8 @@ const LoginScreen = ({ navigation }: Props) => {
   // =========================
   // NORMAL LOGIN
   // =========================
+
   const handleLogin = async () => {
-  // Basic validation
   if (!email.trim()) {
     Alert.alert("Error", "Please enter email");
     return;
@@ -50,13 +53,11 @@ const LoginScreen = ({ navigation }: Props) => {
 
   try {
     setSubmitting(true);
-    
+
     const response = await loginUser({
       email: email.trim(),
       password: password.trim(),
     });
-
-
 
     await login(response.token, {
       id: response.id,
@@ -65,38 +66,34 @@ const LoginScreen = ({ navigation }: Props) => {
       role: response.role,
       status: response.status,
     });
-  } 
-  
-  catch (error: any) {
-  const debugMessage =
-    `message: ${error?.message}\n` +
-    `code: ${error?.code}\n` +
-    `status: ${error?.response?.status}\n` +
-    `data: ${JSON.stringify(error?.response?.data)}`;
 
-  Alert.alert("Login Debug", debugMessage);
+  } catch (error: any) {
+    console.log("LOGIN ERROR:", error?.response?.data || error);
 
-  if (!error.response) {
+    const status = error?.response?.status;
+
+    // ❌ No backend / network issue
+    if (!error?.response) {
+      Alert.alert(
+        "No Internet",
+        "Check connection or server is not running"
+      );
+      return;
+    }
+
+    // ❌ Wrong credentials (your backend returns 400)
+    if (status === 400 || status === 401 || status === 403) {
+      Alert.alert("Login Failed", "Invalid email or password");
+      return;
+    }
+
+    // ❌ Other errors
     Alert.alert(
-      "No Internet",
-      "Please check your internet connection or make sure the server is running."
+      "Error",
+      error?.response?.data?.message || "Something went wrong"
     );
-    return;
-  }
 
-  if (error.response.status === 401 || error.response.status === 403) {
-    Alert.alert("Login Failed", "Wrong email or password");
-    return;
-  }
-
-  Alert.alert(
-    "Error",
-    error?.response?.data?.message ||
-      `Server error (${error.response.status})`
-  );
-}
-  
-  finally {
+  } finally {
     setSubmitting(false);
   }
 };
@@ -110,13 +107,9 @@ const LoginScreen = ({ navigation }: Props) => {
 
       const result = await biometricLogin();
 
-      // 🔹 If biometric fails, show message
       if (!result.success) {
         Alert.alert("Biometric Login", result.message || "Login failed");
       }
-
-      // 🔹 If success → AuthContext automatically logs in
-
     } catch (error) {
       Alert.alert("Error", "Biometric login failed");
     } finally {
@@ -124,93 +117,102 @@ const LoginScreen = ({ navigation }: Props) => {
     }
   };
 
+  // =========================
+  // UI
+  // =========================
   return (
-    // KeyboardAvoidingView helps move UI above keyboard on iPhone
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 20}
     >
-      <View style={styles.container}>
-        {/* Club logo */}
-        <Image
-          source={require("../../assets/logo.png")}
-          style={styles.logo}
-        />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Club logo */}
+          <Image source={require("../../assets/logo.png")} style={styles.logo} />
 
-        {/* Heading */}
-        <Text style={styles.title}>Gotham Cricket Club</Text>
-        <Text style={styles.subtitle}>Sign in to continue</Text>
+          {/* Heading */}
+          <Text style={styles.title}>Gotham Cricket Club</Text>
+          <Text style={styles.subtitle}>Sign in to continue</Text>
 
-        {/* Login card */}
-        <View style={styles.card}>
-          {/* Email input */}
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#7a7a7a"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-
-          {/* Password input with show/hide toggle */}
-          <View style={styles.passwordRow}>
+          {/* Login card */}
+          <View style={styles.card}>
+            {/* Email input */}
             <TextInput
-              style={styles.passwordInput}
-              placeholder="Password"
+              style={styles.input}
+              placeholder="Email"
               placeholderTextColor="#7a7a7a"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
             />
 
-            <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
-              <Text style={styles.showText}>
-                {showPassword ? "Hide" : "Show"}
+            {/* Password input with show/hide toggle */}
+            <View style={styles.passwordRow}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password"
+                placeholderTextColor="#7a7a7a"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                 autoCapitalize="none"   // ✅ FIX
+  autoCorrect={false} 
+              />
+
+              <TouchableOpacity onPress={() => setShowPassword((prev) => !prev)}>
+                <Text style={styles.showText}>
+                  {showPassword ? "Hide" : "Show"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Email/password login button */}
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handleLogin}
+              disabled={submitting}
+            >
+              <Text style={styles.primaryButtonText}>
+                {submitting ? "Signing In..." : "Login"}
               </Text>
             </TouchableOpacity>
+
+            {/* Biometric login button */}
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={handleBiometricLogin}
+              disabled={biometricLoading}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {biometricLoading ? "Checking..." : "Login with Biometrics"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Forgot password link */}
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => navigation.navigate("ForgotPassword")}
+            >
+              <Text style={styles.linkText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            {/* Register link */}
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => navigation.navigate("Register")}
+            >
+              <Text style={styles.linkText}>New member? Register here</Text>
+            </TouchableOpacity>
           </View>
-
-          {/* Email/password login button */}
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleLogin}
-            disabled={submitting}
-          >
-            <Text style={styles.primaryButtonText}>
-              {submitting ? "Signing In..." : "Login"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Biometric login button */}
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={handleBiometricLogin}
-            disabled={biometricLoading}
-          >
-            <Text style={styles.secondaryButtonText}>
-              {biometricLoading ? "Checking..." : "Login with Biometrics"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Forgot password link */}
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate("ForgotPassword")}
-          >
-            <Text style={styles.linkText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
-          {/* Register link */}
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate("Register")}
-          >
-            <Text style={styles.linkText}>New member? Register here</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 };
@@ -224,11 +226,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#2b0540",
   },
 
-  // Center content vertically
+  // Scroll content wrapper
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     padding: 20,
+    paddingBottom: 140,
+    backgroundColor: "#2b0540",
   },
 
   // Club logo image
@@ -265,7 +269,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
 
-  // Standard input
+  // Email input
   input: {
     borderWidth: 1,
     borderColor: "#d9d2e1",
@@ -278,7 +282,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fafafa",
   },
 
-  // Password input row with show/hide action
+  // Password row wrapper
   passwordRow: {
     borderWidth: 1,
     borderColor: "#d9d2e1",
@@ -288,6 +292,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fafafa",
     flexDirection: "row",
     alignItems: "center",
+    
   },
 
   // Password text input
@@ -298,7 +303,7 @@ const styles = StyleSheet.create({
     color: "#111",
   },
 
-  // Show/hide text
+  // Show/hide password text
   showText: {
     color: "#2b0540",
     fontWeight: "700",
@@ -334,11 +339,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 
-  // Bottom links
+  // Link button wrapper
   linkButton: {
     marginTop: 14,
   },
 
+  // Link text
   linkText: {
     color: "#2b0540",
     textAlign: "center",

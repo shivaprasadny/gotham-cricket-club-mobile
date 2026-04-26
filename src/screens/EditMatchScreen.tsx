@@ -12,10 +12,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+
 import { getMatchById, updateMatch } from "../services/matchService";
 import { getTeams } from "../services/teamService";
 import { getLeagues } from "../services/leagueService";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 
 type Props = {
   route: any;
@@ -209,6 +212,42 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
 
   const finalMatchFormat =
     matchFormat === "CUSTOM" ? customFormat.trim() : matchFormat;
+    // ==============================
+// ANDROID SAFE DATE + TIME PICKER
+// ==============================
+const openAndroidDateTimePicker = (
+  currentDate: Date | null,
+  onFinalDate: (date: Date) => void
+) => {
+  const baseDate = currentDate || new Date();
+
+  // STEP 1: Pick DATE
+  DateTimePickerAndroid.open({
+    value: baseDate,
+    mode: "date",
+    is24Hour: false,
+    onChange: (event, selectedDate) => {
+      if (event.type !== "set" || !selectedDate) return;
+
+      // STEP 2: Pick TIME
+      DateTimePickerAndroid.open({
+        value: selectedDate,
+        mode: "time",
+        is24Hour: false,
+        onChange: (timeEvent, selectedTime) => {
+          if (timeEvent.type !== "set" || !selectedTime) return;
+
+          const finalDate = new Date(selectedDate);
+          finalDate.setHours(selectedTime.getHours());
+          finalDate.setMinutes(selectedTime.getMinutes());
+          finalDate.setSeconds(0);
+
+          onFinalDate(finalDate);
+        },
+      });
+    },
+  });
+};
 
   const handleUpdateMatch = async () => {
     if (!homeTeamId) {
@@ -453,16 +492,20 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
           <TouchableOpacity
             style={styles.selectInput}
             onPress={() => {
-              setTempMatchDate(matchDate || new Date());
-              setShowDatePicker(true);
-            }}
+  if (Platform.OS === "android") {
+    openAndroidDateTimePicker(matchDate, setMatchDate);
+  } else {
+    setTempMatchDate(matchDate || new Date());
+    setShowDatePicker(true);
+  }
+}}
           >
             <Text style={styles.selectInputText}>
               {matchDate ? matchDate.toLocaleString() : "Select match date & time"}
             </Text>
           </TouchableOpacity>
 
-          {showDatePicker && (
+          {Platform.OS === "ios" && showDatePicker && (
             <View style={styles.inlinePickerCard}>
               <DateTimePicker
                 value={tempMatchDate}
@@ -526,9 +569,13 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
           <TouchableOpacity
             style={styles.selectInput}
             onPress={() => {
-              setTempMatchFeeDueDate(matchFeeDueDate || new Date());
-              setShowFeeDueDatePicker(true);
-            }}
+  if (Platform.OS === "android") {
+    openAndroidDateTimePicker(matchFeeDueDate, setMatchFeeDueDate);
+  } else {
+    setTempMatchFeeDueDate(matchFeeDueDate || new Date());
+    setShowFeeDueDatePicker(true);
+  }
+}}
           >
             <Text style={styles.selectInputText}>
               {matchFeeDueDate
@@ -537,7 +584,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
             </Text>
           </TouchableOpacity>
 
-          {showFeeDueDatePicker && (
+          {Platform.OS === "ios" && showFeeDueDatePicker && (
             <View style={styles.inlinePickerCard}>
               <DateTimePicker
                 value={tempMatchFeeDueDate}

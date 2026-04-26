@@ -10,7 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
+
 import { createEvent } from "../services/eventService";
 
 type Props = {
@@ -18,37 +22,75 @@ type Props = {
 };
 
 const CreateEventScreen = ({ navigation }: Props) => {
-  // Form fields
+  // =========================
+  // STATE
+  // =========================
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
+
   const [eventDate, setEventDate] = useState<Date | null>(null);
 
-  // Controlled date picker states
+  // iOS picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [tempEventDate, setTempEventDate] = useState<Date>(new Date());
+  const [tempEventDate, setTempEventDate] = useState(new Date());
 
-  // Loading state
   const [submitting, setSubmitting] = useState(false);
 
-  // Open date picker
+  // =========================
+  // ANDROID + IOS PICKER FIX
+  // =========================
   const openDatePicker = () => {
-    setTempEventDate(eventDate || new Date());
-    setShowDatePicker(true);
+    const baseDate = eventDate || new Date();
+
+    // ANDROID → separate date + time (BEST UX)
+    if (Platform.OS === "android") {
+      // STEP 1: Pick Date
+      DateTimePickerAndroid.open({
+        value: baseDate,
+        mode: "date",
+        onChange: (event, selectedDate) => {
+          if (event.type !== "set" || !selectedDate) return;
+
+          // STEP 2: Pick Time
+          DateTimePickerAndroid.open({
+            value: selectedDate,
+            mode: "time",
+            onChange: (timeEvent, selectedTime) => {
+              if (timeEvent.type !== "set" || !selectedTime) return;
+
+              // Combine date + time
+              const finalDate = new Date(selectedDate);
+              finalDate.setHours(selectedTime.getHours());
+              finalDate.setMinutes(selectedTime.getMinutes());
+              finalDate.setSeconds(0);
+
+              setEventDate(finalDate);
+            },
+          });
+        },
+      });
+    }
+    // IOS → keep inline picker
+    else {
+      setTempEventDate(baseDate);
+      setShowDatePicker(true);
+    }
   };
 
-  // Save picked date
+  // Save for iOS
   const handleDoneDate = () => {
     setEventDate(tempEventDate);
     setShowDatePicker(false);
   };
 
-  // Cancel picked date
   const handleCancelDate = () => {
     setShowDatePicker(false);
   };
 
-  // Create event
+  // =========================
+  // CREATE EVENT
+  // =========================
   const handleCreate = async () => {
     if (!title.trim()) {
       Alert.alert("Error", "Please enter event title");
@@ -91,103 +133,84 @@ const CreateEventScreen = ({ navigation }: Props) => {
     }
   };
 
+  // =========================
+  // UI
+  // =========================
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
     >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Screen title */}
+      <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Create Event</Text>
 
-        {/* Event title */}
         <Text style={styles.label}>Title</Text>
         <TextInput
           style={styles.input}
           placeholder="Event Title"
-          placeholderTextColor="#7a7a7a"
           value={title}
           onChangeText={setTitle}
         />
 
-        {/* Description */}
         <Text style={styles.label}>Description</Text>
         <TextInput
           style={[styles.input, styles.notesInput]}
           placeholder="Description"
-          placeholderTextColor="#7a7a7a"
           value={description}
           onChangeText={setDescription}
           multiline
-          textAlignVertical="top"
         />
 
-        {/* Location */}
         <Text style={styles.label}>Location</Text>
         <TextInput
           style={styles.input}
           placeholder="Location"
-          placeholderTextColor="#7a7a7a"
           value={location}
           onChangeText={setLocation}
         />
 
-        {/* Event date picker button */}
+        {/* DATE PICKER BUTTON */}
         <Text style={styles.label}>Event Date & Time</Text>
         <TouchableOpacity style={styles.input} onPress={openDatePicker}>
           <Text style={styles.inputText}>
-            {eventDate ? eventDate.toLocaleString() : "Select Event Date & Time"}
+            {eventDate
+              ? eventDate.toLocaleString()
+              : "Select Event Date & Time"}
           </Text>
         </TouchableOpacity>
 
-        {/* Controlled date picker */}
-        {showDatePicker && (
+        {/* IOS PICKER ONLY */}
+        {Platform.OS === "ios" && showDatePicker && (
           <View style={styles.inlinePickerCard}>
             <DateTimePicker
               value={tempEventDate}
               mode="datetime"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={(event, selectedDate) => {
-                if (selectedDate) {
-                  setTempEventDate(selectedDate);
-                }
-
-                // Android auto-save on select
-                if (Platform.OS !== "ios" && selectedDate) {
-                  setEventDate(selectedDate);
-                  setShowDatePicker(false);
-                }
-              }}
+              display="inline"
+              onChange={(e, d) => d && setTempEventDate(d)}
             />
 
-            {Platform.OS === "ios" && (
-              <View style={styles.dateActionRow}>
-                <TouchableOpacity
-                  style={styles.dateCancelBtn}
-                  onPress={handleCancelDate}
-                >
-                  <Text style={styles.dateCancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
+            <View style={styles.dateActionRow}>
+              <TouchableOpacity
+                style={styles.dateCancelBtn}
+                onPress={handleCancelDate}
+              >
+                <Text>Cancel</Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.dateDoneBtn}
-                  onPress={handleDoneDate}
-                >
-                  <Text style={styles.dateDoneBtnText}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              <TouchableOpacity
+                style={styles.dateDoneBtn}
+                onPress={handleDoneDate}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700" }}>
+                  Done
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
-        {/* Create button */}
         <TouchableOpacity
-          style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+          style={styles.submitBtn}
           onPress={handleCreate}
           disabled={submitting}
         >
@@ -203,94 +226,76 @@ const CreateEventScreen = ({ navigation }: Props) => {
 export default CreateEventScreen;
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#f8f5fb",
-  },
-  container: {
-    padding: 20,
-    paddingBottom: 80,
-    backgroundColor: "#f8f5fb",
-    flexGrow: 1,
-  },
+  screen: { flex: 1, backgroundColor: "#f8f5fb" },
+  container: { padding: 20 },
+
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "700",
-    marginBottom: 24,
     textAlign: "center",
+    marginBottom: 20,
     color: "#2b0540",
   },
+
   label: {
     fontWeight: "700",
+    marginBottom: 6,
     color: "#2b0540",
-    marginBottom: 8,
-    marginTop: 6,
   },
+
   input: {
     borderWidth: 1,
     borderColor: "#d9d2e1",
     padding: 12,
-    marginBottom: 12,
     borderRadius: 10,
+    marginBottom: 12,
     backgroundColor: "#fff",
   },
-  inputText: {
-    color: "#111827",
-  },
+
+  inputText: { color: "#111" },
+
   notesInput: {
     minHeight: 100,
     textAlignVertical: "top",
   },
+
   inlinePickerCard: {
     backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: "#d9d2e1",
     borderRadius: 12,
     marginBottom: 12,
-    overflow: "hidden",
   },
+
   dateActionRow: {
     flexDirection: "row",
     gap: 10,
     padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
   },
+
   dateCancelBtn: {
     flex: 1,
-    backgroundColor: "#e5e7eb",
-    paddingVertical: 10,
+    backgroundColor: "#eee",
+    padding: 10,
     borderRadius: 8,
+    alignItems: "center",
   },
-  dateCancelBtnText: {
-    textAlign: "center",
-    fontWeight: "700",
-    color: "#111827",
-  },
+
   dateDoneBtn: {
     flex: 1,
     backgroundColor: "#2b0540",
-    paddingVertical: 10,
+    padding: 10,
     borderRadius: 8,
+    alignItems: "center",
   },
-  dateDoneBtnText: {
-    textAlign: "center",
-    fontWeight: "700",
-    color: "#fff",
-  },
+
   submitBtn: {
     backgroundColor: "#da9306",
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 16,
+    padding: 14,
+    borderRadius: 10,
   },
-  submitBtnDisabled: {
-    opacity: 0.6,
-  },
+
   submitBtnText: {
-    color: "#2b0540",
     textAlign: "center",
     fontWeight: "700",
-    fontSize: 16,
+    color: "#2b0540",
   },
 });

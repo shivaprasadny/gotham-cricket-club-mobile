@@ -343,9 +343,7 @@ const MatchesScreen = ({ navigation }: Props) => {
         data={filteredMatches}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
-        contentContainerStyle={
-          filteredMatches.length === 0 ? styles.center : styles.list
-        }
+       contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -365,6 +363,7 @@ const MatchesScreen = ({ navigation }: Props) => {
                 style={styles.topFilterBtn}
                 onPress={() => openPicker("STATUS")}
               >
+                
                 <Text style={styles.topFilterBtnText}>{filter}</Text>
               </TouchableOpacity>
 
@@ -395,17 +394,28 @@ const MatchesScreen = ({ navigation }: Props) => {
             </View>
           </View>
         }
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>
-            {filter === "UPCOMING"
-              ? "No upcoming matches found."
-              : filter === "PAST"
-              ? "No past matches found."
-              : filter === "CANCELLED"
-              ? "No cancelled matches found."
-              : "No matches found."}
-          </Text>
-        }
+       ListEmptyComponent={
+  <View style={styles.emptyCard}>
+    
+    <Text style={styles.emptyIcon}>🏏</Text>
+
+    <Text style={styles.emptyTitle}>
+      {filter === "UPCOMING"
+        ? "No Upcoming Matches"
+        : filter === "PAST"
+        ? "No Past Matches"
+        : filter === "CANCELLED"
+        ? "No Cancelled Matches"
+        : "No Matches Found"}
+    </Text>
+
+    <Text style={styles.emptySubText}>
+      {teamFilter !== "ALL_TEAMS" || leagueFilter !== "ALL_LEAGUES"
+        ? "Try changing filters or reset."
+        : "Matches will appear here once created."}
+    </Text>
+  </View>
+}
       />
 
       <Modal
@@ -469,26 +479,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#4B1D6B",
   },
 
-  topFilterRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 16,
-  },
-  topFilterBtn: {
-    flex: 1,
-    backgroundColor: "#5A257A",
-    borderWidth: 1,
-    borderColor: "#b89ad1",
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-  },
-  topFilterBtnText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "700",
-    fontSize: 12,
-  },
+ 
 
   createBtn: {
     backgroundColor: "#F4B400",
@@ -658,4 +649,61 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
   },
+
+
+
+
+
+topFilterRow: {
+  flexDirection: "row",
+  gap: 8,
+  marginBottom: 14,
+  backgroundColor: "#3a0a57",
+  padding: 6,
+  borderRadius: 14,
+  borderWidth: 1,
+  borderColor: "#4d1670",
+},
+
+topFilterBtn: {
+  flex: 1,
+  borderRadius: 10,
+  paddingVertical: 10,
+  backgroundColor: "#5A257A",
+},
+
+topFilterBtnText: {
+  color: "#fff",
+  textAlign: "center",
+  fontWeight: "800",
+  fontSize: 12,
+},
+emptyCard: {
+  backgroundColor: "#3a0a57",
+  borderRadius: 18,
+  padding: 22,
+  alignItems: "center",
+  marginTop: 20,
+  borderWidth: 1,
+  borderColor: "#4d1670",
+},
+
+emptyIcon: {
+  fontSize: 32,
+},
+
+emptyTitle: {
+  color: "#fff",
+  fontSize: 18,
+  fontWeight: "800",
+  marginTop: 10,
+},
+
+emptySubText: {
+  color: "#ddd",
+  marginTop: 6,
+  textAlign: "center",
+  fontWeight: "600",
+},
+
 });

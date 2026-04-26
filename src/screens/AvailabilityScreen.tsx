@@ -2,16 +2,16 @@ import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-
 } from "react-native";
+
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+
 import { useFocusEffect } from "@react-navigation/native";
 import {
   AvailabilityStatus,
@@ -24,7 +24,9 @@ type Props = {
   navigation: any;
 };
 
-// All possible availability options
+// =========================
+// STATUS OPTIONS
+// =========================
 const STATUS_OPTIONS: AvailabilityStatus[] = [
   "AVAILABLE",
   "MAYBE",
@@ -35,20 +37,20 @@ const STATUS_OPTIONS: AvailabilityStatus[] = [
 const AvailabilityScreen = ({ route, navigation }: Props) => {
   const { matchId, opponentName, venue, matchDate, matchType } = route.params;
 
-  // Stores currently selected availability status
+  // =========================
+  // STATE
+  // =========================
   const [selectedStatus, setSelectedStatus] =
     useState<AvailabilityStatus>("AVAILABLE");
 
-  // Stores optional message typed by user
   const [message, setMessage] = useState("");
 
-  // Used while saving availability
   const [submitting, setSubmitting] = useState(false);
-
-  // Used while loading previous saved availability
   const [loading, setLoading] = useState(true);
 
-  // Load existing availability whenever this screen comes into focus
+  // =========================
+  // LOAD DATA
+  // =========================
   const loadMyAvailability = async () => {
     try {
       setLoading(true);
@@ -58,12 +60,8 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
       if (data) {
         setSelectedStatus(data.status ?? "AVAILABLE");
         setMessage(data.message ?? "");
-      } else {
-        setSelectedStatus("AVAILABLE");
-        setMessage("");
       }
-    } catch (error) {
-      // If API fails, fall back to default values
+    } catch {
       setSelectedStatus("AVAILABLE");
       setMessage("");
     } finally {
@@ -71,14 +69,15 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  // Reload data every time screen opens
   useFocusEffect(
     useCallback(() => {
       void loadMyAvailability();
     }, [matchId])
   );
 
-  // Save or update availability
+  // =========================
+  // SAVE
+  // =========================
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
@@ -98,18 +97,20 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
 
       navigation.goBack();
     } catch (error: any) {
-      const errorMessage =
+      Alert.alert(
+        "Error",
         error?.response?.data?.message ||
-        error?.message ||
-        "Failed to save availability";
-
-      Alert.alert("Error", errorMessage);
+          error?.message ||
+          "Failed to save availability"
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Format match date safely
+  // =========================
+  // FORMAT DATE
+  // =========================
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleString();
@@ -118,7 +119,9 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  // Friendly label for status button
+  // =========================
+  // LABEL
+  // =========================
   const getStatusLabel = (status: AvailabilityStatus) => {
     switch (status) {
       case "AVAILABLE":
@@ -134,132 +137,118 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  // Loading state while fetching existing availability
+  // =========================
+  // LOADING UI
+  // =========================
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
         <ActivityIndicator size="large" />
-        <Text style={styles.loaderText}>Loading your availability...</Text>
+        <Text style={styles.loaderText}>Loading availability...</Text>
       </View>
     );
   }
 
   return (
-    // KeyboardAvoidingView pushes content upward when keyboard opens
-
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      // Helps when using navigation header / status bar
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 20}
+    // 🔥 THIS FIXES EVERYTHING (Android + iOS)
+    <KeyboardAwareScrollView
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      enableOnAndroid={true} // 🔥 CRITICAL
+      extraScrollHeight={120} // 🔥 pushes button above keyboard
     >
-      <ScrollView
-        // flexGrow + paddingBottom helps content move and remain scrollable
-        contentContainerStyle={styles.container}
-        // Allows taps to work even if keyboard is open
-        keyboardShouldPersistTaps="handled"
-        // Lets scroll behavior feel more natural with keyboard open
-        showsVerticalScrollIndicator={false}
-      >
-        <Text style={styles.title}>Match Availability</Text>
+      <Text style={styles.title}>Match Availability</Text>
 
-        <View style={styles.matchCard}>
-          <Text style={styles.matchTitle}>{opponentName}</Text>
-          <Text style={styles.matchText}>Type: {matchType}</Text>
-          <Text style={styles.matchText}>Venue: {venue}</Text>
-          <Text style={styles.matchText}>Date: {formatDate(matchDate)}</Text>
-        </View>
+      {/* MATCH DETAILS */}
+      <View style={styles.matchCard}>
+        <Text style={styles.matchTitle}>{opponentName}</Text>
+        <Text style={styles.matchText}>Type: {matchType}</Text>
+        <Text style={styles.matchText}>Venue: {venue}</Text>
+        <Text style={styles.matchText}>
+          Date: {formatDate(matchDate)}
+        </Text>
+      </View>
 
-        <Text style={styles.sectionTitle}>Select Status</Text>
+      {/* STATUS */}
+      <Text style={styles.sectionTitle}>Select Status</Text>
 
-        {STATUS_OPTIONS.map((status) => (
-          <TouchableOpacity
-            key={status}
-            style={[
-              styles.statusButton,
-              selectedStatus === status && styles.selectedStatusButton,
-            ]}
-            onPress={() => setSelectedStatus(status)}
-            disabled={submitting}
-          >
-            <Text
-              style={[
-                styles.statusButtonText,
-                selectedStatus === status && styles.selectedStatusButtonText,
-              ]}
-            >
-              {getStatusLabel(status)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-
-        <Text style={styles.sectionTitle}>Message</Text>
-
-        <TextInput
-          style={styles.messageInput}
-          placeholder="Example: Will come late / Need to leave early / Hamstring issue"
-          multiline
-          numberOfLines={4}
-          value={message}
-          onChangeText={setMessage}
-          editable={!submitting}
-          // Makes multiline input start from top on Android
-          textAlignVertical="top"
-        />
-
+      {STATUS_OPTIONS.map((status) => (
         <TouchableOpacity
-          style={[styles.saveButton, submitting && styles.disabledButton]}
-          onPress={handleSubmit}
+          key={status}
+          style={[
+            styles.statusButton,
+            selectedStatus === status && styles.selectedStatusButton,
+          ]}
+          onPress={() => setSelectedStatus(status)}
           disabled={submitting}
         >
-          <Text style={styles.saveButtonText}>
-            {submitting ? "Saving..." : "Save Availability"}
+          <Text
+            style={[
+              styles.statusButtonText,
+              selectedStatus === status &&
+                styles.selectedStatusButtonText,
+            ]}
+          >
+            {getStatusLabel(status)}
           </Text>
         </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      ))}
 
+      {/* MESSAGE */}
+      <Text style={styles.sectionTitle}>Message</Text>
+
+      <TextInput
+        style={styles.messageInput}
+        placeholder="Example: Coming late / leaving early"
+        multiline
+        value={message}
+        onChangeText={setMessage}
+        editable={!submitting}
+        textAlignVertical="top"
+      />
+
+      {/* BUTTON */}
+      <TouchableOpacity
+        style={[styles.saveButton, submitting && styles.disabledButton]}
+        onPress={handleSubmit}
+        disabled={submitting}
+      >
+        <Text style={styles.saveButtonText}>
+          {submitting ? "Saving..." : "Save Availability"}
+        </Text>
+      </TouchableOpacity>
+    </KeyboardAwareScrollView>
   );
 };
 
 export default AvailabilityScreen;
 
+// =========================
+// STYLES
+// =========================
 const styles = StyleSheet.create({
-  // Full-screen wrapper for keyboard handling
-  screen: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-
-  // Scroll content wrapper
   container: {
-    flexGrow: 1,
     padding: 20,
-    backgroundColor: "#fff",
-    // Extra bottom spacing so the last input/button can scroll above keyboard
     paddingBottom: 40,
+    backgroundColor: "#fff",
+    flexGrow: 1,
   },
 
-  // Loader layout
   loaderContainer: {
     flex: 1,
-    backgroundColor: "#fff",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
   },
 
   loaderText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: "#444",
+    marginTop: 10,
   },
 
   title: {
     fontSize: 26,
     fontWeight: "700",
-    marginBottom: 20,
     textAlign: "center",
+    marginBottom: 20,
   },
 
   matchCard: {
@@ -272,19 +261,17 @@ const styles = StyleSheet.create({
   matchTitle: {
     fontSize: 20,
     fontWeight: "700",
-    marginBottom: 8,
   },
 
   matchText: {
-    fontSize: 15,
-    marginBottom: 4,
+    marginTop: 4,
   },
 
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    marginBottom: 10,
     marginTop: 10,
+    marginBottom: 10,
   },
 
   statusButton: {
@@ -297,12 +284,10 @@ const styles = StyleSheet.create({
 
   selectedStatusButton: {
     backgroundColor: "#111",
-    borderColor: "#111",
   },
 
   statusButtonText: {
     textAlign: "center",
-    fontWeight: "600",
   },
 
   selectedStatusButtonText: {
@@ -312,29 +297,25 @@ const styles = StyleSheet.create({
   messageInput: {
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 8,
     padding: 12,
+    borderRadius: 8,
+    minHeight: 100,
     marginBottom: 20,
-    minHeight: 110,
-    textAlignVertical: "top",
-    backgroundColor: "#fff",
   },
 
   saveButton: {
     backgroundColor: "#111",
-    paddingVertical: 14,
+    padding: 14,
     borderRadius: 8,
     alignItems: "center",
-    justifyContent: "center",
-  },
-
-  disabledButton: {
-    opacity: 0.7,
   },
 
   saveButtonText: {
     color: "#fff",
     fontWeight: "700",
-    fontSize: 16,
+  },
+
+  disabledButton: {
+    opacity: 0.6,
   },
 });

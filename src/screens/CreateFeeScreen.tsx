@@ -22,6 +22,9 @@ import { getMatches } from "../services/matchService";
 import { getSquadByMatch } from "../services/squadService";
 
 import { getAllMembers } from "../services/memberService";
+import {
+  DateTimePickerAndroid
+} from "@react-native-community/datetimepicker";
 
 type Props = {
   navigation: any;
@@ -255,11 +258,52 @@ const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
   }, [matches, matchSearchText]);
 
   // Open due date picker
-  const openDatePicker = () => {
+ const openDatePicker = () => {
+  // =========================
+  // ANDROID SAFE PICKER
+  // =========================
+  if (Platform.OS === "android") {
+    const baseDate = dueDate || new Date();
+
+    // STEP 1: PICK DATE
+    DateTimePickerAndroid.open({
+      value: baseDate,
+      mode: "date",
+      is24Hour: false,
+      onChange: (event, selectedDate) => {
+        // If user cancels → do nothing
+        if (event.type !== "set" || !selectedDate) return;
+
+        // STEP 2: PICK TIME
+        DateTimePickerAndroid.open({
+          value: selectedDate,
+          mode: "time",
+          is24Hour: false,
+          onChange: (timeEvent, selectedTime) => {
+            if (timeEvent.type !== "set" || !selectedTime) return;
+
+            // Combine date + time
+            const finalDate = new Date(selectedDate);
+            finalDate.setHours(selectedTime.getHours());
+            finalDate.setMinutes(selectedTime.getMinutes());
+            finalDate.setSeconds(0);
+            finalDate.setMilliseconds(0);
+
+            // ✅ FINAL VALUE SET HERE
+            setDueDate(finalDate);
+          },
+        });
+      },
+    });
+  } 
+  // =========================
+  // iOS (NO CHANGE)
+  // =========================
+  else {
     setTempDueDate(dueDate || new Date());
     setShowDatePicker(true);
-  };
-
+  }
+};
   // Scroll search section upward
   const handleSearchFocus = () => {
     setTimeout(() => {

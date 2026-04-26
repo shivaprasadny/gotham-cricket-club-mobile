@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import { Picker } from "@react-native-picker/picker";
 import { registerUser } from "../services/authService";
 
 type Props = {
@@ -27,8 +27,13 @@ const RegisterScreen = ({ navigation }: Props) => {
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [gender, setGender] = useState("");
 
+  // =========================
+  // DOB PICKER STATE
+  // =========================
   const [showDobPicker, setShowDobPicker] = useState(false);
-  const [tempDob, setTempDob] = useState<Date>(new Date(2000, 0, 1));
+  const [dobMonth, setDobMonth] = useState(1);
+  const [dobDay, setDobDay] = useState(1);
+  const [dobYear, setDobYear] = useState(2000);
 
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -42,19 +47,50 @@ const RegisterScreen = ({ navigation }: Props) => {
 
   const [submitting, setSubmitting] = useState(false);
 
+  // =========================
+  // DOB OPTIONS
+  // =========================
+  const months = [
+    { label: "January", value: 1 },
+    { label: "February", value: 2 },
+    { label: "March", value: 3 },
+    { label: "April", value: 4 },
+    { label: "May", value: 5 },
+    { label: "June", value: 6 },
+    { label: "July", value: 7 },
+    { label: "August", value: 8 },
+    { label: "September", value: 9 },
+    { label: "October", value: 10 },
+    { label: "November", value: 11 },
+    { label: "December", value: 12 },
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 80 }, (_, i) => currentYear - i);
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+
+  // =========================
+  // OPEN DOB MODAL
+  // =========================
   const openDobPicker = () => {
     if (dateOfBirth) {
-      setTempDob(new Date(dateOfBirth));
+      const existingDate = new Date(dateOfBirth);
+      setDobMonth(existingDate.getMonth() + 1);
+      setDobDay(existingDate.getDate());
+      setDobYear(existingDate.getFullYear());
     }
+
     setShowDobPicker(true);
   };
 
+  // =========================
+  // SAVE DOB AS YYYY-MM-DD
+  // =========================
   const handleSaveDob = () => {
-    const y = tempDob.getFullYear();
-    const m = String(tempDob.getMonth() + 1).padStart(2, "0");
-    const d = String(tempDob.getDate()).padStart(2, "0");
+    const m = String(dobMonth).padStart(2, "0");
+    const d = String(dobDay).padStart(2, "0");
 
-    setDateOfBirth(`${y}-${m}-${d}`);
+    setDateOfBirth(`${dobYear}-${m}-${d}`);
     setShowDobPicker(false);
   };
 
@@ -142,6 +178,7 @@ const RegisterScreen = ({ navigation }: Props) => {
             onChangeText={setNickname}
           />
 
+          {/* DOB FIELD */}
           <TouchableOpacity style={styles.input} onPress={openDobPicker}>
             <Text style={dateOfBirth ? styles.inputText : styles.placeholder}>
               {dateOfBirth || "Date of Birth"}
@@ -246,20 +283,53 @@ const RegisterScreen = ({ navigation }: Props) => {
         </View>
       </ScrollView>
 
+      {/* DOB MODAL - iPhone style Month / Day / Year picker */}
       <Modal visible={showDobPicker} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Select Date of Birth</Text>
 
-            <DateTimePicker
-              value={tempDob}
-              mode="date"
-              display="spinner"
-              textColor="#000000"
-              maximumDate={new Date()}
-              style={styles.datePicker}
-              onChange={(e, d) => d && setTempDob(d)}
-            />
+            <View style={styles.pickerRow}>
+              {/* MONTH PICKER */}
+              <Picker
+                selectedValue={dobMonth}
+                style={styles.picker}
+                itemStyle={styles.pickerItem}
+                onValueChange={(value) => setDobMonth(value)}
+              >
+                {months.map((month) => (
+                  <Picker.Item
+                    key={month.value}
+                    label={month.label}
+                    value={month.value}
+                  />
+                ))}
+              </Picker>
+
+              {/* DAY PICKER */}
+              <Picker
+                selectedValue={dobDay}
+                style={styles.picker}
+                itemStyle={styles.pickerItem}
+                onValueChange={(value) => setDobDay(value)}
+              >
+                {days.map((day) => (
+                  <Picker.Item key={day} label={String(day)} value={day} />
+                ))}
+              </Picker>
+
+              {/* YEAR PICKER */}
+              <Picker
+                selectedValue={dobYear}
+                style={styles.picker}
+                itemStyle={styles.pickerItem}
+                onValueChange={(value) => setDobYear(value)}
+              >
+                {years.map((year) => (
+                  <Picker.Item key={year} label={String(year)} value={year} />
+                ))}
+              </Picker>
+            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -397,12 +467,22 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     marginBottom: 10,
+    color: "#2b0540",
   },
 
-  datePicker: {
-    width: "100%",
-    height: 200,
-    backgroundColor: "#fff",
+  pickerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  picker: {
+    flex: 1,
+    height: 180,
+  },
+
+  pickerItem: {
+    fontSize: 16,
+    color: "#111",
   },
 
   modalActions: {

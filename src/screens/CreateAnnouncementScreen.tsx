@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#fff",
     flexGrow: 1,
-    paddingBottom: 40,
+    paddingBottom: 140,
   },
 
   title: {

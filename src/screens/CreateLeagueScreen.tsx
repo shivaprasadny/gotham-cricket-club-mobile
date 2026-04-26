@@ -11,8 +11,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
+
 import { createLeague } from "../services/leagueService";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 
 type Props = {
   navigation: any;
@@ -113,6 +116,40 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
     }
   };
 
+  // Android-safe date + time picker
+const openAndroidDateTimePicker = (
+  currentDate: Date | null,
+  onFinalDate: (date: Date) => void
+) => {
+  const baseDate = currentDate || new Date();
+
+  DateTimePickerAndroid.open({
+    value: baseDate,
+    mode: "date",
+    is24Hour: false,
+    onChange: (event, selectedDate) => {
+      if (event.type !== "set" || !selectedDate) return;
+
+      DateTimePickerAndroid.open({
+        value: selectedDate,
+        mode: "time",
+        is24Hour: false,
+        onChange: (timeEvent, selectedTime) => {
+          if (timeEvent.type !== "set" || !selectedTime) return;
+
+          const finalDate = new Date(selectedDate);
+          finalDate.setHours(selectedTime.getHours());
+          finalDate.setMinutes(selectedTime.getMinutes());
+          finalDate.setSeconds(0);
+          finalDate.setMilliseconds(0);
+
+          onFinalDate(finalDate);
+        },
+      });
+    },
+  });
+};
+
   return (
     // KeyboardAvoidingView keeps inputs visible above keyboard
     <KeyboardAvoidingView
@@ -190,14 +227,18 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
         <TouchableOpacity
           style={styles.input}
           onPress={() => {
-            setTempStartDate(startDate || new Date());
-            setShowStartDatePicker(true);
-          }}
+  if (Platform.OS === "android") {
+    openAndroidDateTimePicker(startDate, setStartDate);
+  } else {
+    setTempStartDate(startDate || new Date());
+    setShowStartDatePicker(true);
+  }
+}}
         >
           <Text style={styles.inputText}>{formatDate(startDate)}</Text>
         </TouchableOpacity>
 
-        {showStartDatePicker && (
+        {Platform.OS === "ios" && showStartDatePicker && (
           <View style={styles.inlinePickerCard}>
             <DateTimePicker
               value={tempStartDate}
@@ -243,14 +284,18 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
         <TouchableOpacity
           style={styles.input}
           onPress={() => {
-            setTempEndDate(endDate || new Date());
-            setShowEndDatePicker(true);
-          }}
+  if (Platform.OS === "android") {
+    openAndroidDateTimePicker(endDate, setEndDate);
+  } else {
+    setTempEndDate(endDate || new Date());
+    setShowEndDatePicker(true);
+  }
+}}
         >
           <Text style={styles.inputText}>{formatDate(endDate)}</Text>
         </TouchableOpacity>
 
-        {showEndDatePicker && (
+      {Platform.OS === "ios" && showEndDatePicker && (
           <View style={styles.inlinePickerCard}>
             <DateTimePicker
               value={tempEndDate}
@@ -329,7 +374,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: "#f8f5fb",
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 140,
   },
 
   title: {
