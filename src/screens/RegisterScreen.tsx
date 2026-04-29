@@ -231,6 +231,8 @@ const RegisterScreen = ({ navigation }: Props) => {
             placeholder="Password"
             secureTextEntry
             value={password}
+            autoCapitalize="none"
+            autoCorrect={false}
             onChangeText={setPassword}
           />
 
@@ -239,6 +241,8 @@ const RegisterScreen = ({ navigation }: Props) => {
             placeholder="Confirm Password"
             secureTextEntry
             value={confirmPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
             onChangeText={setConfirmPassword}
           />
 

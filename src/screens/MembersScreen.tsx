@@ -19,6 +19,7 @@ import {
 import { deactivateMember,activateMember } from "../services/adminService";
 import { getAllMembers } from "../services/memberService";
 
+
 type Member = {
   id?: number;
   userId?: number;
@@ -65,6 +66,8 @@ const MembersScreen = () => {
   useEffect(() => {
     void loadMembers();
   }, []);
+
+
 
   const onRefresh = async () => {
     setRefreshing(true);

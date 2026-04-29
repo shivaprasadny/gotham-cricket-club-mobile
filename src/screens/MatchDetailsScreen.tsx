@@ -225,13 +225,19 @@ const canManageSquad = isAdmin || isCaptain;
             style={styles.primaryButton}
             onPress={() =>
               navigation.navigate("Availability", {
-                matchId: match.id,
-                opponentName:
-                  match.awayTeamName || match.externalOpponentName || "Opponent",
-                venue: match.venue,
-                matchDate: match.matchDate,
-                matchType: match.matchType,
-              })
+  matchId: match.id,
+  homeTeamName: match.homeTeamName,
+  awayTeamName: match.awayTeamName,
+  externalOpponentName: match.externalOpponentName,
+  venue: match.venue,
+  matchDate: match.matchDate,
+  matchType: match.matchType,
+  matchFormat: match.matchFormat,
+  matchFeeAmount: match.matchFeeAmount,
+  matchFeeDueDate: match.matchFeeDueDate,
+  matchFeeDescription: match.matchFeeDescription,
+  status: match.status,
+})
             }
           >
             <Text style={styles.primaryButtonText}>
@@ -329,6 +335,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f5fb",
+  
   },
   content: {
     padding: 16,

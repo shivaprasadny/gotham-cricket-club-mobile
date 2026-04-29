@@ -35,7 +35,20 @@ const STATUS_OPTIONS: AvailabilityStatus[] = [
 ];
 
 const AvailabilityScreen = ({ route, navigation }: Props) => {
-  const { matchId, opponentName, venue, matchDate, matchType } = route.params;
+  const {
+  matchId,
+  homeTeamName,
+  awayTeamName,
+  externalOpponentName,
+  venue,
+  matchDate,
+  matchType,
+  matchFormat,
+  matchFeeAmount,
+  matchFeeDueDate,
+  matchFeeDescription,
+  status,
+} = route.params;
 
   // =========================
   // STATE
@@ -108,6 +121,16 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
     }
   };
 
+  const getMatchTitle = () => {
+  if (awayTeamName) {
+    return `${homeTeamName || "Team"} vs ${awayTeamName}`;
+  }
+
+  return `${homeTeamName || "Team"} vs ${
+    externalOpponentName || "Opponent"
+  }`;
+};
+
   // =========================
   // FORMAT DATE
   // =========================
@@ -152,23 +175,48 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
   return (
     // 🔥 THIS FIXES EVERYTHING (Android + iOS)
     <KeyboardAwareScrollView
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-      enableOnAndroid={true} // 🔥 CRITICAL
-      extraScrollHeight={120} // 🔥 pushes button above keyboard
-    >
+  contentContainerStyle={styles.container}
+  keyboardShouldPersistTaps="handled"
+  enableOnAndroid={true}
+  extraScrollHeight={120}
+  extraHeight={140} // 🔥 ADD THIS
+  keyboardOpeningTime={0} // 🔥 ADD THIS (faster response)
+>
       <Text style={styles.title}>Match Availability</Text>
 
-      {/* MATCH DETAILS */}
-      <View style={styles.matchCard}>
-        <Text style={styles.matchTitle}>{opponentName}</Text>
-        <Text style={styles.matchText}>Type: {matchType}</Text>
-        <Text style={styles.matchText}>Venue: {venue}</Text>
-        <Text style={styles.matchText}>
-          Date: {formatDate(matchDate)}
-        </Text>
-      </View>
+     {/* Match information card */}
+          
+<View style={styles.matchCard}>
+  <Text style={styles.matchTitle}>{getMatchTitle()}</Text>
 
+  <Text style={styles.matchText}>Type: {matchType}</Text>
+  <Text style={styles.matchText}>Format: {matchFormat || "N/A"}</Text>
+  <Text style={styles.matchText}>Venue: {venue}</Text>
+
+  <Text style={styles.matchText}>
+    Match Fee:{" "}
+    {matchFeeAmount !== null && matchFeeAmount !== undefined
+      ? `$${matchFeeAmount}`
+      : "N/A"}
+  </Text>
+
+  <Text style={styles.matchText}>
+    Fee Due Date:{" "}
+    {matchFeeDueDate
+      ? new Date(matchFeeDueDate).toLocaleString()
+      : "N/A"}
+  </Text>
+
+  {matchFeeDescription ? (
+    <Text style={styles.matchText}>Fee Note: {matchFeeDescription}</Text>
+  ) : null}
+
+  <Text style={styles.matchText}>
+    Date: {new Date(matchDate).toLocaleString()}
+  </Text>
+
+  <Text style={styles.matchText}>Status: {status || "UPCOMING"}</Text>
+</View>
       {/* STATUS */}
       <Text style={styles.sectionTitle}>Select Status</Text>
 
@@ -229,7 +277,7 @@ export default AvailabilityScreen;
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 100,
     backgroundColor: "#fff",
     flexGrow: 1,
   },

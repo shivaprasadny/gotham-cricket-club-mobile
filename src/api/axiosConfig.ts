@@ -3,10 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Create one shared axios instance for the whole app
 
- 
+  // baseURL: "http://192.168.1.127:8080/api",
 
 const api = axios.create({
-   baseURL: "http://192.168.1.127:8080/api",
+  //  baseURL: "http://32.194.245.83:8080/api",
+  baseURL:"https://api.shivaprasadofficial.com/api",
   headers: {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
