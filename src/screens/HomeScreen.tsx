@@ -650,16 +650,12 @@ setUpcomingEvents(upcomingEventList);
               <TouchableOpacity
                 style={styles.reminderBtn}
                 onPress={() =>
-                  navigation.navigate("Availability", {
-                    matchId: nextWeeklyUnmarkedMatch.id,
-                    opponentName: getOpponentName(nextWeeklyUnmarkedMatch),
-                    matchDate: nextWeeklyUnmarkedMatch.matchDate,
-                    venue: nextWeeklyUnmarkedMatch.venue,
-                    matchType: nextWeeklyUnmarkedMatch.matchType,
-                  })
+                  navigation.navigate("MatchDetails", {
+  matchId: nextWeeklyUnmarkedMatch.id,
+})
                 }
               >
-                <Text style={styles.reminderBtnText}>Mark Availability</Text>
+                <Text style={styles.reminderBtnText}>View Match Details</Text>
               </TouchableOpacity>
             </View>
           </>

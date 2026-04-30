@@ -38,6 +38,7 @@ import EditFeeScreen from "../screens/EditFeeScreen";
 import TeamsScreen from "../screens/TeamsScreen";
 import MembersScreen from "../screens/MembersScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
+import VerifyEmailScreen from "../screens/VerifyEmailScreen";
 
 
 
@@ -57,6 +58,7 @@ const AppNavigator = () => {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
         </Stack.Navigator>
       ) : (
         <Stack.Navigator>
@@ -95,6 +97,7 @@ const AppNavigator = () => {
 <Stack.Screen name="FeeDetails" component={FeeDetailsScreen} /> 
 <Stack.Screen name="EditFee" component={EditFeeScreen} />
 <Stack.Screen name="EditEvent" component={EditEventScreen} />
+
 <Stack.Screen
   name="Teams"
   component={TeamsScreen}

@@ -94,51 +94,65 @@ const RegisterScreen = ({ navigation }: Props) => {
     setShowDobPicker(false);
   };
 
-  const handleRegister = async () => {
-    if (!firstName.trim()) return Alert.alert("Error", "Enter first name");
-    if (!lastName.trim()) return Alert.alert("Error", "Enter last name");
-    if (!email.trim()) return Alert.alert("Error", "Enter email");
-    if (!password.trim()) return Alert.alert("Error", "Enter password");
+  // =========================
+// REGISTER USER HANDLER
+// =========================
+const handleRegister = async () => {
 
-    if (password !== confirmPassword) {
-      return Alert.alert("Error", "Passwords do not match");
-    }
+  // Basic validations
+  if (!firstName.trim()) return Alert.alert("Error", "Enter first name");
+  if (!lastName.trim()) return Alert.alert("Error", "Enter last name");
+  if (!email.trim()) return Alert.alert("Error", "Enter email");
+  if (!password.trim()) return Alert.alert("Error", "Enter password");
 
-    try {
-      setSubmitting(true);
+  // Password match check
+  if (password !== confirmPassword) {
+    return Alert.alert("Error", "Passwords do not match");
+  }
 
-      const payload = {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        nickname: nickname.trim(),
-        dateOfBirth: dateOfBirth || null,
-        gender,
-        email: email.trim(),
-        phone: phone.trim(),
-        password: password.trim(),
-        battingStyle: battingStyle.trim(),
-        bowlingStyle: bowlingStyle.trim(),
-        playerType: playerType.trim(),
-        jerseyNumber: jerseyNumber ? Number(jerseyNumber) : null,
-      };
+  try {
+    setSubmitting(true);
 
-      const response = await registerUser(payload);
+    // Prepare payload for backend
+    const payload = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      nickname: nickname.trim(),
+      dateOfBirth: dateOfBirth || null,
+      gender,
+      email: email.trim(),
+      phone: phone.trim(),
+      password: password.trim(),
+      battingStyle: battingStyle.trim(),
+      bowlingStyle: bowlingStyle.trim(),
+      playerType: playerType.trim(),
+      jerseyNumber: jerseyNumber ? Number(jerseyNumber) : null,
+    };
 
-      Alert.alert(
-        "Success",
-        typeof response === "string" ? response : "Registered!"
-      );
+    // Call backend API
+    const response = await registerUser(payload);
 
-      navigation.navigate("Login");
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Registration failed"
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    // Show success message
+    Alert.alert(
+      "Success",
+      typeof response === "string" ? response : "Registered!"
+    );
+
+    // 🔥 IMPORTANT CHANGE
+    // Navigate to Verify Email screen with email
+    navigation.navigate("VerifyEmail", {
+      email: email.trim(),
+    });
+
+  } catch (error: any) {
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Registration failed"
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   return (
     <KeyboardAvoidingView

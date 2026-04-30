@@ -54,11 +54,10 @@ const LoginScreen = ({ navigation }: Props) => {
   try {
     setSubmitting(true);
 
-    const response = await loginUser({
-      email: email.trim(),
-      password: password.trim(),
-    });
+    // Call backend login API
+    const response = await loginUser(email.trim(), password.trim());
 
+    // Save token and user in AuthContext
     await login(response.token, {
       id: response.id,
       fullName: response.fullName,
@@ -66,33 +65,29 @@ const LoginScreen = ({ navigation }: Props) => {
       role: response.role,
       status: response.status,
     });
-
   } catch (error: any) {
-    console.log("LOGIN ERROR:", error?.response?.data || error);
+    const message = error?.response?.data?.message;
 
-    const status = error?.response?.status;
-
-    // ❌ No backend / network issue
+    // No backend / internet issue
     if (!error?.response) {
-      Alert.alert(
-        "No Internet",
-        "Check connection or server is not running"
-      );
+      Alert.alert("No Internet", "Check connection or server is not running");
       return;
     }
 
-    // ❌ Wrong credentials (your backend returns 400)
-    if (status === 400 || status === 401 || status === 403) {
-      Alert.alert("Login Failed", "Invalid email or password");
+    // Email not verified yet
+    if (message === "Please verify your email first") {
+      Alert.alert("Verify Email", "Please verify your email first.");
+      navigation.navigate("VerifyEmail", { email: email.trim() });
       return;
     }
 
-    // ❌ Other errors
-    Alert.alert(
-      "Error",
-      error?.response?.data?.message || "Something went wrong"
-    );
+    // Waiting admin approval
+    if (message === "Waiting for admin approval") {
+      Alert.alert("Pending Approval", "Your account is waiting for admin approval.");
+      return;
+    }
 
+    Alert.alert("Login Failed", message || "Invalid email or password");
   } finally {
     setSubmitting(false);
   }

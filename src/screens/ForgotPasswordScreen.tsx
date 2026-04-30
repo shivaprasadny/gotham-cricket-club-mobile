@@ -13,9 +13,10 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+
 import {
   forgotPassword,
-  requestPasswordResetCode,
+  resetPassword,
 } from "../services/authService";
 
 type Props = {
@@ -40,89 +41,86 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
   // =========================
   // SEND RESET CODE
   // =========================
-  const handleSendCode = async () => {
-    if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email");
-      return;
-    }
 
-    try {
-      setSendingCode(true);
+const handleSendCode = async () => {
+  if (!email.trim()) {
+    Alert.alert("Error", "Please enter your email");
+    return;
+  }
 
-      const response = await requestPasswordResetCode(email.trim());
+  try {
+    setSendingCode(true);
 
-      // Auto-fill code input for easier testing
-      setCode(response.resetCode);
+    // Backend sends reset code to email
+    const response = await forgotPassword(email.trim());
 
-      Alert.alert(
-        "Reset Code",
-        `Code: ${response.resetCode}\n\n${response.message}`
-      );
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to send reset code"
-      );
-    } finally {
-      setSendingCode(false);
-    }
-  };
-
+    Alert.alert(
+      "Code Sent",
+      typeof response === "string"
+        ? response
+        : "Password reset code sent to your email."
+    );
+  } catch (error: any) {
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Failed to send reset code"
+    );
+  } finally {
+    setSendingCode(false);
+  }
+};
   // =========================
   // RESET PASSWORD
   // =========================
-  const handleResetPassword = async () => {
-    if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email");
-      return;
-    }
+  
 
-    if (!code.trim()) {
-      Alert.alert("Error", "Please enter reset code");
-      return;
-    }
+const handleResetPassword = async () => {
+  if (!email.trim()) {
+    Alert.alert("Error", "Please enter your email");
+    return;
+  }
 
-    if (!newPassword.trim()) {
-      Alert.alert("Error", "Please enter new password");
-      return;
-    }
+  if (!code.trim()) {
+    Alert.alert("Error", "Please enter reset code");
+    return;
+  }
 
-    if (!confirmPassword.trim()) {
-      Alert.alert("Error", "Please confirm your password");
-      return;
-    }
+  if (!newPassword.trim()) {
+    Alert.alert("Error", "Please enter new password");
+    return;
+  }
 
-    if (newPassword.trim() !== confirmPassword.trim()) {
-      Alert.alert("Error", "Passwords do not match");
-      return;
-    }
+  if (newPassword.trim() !== confirmPassword.trim()) {
+    Alert.alert("Error", "Passwords do not match");
+    return;
+  }
 
-    try {
-      setResetting(true);
+  try {
+    setResetting(true);
 
-      const response = await forgotPassword({
-        email: email.trim(),
-        code: code.trim(),
-        newPassword: newPassword.trim(),
-      });
+    // Backend verifies code and updates password
+    const response = await resetPassword(
+      email.trim(),
+      code.trim(),
+      newPassword.trim()
+    );
 
-      Alert.alert(
-        "Success",
-        typeof response === "string"
-          ? response
-          : "Password reset successful"
-      );
+    Alert.alert(
+      "Success",
+      typeof response === "string" ? response : "Password reset successful"
+    );
 
-      navigation.navigate("Login");
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message || "Failed to reset password"
-      );
-    } finally {
-      setResetting(false);
-    }
-  };
+    navigation.navigate("Login");
+  } catch (error: any) {
+    Alert.alert(
+      "Error",
+      error?.response?.data?.message || "Failed to reset password"
+    );
+  } finally {
+    setResetting(false);
+  }
+};
+
 
   // =========================
   // DISABLE RESET BUTTON CHECK

@@ -1,57 +1,55 @@
 import api from "../api/axiosConfig";
-import {
-  LoginRequest,
-  LoginResponse,
-  RegisterRequest,
-} from "../types/auth";
 
-/**
- * Login user
- */
-export const loginUser = async (
-  payload: LoginRequest
-): Promise<LoginResponse> => {
-  const response = await api.post("/auth/login", payload);
-  return response.data;
-};
-
-/**
- * Register user
- */
-export const registerUser = async (
-  payload: RegisterRequest
-): Promise<string> => {
+// Register new user
+export const registerUser = async (payload: any) => {
   const response = await api.post("/auth/register", payload);
   return response.data;
 };
 
-/**
- * Response returned when reset code is requested
- * For now resetCode is returned for testing only
- */
-export type ForgotPasswordCodeResponse = {
-  message: string;
-  resetCode: string;
-};
-
-/**
- * Ask backend to generate reset code
- */
-export const requestPasswordResetCode = async (
-  email: string
-): Promise<ForgotPasswordCodeResponse> => {
-  const response = await api.post("/auth/forgot-password", { email });
+// Verify email code
+export const verifyEmailCode = async (email: string, code: string) => {
+  const response = await api.post("/auth/verify-email-code", {
+    email,
+    code,
+  });
   return response.data;
 };
 
-/**
- * Reset password using email + code + new password
- */
-export const forgotPassword = async (payload: {
-  email: string;
-  code: string;
-  newPassword: string;
-}): Promise<string> => {
-  const response = await api.post("/auth/reset-password", payload);
+// Resend email verification code
+export const resendVerificationCode = async (email: string) => {
+  const response = await api.post("/auth/resend-verification-code", {
+    email,
+  });
+  return response.data;
+};
+
+// Login user
+export const loginUser = async (email: string, password: string) => {
+  const response = await api.post("/auth/login", {
+    email,
+    password,
+  });
+  return response.data;
+};
+
+// Request forgot password code
+export const forgotPassword = async (email: string) => {
+  const response = await api.post("/auth/forgot-password", {
+    email,
+  });
+  return response.data;
+};
+
+// Reset password with code
+export const resetPassword = async (
+  email: string,
+  code: string,
+  newPassword: string
+) => {
+  const response = await api.post("/auth/reset-password", {
+    email,
+    code,
+    newPassword,
+  });
   return response.data;
 };
