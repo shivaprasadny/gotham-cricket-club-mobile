@@ -7,8 +7,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const api = axios.create({
   //  baseURL: "http://32.194.245.83:8080/api",
-  baseURL:"https://api.shivaprasadofficial.com/api",
-  //  baseURL: "http://192.168.1.127:8080/api",
+  // baseURL:"https://api.shivaprasadofficial.com/api",
+   baseURL: "http://192.168.1.127:8080/api",
   headers: {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
@@ -49,7 +49,12 @@ api.interceptors.response.use(
     try {
       const status = error?.response?.status;
 
-      if (status === 401) {
+
+
+      console.log("API ERROR STATUS:", error?.response?.status);
+console.log("API ERROR DATA:", error?.response?.data);
+
+     if (status === 401 || status === 403) {
         console.log("401 Unauthorized → clearing saved auth session");
 
         // Remove saved session from storage

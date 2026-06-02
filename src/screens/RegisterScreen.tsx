@@ -174,6 +174,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="First Name"
+            placeholderTextColor="#7a7a7a"
             value={firstName}
             onChangeText={setFirstName}
           />
@@ -181,6 +182,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Last Name"
+            placeholderTextColor="#7a7a7a"
             value={lastName}
             onChangeText={setLastName}
           />
@@ -188,6 +190,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Nickname"
+            placeholderTextColor="#7a7a7a"
             value={nickname}
             onChangeText={setNickname}
           />
@@ -225,6 +228,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Email"
+            placeholderTextColor="#7a7a7a"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -235,6 +239,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Phone"
+            placeholderTextColor="#7a7a7a"
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
@@ -243,6 +248,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Password"
+            placeholderTextColor="#7a7a7a"
             secureTextEntry
             value={password}
             autoCapitalize="none"
@@ -253,6 +259,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Confirm Password"
+            placeholderTextColor="#7a7a7a"
             secureTextEntry
             value={confirmPassword}
             autoCapitalize="none"
@@ -263,6 +270,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Batting Style"
+            placeholderTextColor="#7a7a7a"
             value={battingStyle}
             onChangeText={setBattingStyle}
           />
@@ -270,6 +278,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Bowling Style"
+            placeholderTextColor="#7a7a7a"
             value={bowlingStyle}
             onChangeText={setBowlingStyle}
           />
@@ -277,6 +286,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Player Type"
+            placeholderTextColor="#7a7a7a"
             value={playerType}
             onChangeText={setPlayerType}
           />
@@ -284,6 +294,7 @@ const handleRegister = async () => {
           <TextInput
             style={styles.input}
             placeholder="Jersey Number"
+            placeholderTextColor="#7a7a7a"
             value={jerseyNumber}
             onChangeText={setJerseyNumber}
             keyboardType="numeric"
@@ -409,12 +420,14 @@ const styles = StyleSheet.create({
   },
 
   input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
+  borderWidth: 1,
+  borderColor: "#ddd",
+  padding: 12,
+  borderRadius: 10,
+  marginBottom: 10,
+  color: "#111",
+  backgroundColor: "#fff",
+},
 
   inputText: {
     color: "#111",

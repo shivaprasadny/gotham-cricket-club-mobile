@@ -12,6 +12,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { getMyProfile } from "../services/profileService";
 import { useAuth } from "../context/AuthContext";
 
+import { registerForPushNotificationsAsync } from "../services/pushNotificationService";
+
 type Props = {
   navigation: any;
 };
@@ -54,39 +56,40 @@ const ProfileScreen = ({ navigation }: Props) => {
   // FORMAT DATE NICELY
   // Example: April 20th, 2026
   // =========================
+  
+
   const formatPrettyDate = (date?: string) => {
-    if (!date) return "-";
+  if (!date) return "-";
 
-    try {
-      const d = new Date(date);
+  try {
+    const [year, month, day] = date.split("-").map(Number);
 
-      // Make sure date is valid
-      if (isNaN(d.getTime())) return date;
+    if (!year || !month || !day) return date;
 
-      const day = d.getDate();
+    const getSuffix = (num: number) => {
+      if (num >= 11 && num <= 13) return "th";
 
-      const getSuffix = (num: number) => {
-        if (num >= 11 && num <= 13) return "th";
-        switch (num % 10) {
-          case 1:
-            return "st";
-          case 2:
-            return "nd";
-          case 3:
-            return "rd";
-          default:
-            return "th";
-        }
-      };
+      switch (num % 10) {
+        case 1:
+          return "st";
+        case 2:
+          return "nd";
+        case 3:
+          return "rd";
+        default:
+          return "th";
+      }
+    };
 
-      const month = d.toLocaleString("en-US", { month: "long" });
-      const year = d.getFullYear();
+    const monthName = new Date(year, month - 1, day).toLocaleString("en-US", {
+      month: "long",
+    });
 
-      return `📅 ${month} ${day}${getSuffix(day)}, ${year}`;
-    } catch {
-      return date;
-    }
-  };
+    return `📅 ${monthName} ${day}${getSuffix(day)}, ${year}`;
+  } catch {
+    return date;
+  }
+};
 
   // =========================
   // LOAD PROFILE FROM BACKEND
@@ -174,6 +177,18 @@ const ProfileScreen = ({ navigation }: Props) => {
           <Text style={styles.editText}>Edit Profile</Text>
         </TouchableOpacity>
       </View>
+
+
+<TouchableOpacity
+  style={styles.editBtn}
+  onPress={async () => {
+    const token = await registerForPushNotificationsAsync();
+    Alert.alert("Push Token", token || "No token found");
+  }}
+>
+  <Text style={styles.editText}>Test Push Token</Text>
+</TouchableOpacity>
+
 
       {/* ================= PERSONAL INFO ================= */}
       <View style={styles.card}>

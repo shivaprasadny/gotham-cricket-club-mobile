@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { getMyFees } from "../services/feeService";
+import { getMyFees } from "../../services/feeService";
 
 type Props = {
   navigation: any;
@@ -27,6 +27,8 @@ const HomeFeeCard = ({ navigation }: Props) => {
 
   // Load user fees
   const loadFees = async () => {
+
+    setLoading(true);
     try {
       const data = await getMyFees();
       setFees(Array.isArray(data) ? data : []);
@@ -48,7 +50,7 @@ const HomeFeeCard = ({ navigation }: Props) => {
   const pendingFees = useMemo(
     () =>
       fees.filter(
-        (f) => f.status === "UNPAID" || f.status === "PAYMENT_SUBMITTED"
+        (f) => f.status === "UNPAID" 
       ),
     [fees]
   );

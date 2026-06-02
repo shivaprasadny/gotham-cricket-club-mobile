@@ -1,10 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
-// import {
-//   registerForPushNotificationsAsync,
-//   savePushTokenToBackend,
-// } from "../services/pushNotificationService";
+import {
+  registerForPushNotificationsAsync,
+  savePushTokenToBackend,
+} from "../services/pushNotificationService";
 
 type UserType = {
   id: number;
@@ -103,10 +103,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
        * Register push notifications after successful login
        * Safe to keep here for real-device builds
        */
-      // const pushToken = await registerForPushNotificationsAsync();
-      // if (pushToken) {
-      //   await savePushTokenToBackend(pushToken);
-      // }
+     console.log("LOGIN SUCCESS - START PUSH REGISTER");
+
+const pushToken = await registerForPushNotificationsAsync();
+
+console.log("PUSH TOKEN FROM LOGIN:", pushToken);
+
+if (pushToken) {
+  await savePushTokenToBackend(pushToken);
+  console.log("PUSH TOKEN SAVED TO BACKEND");
+}
     } catch (error) {
       console.error("Error saving auth data:", error);
     }
@@ -182,8 +188,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setToken(null);
       setUser(null);
 
-      // await AsyncStorage.removeItem("token");
-      // await AsyncStorage.removeItem("user");
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("user");
     } catch (error) {
       console.error("Error clearing auth data:", error);
     }

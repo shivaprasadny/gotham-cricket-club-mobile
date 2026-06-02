@@ -42,8 +42,8 @@ const MainTabNavigator = () => {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Matches" component={MatchesScreen} />
       <Tab.Screen name="Announcements" component={AnnouncementsScreen} />
-      <Tab.Screen name="Members" component={MembersScreen} />
-      <Tab.Screen name="Teams" component={TeamsScreen} />
+      {/* <Tab.Screen name="Members" component={MembersScreen} />
+      <Tab.Screen name="Teams" component={TeamsScreen} /> */}
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

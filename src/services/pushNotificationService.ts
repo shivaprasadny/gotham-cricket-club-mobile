@@ -1,12 +1,9 @@
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
-import Constants from "expo-constants";
-import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+import { Alert, Platform } from "react-native";
 import api from "../api/axiosConfig";
 
-/**
- * Controls how notifications behave while the app is open
- */
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -16,18 +13,26 @@ Notifications.setNotificationHandler({
   }),
 });
 
-/**
- * Ask permission and get Expo push token
- * Real device only
- */
 export const registerForPushNotificationsAsync = async (): Promise<string | null> => {
   try {
-    if (!Device.isDevice) {
-      console.log("Push notifications require a physical device.");
+    console.log("REGISTER PUSH FUNCTION CALLED");
+
+    if (
+      Platform.OS === "android" &&
+      Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+    ) {
+      Alert.alert(
+        "Expo Go Not Supported",
+        "Android push notifications need EAS preview/development build."
+      );
       return null;
     }
 
-    // Android notification channel
+    if (!Device.isDevice) {
+      Alert.alert("Push Error", "Push notifications require a real device.");
+      return null;
+    }
+
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
         name: "default",
@@ -37,30 +42,27 @@ export const registerForPushNotificationsAsync = async (): Promise<string | null
       });
     }
 
-    // Check current permission
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
-
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
-    // Ask permission if needed
     if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
+      const permission = await Notifications.requestPermissionsAsync();
+      finalStatus = permission.status;
     }
 
     if (finalStatus !== "granted") {
-      console.log("Permission not granted for push notifications.");
+      Alert.alert("Permission Needed", "Notification permission was not granted.");
       return null;
     }
 
-    // Expo projectId required for Expo push token
     const projectId =
-      Constants.expoConfig?.extra?.eas?.projectId ??
-      Constants.easConfig?.projectId;
+      Constants.easConfig?.projectId ||
+      Constants.expoConfig?.extra?.eas?.projectId;
+
+    console.log("PROJECT ID:", projectId);
 
     if (!projectId) {
-      console.log("Missing EAS projectId");
+      Alert.alert("Push Error", "Missing EAS projectId.");
       return null;
     }
 
@@ -68,17 +70,20 @@ export const registerForPushNotificationsAsync = async (): Promise<string | null
       projectId,
     });
 
-    console.log("EXPO PUSH TOKEN:", tokenResponse.data);
-    return tokenResponse.data;
-  } catch (error) {
+    const token = tokenResponse.data;
+
+  // Debug log for development only
+console.log("EXPO PUSH TOKEN:", token);
+
+// Return token to save in backend
+return token;
+  } catch (error: any) {
     console.log("PUSH TOKEN ERROR:", error);
+    Alert.alert("Push Token Error", String(error?.message || error));
     return null;
   }
 };
 
-/**
- * Save push token in backend
- */
 export const savePushTokenToBackend = async (token: string) => {
   const response = await api.post("/notifications/token", { token });
   return response.data;

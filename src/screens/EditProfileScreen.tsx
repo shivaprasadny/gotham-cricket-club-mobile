@@ -19,6 +19,7 @@ type Props = {
 };
 
 const EditProfileScreen = ({ navigation }: Props) => {
+  // Basic profile fields
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [nickname, setNickname] = useState("");
@@ -26,11 +27,13 @@ const EditProfileScreen = ({ navigation }: Props) => {
   const [gender, setGender] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
 
+  // Cricket profile fields
   const [battingStyle, setBattingStyle] = useState("");
   const [bowlingStyle, setBowlingStyle] = useState("");
   const [playerType, setPlayerType] = useState("");
   const [jerseyNumber, setJerseyNumber] = useState("");
 
+  // Save button loading state
   const [saving, setSaving] = useState(false);
 
   // DOB picker modal state
@@ -39,6 +42,7 @@ const EditProfileScreen = ({ navigation }: Props) => {
   const [dobDay, setDobDay] = useState(1);
   const [dobYear, setDobYear] = useState(2000);
 
+  // Month list for picker
   const months = [
     { label: "January", value: 1 },
     { label: "February", value: 2 },
@@ -54,10 +58,33 @@ const EditProfileScreen = ({ navigation }: Props) => {
     { label: "December", value: 12 },
   ];
 
+  // Year list for picker
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 80 }, (_, i) => currentYear - i);
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
+  // This gives correct number of days for selected month/year
+  const getDaysInMonth = (month: number, year: number) => {
+    return new Date(year, month, 0).getDate();
+  };
+
+  // Day list changes based on selected month/year
+  const days = Array.from(
+    { length: getDaysInMonth(dobMonth, dobYear) },
+    (_, i) => i + 1
+  );
+
+  // Parse DOB manually to avoid iOS timezone issue
+  const parseDob = (dob: string) => {
+    const [year, month, day] = dob.split("-").map(Number);
+
+    return {
+      year,
+      month,
+      day,
+    };
+  };
+
+  // Load profile from backend
   const loadProfile = async () => {
     try {
       const data = await getMyProfile();
@@ -74,41 +101,49 @@ const EditProfileScreen = ({ navigation }: Props) => {
       setPlayerType(data.playerType || "");
       setJerseyNumber(data.jerseyNumber ? String(data.jerseyNumber) : "");
 
-      // Pre-fill DOB picker values from existing profile DOB
+      // Pre-fill DOB picker values from backend DOB
       if (data.dateOfBirth) {
-        const d = new Date(data.dateOfBirth);
-        setDobMonth(d.getMonth() + 1);
-        setDobDay(d.getDate());
-        setDobYear(d.getFullYear());
+        const dob = parseDob(data.dateOfBirth);
+        setDobMonth(dob.month);
+        setDobDay(dob.day);
+        setDobYear(dob.year);
       }
     } catch {
       Alert.alert("Error", "Failed to load profile");
     }
   };
 
+  // Run loadProfile one time when screen opens
   useEffect(() => {
     loadProfile();
   }, []);
 
+  // If user selects February etc., fix invalid day like Feb 31
+  useEffect(() => {
+    const maxDay = getDaysInMonth(dobMonth, dobYear);
+
+    if (dobDay > maxDay) {
+      setDobDay(maxDay);
+    }
+  }, [dobMonth, dobYear]);
+
+  // Show DOB nicely on screen
   const formatPrettyDate = (date?: string) => {
     if (!date) return "Select Date of Birth";
 
-    try {
-      const d = new Date(date);
-      const month = d.toLocaleString("en-US", { month: "long" });
-      return `🎂 ${month} ${d.getDate()}, ${d.getFullYear()}`;
-    } catch {
-      return date;
-    }
+    const dob = parseDob(date);
+    const monthName = months.find((m) => m.value === dob.month)?.label;
+
+    return `🎂 ${monthName} ${dob.day}, ${dob.year}`;
   };
 
-  // Open DOB modal and load existing DOB into picker
+  // Open DOB picker modal
   const openDobPicker = () => {
     if (dateOfBirth) {
-      const d = new Date(dateOfBirth);
-      setDobMonth(d.getMonth() + 1);
-      setDobDay(d.getDate());
-      setDobYear(d.getFullYear());
+      const dob = parseDob(dateOfBirth);
+      setDobMonth(dob.month);
+      setDobDay(dob.day);
+      setDobYear(dob.year);
     }
 
     setShowDobPicker(true);
@@ -123,6 +158,7 @@ const EditProfileScreen = ({ navigation }: Props) => {
     setShowDobPicker(false);
   };
 
+  // Save full profile
   const handleSave = async () => {
     try {
       setSaving(true);
@@ -228,7 +264,7 @@ const EditProfileScreen = ({ navigation }: Props) => {
                 selectedValue={dobMonth}
                 style={styles.picker}
                 itemStyle={styles.pickerItem}
-                onValueChange={(value) => setDobMonth(value)}
+                onValueChange={(value) => setDobMonth(Number(value))}
               >
                 {months.map((month) => (
                   <Picker.Item key={month.value} label={month.label} value={month.value} />
@@ -239,7 +275,7 @@ const EditProfileScreen = ({ navigation }: Props) => {
                 selectedValue={dobDay}
                 style={styles.picker}
                 itemStyle={styles.pickerItem}
-                onValueChange={(value) => setDobDay(value)}
+                onValueChange={(value) => setDobDay(Number(value))}
               >
                 {days.map((day) => (
                   <Picker.Item key={day} label={String(day)} value={day} />
@@ -250,7 +286,7 @@ const EditProfileScreen = ({ navigation }: Props) => {
                 selectedValue={dobYear}
                 style={styles.picker}
                 itemStyle={styles.pickerItem}
-                onValueChange={(value) => setDobYear(value)}
+                onValueChange={(value) => setDobYear(Number(value))}
               >
                 {years.map((year) => (
                   <Picker.Item key={year} label={String(year)} value={year} />
