@@ -29,7 +29,7 @@ import HomeHeroCard from "../components/home/HomeHeroCard";
 import PendingApprovalsSection from "../components/home/PendingApprovalsSection";
 import WeeklyMatchesSection from "../components/home/WeeklyMatchesSection";
 import AvailabilityReminderCard from "../components/home/AvailabilityReminderCard";
-import PinnedAnnouncementCard from "../components/home/pinnedAnnouncementCard";
+import PinnedAnnouncementCard from "../components/home/PinnedAnnouncementCard";
 import UpcomingEventsSection from "../components/home/UpcomingEventsSection";
 import QuickActionsGrid from "../components/home/QuickActionsGrid";
 import LatestAnnouncementsSection from "../components/home/LatestAnnouncementsSection";
@@ -293,14 +293,13 @@ const HomeScreen = ({ navigation }: Props) => {
   }, [upcomingMatches]);
 
   // Show only AVAILABLE or MAYBE matches
-  const possibleWeeklyMatches = useMemo(() => {
-    return weeklyMatches.filter(
-      (match) =>
-        (match.myAvailability === "AVAILABLE" ||
-          match.myAvailability === "MAYBE") &&
-        !dismissedMatchIds.includes(match.id)
-    );
-  }, [weeklyMatches, dismissedMatchIds]);
+ const possibleWeeklyMatches = useMemo(() => {
+  return weeklyMatches.filter(
+    (match) =>
+      match.myAvailability === "AVAILABLE" &&
+      !dismissedMatchIds.includes(match.id)
+  );
+}, [weeklyMatches, dismissedMatchIds]);
 
   // First weekly match where user has not marked availability
 const weeklyUnmarkedMatches = useMemo(() => {
@@ -334,7 +333,7 @@ const weeklyUnmarkedMatches = useMemo(() => {
         />
 
         {/* Hero card */}
-        <HomeHeroCard quote={quote} />
+        {/* <HomeHeroCard quote={quote} /> */}
 
         {/* Admin approvals */}
         {isAdmin && (

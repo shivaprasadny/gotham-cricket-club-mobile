@@ -5,6 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
+    "notification": {
+  "icon": "./assets/icon.png",
+  "color": "#da9306"
+},
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -23,16 +27,17 @@
     }
   }
 },
-    "android": {
-      "usesCleartextTraffic": true,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "com.shivaprasadnyc.gothamcricketmobile"
-    },
+   "android": {
+  "usesCleartextTraffic": true,
+  "googleServicesFile": "./google-services.json",
+  "adaptiveIcon": {
+    "foregroundImage": "./assets/logo.png",
+    "backgroundColor": "#ffffff"
+  },
+  "edgeToEdgeEnabled": true,
+  "predictiveBackGestureEnabled": false,
+  "package": "com.shivaprasadnyc.gothamcricketmobile"
+},
     "web": {
       "favicon": "./assets/logo.png"
     },

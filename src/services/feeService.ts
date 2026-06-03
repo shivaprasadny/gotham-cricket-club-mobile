@@ -122,3 +122,12 @@ export const createSplitFee = async (data: {
   const response = await api.post("/fees/split", data);
   return response.data;
 };
+export const getFeeById = async (feeId: number) => {
+  const response = await api.get(`/fees/${feeId}`);
+  return response.data;
+};
+
+export const updateSplitFee = async (feeId: number, data: any) => {
+  const response = await api.put(`/fees/${feeId}/split`, data);
+  return response.data;
+};

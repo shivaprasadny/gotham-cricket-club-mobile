@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1028484832458",
+    "project_id": "gotham-cricket-club",
+    "storage_bucket": "gotham-cricket-club.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1028484832458:android:27c058810a973e4ec92833",
+        "android_client_info": {
+          "package_name": "com.shivaprasadnyc.gothamcricketmobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6PiyK-CTOfR4xzCx9_47Z5KHUtoR5K4k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -71,6 +71,17 @@ const HomeMenuModal = ({
           </TouchableOpacity>
 
 
+
+{/* Members */}
+<TouchableOpacity
+  style={styles.menuItem}
+  onPress={() => goTo("Members")}
+>
+  <Ionicons name="people-outline" size={20} color="#da9306" />
+  <Text style={styles.menuText}>Members</Text>
+</TouchableOpacity>
+
+
 {/* Teams */}
 <TouchableOpacity
   style={styles.menuItem}

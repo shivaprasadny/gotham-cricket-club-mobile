@@ -236,10 +236,14 @@ if (isEventType(item.type) && item.targetId) {
     }
 
     // Stack screens
-    if (item.targetScreen === "MyFees") {
-      navigation.navigate("MyFees");
-      return;
-    }
+   // Open My Fees screen when user taps fee notification
+// targetId is the individual FeeAssignment ID from backend
+if (item.targetScreen === "MyFees") {
+  navigation.navigate("MyFees", {
+    feeAssignmentId: item.targetId,
+  });
+  return;
+}
 
     if (item.targetScreen === "Leagues") {
       navigation.navigate("Leagues");
@@ -270,9 +274,11 @@ if (isEventType(item.type) && item.targetId) {
         navigation.navigate("MainTabs", { screen: "Announcements" });
         return;
 
-      case "FEE":
-        navigation.navigate("MyFees");
-        return;
+     case "FEE":
+  navigation.navigate("MyFees", {
+    feeAssignmentId: item.targetId,
+  });
+  return;
 
       case "TEAM":
         navigation.navigate("MainTabs", { screen: "Teams" });

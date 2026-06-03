@@ -39,6 +39,7 @@ import TeamsScreen from "../screens/TeamsScreen";
 import MembersScreen from "../screens/MembersScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import VerifyEmailScreen from "../screens/VerifyEmailScreen";
+import { navigationRef } from "./navigationRef";
 
 
 
@@ -52,7 +53,7 @@ const AppNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+   <NavigationContainer ref={navigationRef}>
       {!token ? (
         <Stack.Navigator>
           <Stack.Screen name="Login" component={LoginScreen} />
