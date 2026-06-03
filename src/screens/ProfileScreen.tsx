@@ -179,15 +179,6 @@ const ProfileScreen = ({ navigation }: Props) => {
       </View>
 
 
-<TouchableOpacity
-  style={styles.editBtn}
-  onPress={async () => {
-    const token = await registerForPushNotificationsAsync();
-    Alert.alert("Push Token", token || "No token found");
-  }}
->
-  <Text style={styles.editText}>Test Push Token</Text>
-</TouchableOpacity>
 
 
       {/* ================= PERSONAL INFO ================= */}
