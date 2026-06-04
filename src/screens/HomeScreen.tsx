@@ -20,12 +20,10 @@ import {
   AppNotification,
   getNotifications,
 } from "../services/notificationService";
-import { getMyFees } from "../services/feeService";
 import { getEvents } from "../services/eventService";
 
 // Home components
 import HomeHeader from "../components/home/HomeHeader";
-import HomeHeroCard from "../components/home/HomeHeroCard";
 import PendingApprovalsSection from "../components/home/PendingApprovalsSection";
 import WeeklyMatchesSection from "../components/home/WeeklyMatchesSection";
 import AvailabilityReminderCard from "../components/home/AvailabilityReminderCard";
@@ -51,7 +49,10 @@ type Match = {
   venue: string;
   matchDate: string;
   matchType: string;
-  matchFee?: number | null;
+  matchFormat?: string | null;
+  matchFeeAmount?: number | null;
+  matchFeeDueDate?: string | null;
+  matchFeeDescription?: string | null;
   status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
   myAvailability?: "AVAILABLE" | "NOT_AVAILABLE" | "MAYBE" | "INJURED";
 };
@@ -82,20 +83,26 @@ type EventItem = {
   myStatus?: "GOING" | "NOT_GOING" | "MAYBE";
 };
 
-const QUOTES = [
-  "Play for the badge. Fight for each other.",
-  "Discipline, unity, and consistency win matches.",
-  "Great teams trust the process.",
-  "Every match is a chance to improve.",
-];
-
 const HomeScreen = ({ navigation }: Props) => {
   const { user, logout } = useAuth();
 
-  // Menu state
+  // =========================
+  // UI STATE
+  // =========================
+
+  // Burger menu open/close
   const [menuVisible, setMenuVisible] = useState(false);
 
-  // Home data states
+  // Main loading state
+  const [loadingHome, setLoadingHome] = useState(true);
+
+  // Pull-to-refresh loading state
+  const [refreshing, setRefreshing] = useState(false);
+
+  // =========================
+  // DATA STATE
+  // =========================
+
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [pinnedAnnouncement, setPinnedAnnouncement] =
@@ -104,35 +111,44 @@ const HomeScreen = ({ navigation }: Props) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
 
-  // UI loading states
-  const [loadingHome, setLoadingHome] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  // =========================
+  // LOCAL HIDE STATE
+  // =========================
 
-  // Hide dismissed match cards only for current session
+  // Hide dismissed matches only for the current app session
   const [dismissedMatchIds, setDismissedMatchIds] = useState<number[]>([]);
 
-  // Role helpers
+  // Hide events from Home only for the current app session
+  // Event still exists in Events screen
+  const [hiddenEventIds, setHiddenEventIds] = useState<number[]>([]);
+
+  // =========================
+  // ROLE HELPERS
+  // =========================
+
   const isAdmin = user?.role === "ADMIN";
   const isCaptain = user?.role === "CAPTAIN";
   const canManage = isAdmin || isCaptain;
 
-  // Get opponent name only
+  // =========================
+  // MATCH HELPERS
+  // =========================
+
+  // Opponent name only
   const getOpponentName = (match: Match) => {
     return match.awayTeamName || match.externalOpponentName || "Opponent";
   };
 
-  // Get readable match title
+  // Full match title: club/team vs opponent
   const getMatchTitle = (match: Match) => {
-    if (match.awayTeamName) {
-      return `${match.homeTeamName || "Team"} vs ${match.awayTeamName}`;
-    }
+    const home = match.homeTeamName || "Team";
+    const opponent =
+      match.awayTeamName || match.externalOpponentName || "Opponent";
 
-    return `${match.homeTeamName || "Team"} vs ${
-      match.externalOpponentName || "Opponent"
-    }`;
+    return `${home} vs ${opponent}`;
   };
 
-  // Countdown for match cards
+  // Countdown text for weekly matches
   const getCountdownText = (matchDate: string) => {
     const now = new Date().getTime();
     const target = new Date(matchDate).getTime();
@@ -152,7 +168,29 @@ const HomeScreen = ({ navigation }: Props) => {
     return `${totalMinutes}m left`;
   };
 
-  // Load all home screen data
+  // Current week range: Monday to Sunday
+  const getWeekRange = () => {
+    const now = new Date();
+
+    // JS: Sunday = 0, Monday = 1
+    const day = now.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+
+    const start = new Date(now);
+    start.setDate(now.getDate() + diffToMonday);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    end.setHours(23, 59, 59, 999);
+
+    return { start, end };
+  };
+
+  // =========================
+  // LOAD HOME DATA
+  // =========================
+
   const loadHomeData = async () => {
     try {
       setLoadingHome(true);
@@ -162,11 +200,10 @@ const HomeScreen = ({ navigation }: Props) => {
         getAnnouncements(),
         getPinnedAnnouncement(),
         getNotifications(),
-        getMyFees(),
         getEvents(),
       ];
 
-      // Admin only API
+      // Only Admin needs pending member requests
       if (isAdmin) {
         requests.push(getPendingMembers());
       }
@@ -186,17 +223,17 @@ const HomeScreen = ({ navigation }: Props) => {
         results[3].status === "fulfilled" ? results[3].value : [];
 
       const eventsData =
-        results[5].status === "fulfilled" ? results[5].value : [];
+        results[4].status === "fulfilled" ? results[4].value : [];
 
       const pendingData =
-        isAdmin && results[6] && results[6].status === "fulfilled"
-          ? results[6].value
+        isAdmin && results[5] && results[5].status === "fulfilled"
+          ? results[5].value
           : [];
 
       // Upcoming matches only
-      const upcoming = Array.isArray(matchesData)
+      const upcomingMatchList = Array.isArray(matchesData)
         ? matchesData
-            .filter((m) => (m.status || "UPCOMING") === "UPCOMING")
+            .filter((match) => (match.status || "UPCOMING") === "UPCOMING")
             .sort(
               (a, b) =>
                 new Date(a.matchDate).getTime() -
@@ -209,12 +246,15 @@ const HomeScreen = ({ navigation }: Props) => {
         ? announcementData.slice(0, 3)
         : [];
 
-      // Upcoming 3 events
+      // Upcoming events only
+      // Passed events disappear automatically
+      // Hidden events disappear only from Home for this session
       const upcomingEventList = Array.isArray(eventsData)
         ? eventsData
             .filter(
               (event) =>
-                new Date(event.eventDate).getTime() >= new Date().getTime()
+                new Date(event.eventDate).getTime() >= new Date().getTime() &&
+                !hiddenEventIds.includes(event.id)
             )
             .sort(
               (a, b) =>
@@ -224,7 +264,7 @@ const HomeScreen = ({ navigation }: Props) => {
             .slice(0, 3)
         : [];
 
-      setUpcomingMatches(upcoming);
+      setUpcomingMatches(upcomingMatchList);
       setAnnouncements(latestAnnouncements);
       setPinnedAnnouncement(pinnedData || null);
       setNotifications(
@@ -240,49 +280,37 @@ const HomeScreen = ({ navigation }: Props) => {
     }
   };
 
-  // Reload home data every time screen focuses
+  // Reload home data every time Home screen focuses
   useFocusEffect(
     useCallback(() => {
       void loadHomeData();
-    }, [isAdmin])
+    }, [isAdmin, hiddenEventIds])
   );
 
-  // Pull to refresh
+  // =========================
+  // REFRESH
+  // =========================
+
   const onRefresh = async () => {
     setRefreshing(true);
+
+    // Reset hidden/dismissed session-only items when user refreshes
     setDismissedMatchIds([]);
+    setHiddenEventIds([]);
+
     await loadHomeData();
   };
 
-  // Random-looking quote based on user id
-  const quote = useMemo(() => {
-    const index = (user?.id || 0) % QUOTES.length;
-    return QUOTES[index];
-  }, [user?.id]);
+  // =========================
+  // DERIVED DATA
+  // =========================
 
-  // Notification badge count
+  // Unread notification badge count
   const unreadNotificationCount = useMemo(() => {
     return notifications.filter((item) => !item.isRead).length;
   }, [notifications]);
 
-  // Get current week Monday to Sunday
-  const getWeekRange = () => {
-    const now = new Date();
-    const day = now.getDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-
-    const start = new Date(now);
-    start.setDate(now.getDate() + diffToMonday);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-
-    return { start, end };
-  };
-
-  // Matches for current week
+  // Matches from Monday to Sunday
   const weeklyMatches = useMemo(() => {
     const { start, end } = getWeekRange();
 
@@ -292,24 +320,32 @@ const HomeScreen = ({ navigation }: Props) => {
     });
   }, [upcomingMatches]);
 
-  // Show only AVAILABLE or MAYBE matches
- const possibleWeeklyMatches = useMemo(() => {
-  return weeklyMatches.filter(
-    (match) =>
-      match.myAvailability === "AVAILABLE" &&
-      !dismissedMatchIds.includes(match.id)
-  );
-}, [weeklyMatches, dismissedMatchIds]);
+  // Weekly matches where user said AVAILABLE only
+  const possibleWeeklyMatches = useMemo(() => {
+    return weeklyMatches.filter(
+      (match) =>
+        match.myAvailability === "AVAILABLE" &&
+        !dismissedMatchIds.includes(match.id)
+    );
+  }, [weeklyMatches, dismissedMatchIds]);
 
-  // First weekly match where user has not marked availability
-const weeklyUnmarkedMatches = useMemo(() => {
-  return weeklyMatches.filter(
-    (match) =>
-      !match.myAvailability &&
-      !dismissedMatchIds.includes(match.id)
-  );
-}, [weeklyMatches, dismissedMatchIds]);
-  // Logout handler
+  // Weekly matches where user has not marked availability yet
+  const weeklyUnmarkedMatches = useMemo(() => {
+    return weeklyMatches.filter(
+      (match) => !match.myAvailability && !dismissedMatchIds.includes(match.id)
+    );
+  }, [weeklyMatches, dismissedMatchIds]);
+
+  // =========================
+  // HANDLERS
+  // =========================
+
+  const handleHideEvent = (eventId: number) => {
+    setHiddenEventIds((prev) =>
+      prev.includes(eventId) ? prev : [...prev, eventId]
+    );
+  };
+
   const handleLogout = async () => {
     setMenuVisible(false);
     await logout();
@@ -324,7 +360,7 @@ const weeklyUnmarkedMatches = useMemo(() => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Top header */}
+        {/* Top header with greeting, fees, notifications, burger menu */}
         <HomeHeader
           user={user}
           navigation={navigation}
@@ -332,10 +368,7 @@ const weeklyUnmarkedMatches = useMemo(() => {
           onOpenMenu={() => setMenuVisible(true)}
         />
 
-        {/* Hero card */}
-        {/* <HomeHeroCard quote={quote} /> */}
-
-        {/* Admin approvals */}
+        {/* Admin pending approval reminder */}
         {isAdmin && (
           <PendingApprovalsSection
             pendingCount={pendingMembers.length}
@@ -350,16 +383,15 @@ const weeklyUnmarkedMatches = useMemo(() => {
           </View>
         ) : (
           <>
+            {/* Inline weekly availability quick response */}
+            <AvailabilityReminderCard
+              matches={weeklyUnmarkedMatches}
+              navigation={navigation}
+              getOpponentName={getOpponentName}
+              onUpdated={loadHomeData}
+            />
 
-                   {/* Availability reminder */}
-      <AvailabilityReminderCard
-  matches={weeklyUnmarkedMatches}
-  navigation={navigation}
-  getOpponentName={getOpponentName}
-  onUpdated={loadHomeData}
-/>
-            
-            {/* Weekly matches */}
+            {/* Weekly matches where user marked Available */}
             <WeeklyMatchesSection
               matches={possibleWeeklyMatches.slice(0, 3)}
               navigation={navigation}
@@ -367,24 +399,21 @@ const weeklyUnmarkedMatches = useMemo(() => {
               getMatchCountdown={getCountdownText}
             />
 
-   
-
             {/* Pinned announcement */}
             <PinnedAnnouncementCard
               announcement={pinnedAnnouncement}
               navigation={navigation}
             />
 
-            {/* Upcoming events */}
+            {/* Upcoming events with quick response and hide button */}
             <UpcomingEventsSection
-              events={upcomingEvents.map((event) => ({
-                ...event,
-                venue: event.location,
-              }))}
+              events={upcomingEvents}
               navigation={navigation}
+              onUpdated={loadHomeData}
+        
             />
 
-            {/* Quick actions */}
+            {/* Shortcut buttons */}
             <QuickActionsGrid
               isAdmin={isAdmin}
               canManage={canManage}
@@ -434,4 +463,18 @@ const styles = StyleSheet.create({
   infoText: {
     color: "#ddd",
   },
+  rightIcons: {
+  flexDirection: "row",
+  alignItems: "center",
+},
+
+hideButton: {
+  width: 28,
+  height: 28,
+  borderRadius: 14,
+  backgroundColor: "#2b0540",
+  alignItems: "center",
+  justifyContent: "center",
+  marginRight: 8,
+},
 });

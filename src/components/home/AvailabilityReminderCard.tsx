@@ -166,9 +166,7 @@ const getLeagueLabel = (match: any) => {
               </View>
 
               <View style={styles.selectBox}>
-                <Text style={styles.selectText}>
-                  {isExpanded ? "Close" : "Select"}
-                </Text>
+              
 
                 <Ionicons
                   name={isExpanded ? "chevron-up" : "chevron-down"}
