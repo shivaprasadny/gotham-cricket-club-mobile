@@ -1,71 +1,112 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Alert } from "react-native";
 
-// Create one shared axios instance for the whole app
+/**
+ * Prevents showing many "Session Expired" alerts at the same time
+ * if multiple API calls fail together.
+ */
+let isSessionExpiredAlertShown = false;
 
- 
-
+/**
+ * Shared Axios instance for the whole app.
+ *
+ * All API calls should use this file so:
+ * 1. baseURL is controlled in one place
+ * 2. JWT token is added automatically
+ * 3. expired/invalid token is handled globally
+ */
 const api = axios.create({
-  //  baseURL: "http://32.194.245.83:8080/api",
-  // baseURL:"https://api.shivaprasadofficial.com/api",
-   baseURL: "http://192.168.1.127:8080/api",
+  // Production backend API
+ //  baseURL: "http://32.194.245.83:8080/api",
+
+
+
+  baseURL:"https://api.shivaprasadofficial.com/api",
+
+
+
+  //  baseURL: "http://192.168.1.127:8080/api",
+
   headers: {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
   },
 });
-// =========================
-// REQUEST INTERCEPTOR
-// =========================
-// Add JWT token to every outgoing request if token exists
+
+/**
+ * REQUEST INTERCEPTOR
+ *
+ * Runs before every API request.
+ * It reads JWT token from AsyncStorage and attaches it to the request.
+ */
 api.interceptors.request.use(
   async (config) => {
     try {
+      // Get saved JWT token from phone storage
       const token = await AsyncStorage.getItem("token");
 
+      // If token exists, attach it to Authorization header
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
 
-      // Optional debug log
-      console.log("REQUEST:", config.method?.toUpperCase(), config.url);
-
       return config;
     } catch (error) {
-      console.error("REQUEST INTERCEPTOR ERROR:", error);
+      console.log("REQUEST INTERCEPTOR ERROR:", error);
       return config;
     }
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
-// =========================
-// RESPONSE INTERCEPTOR
-// =========================
-// If backend says token is invalid / expired, clear saved session
+/**
+ * RESPONSE INTERCEPTOR
+ *
+ * Runs when API returns an error.
+ * If backend says token is expired/invalid, remove local token
+ * and show a clear login-again message.
+ */
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     try {
       const status = error?.response?.status;
 
+      // 401 = Unauthorized / token expired
+      // 403 = Forbidden / token invalid or no permission
+      if ((status === 401 || status === 403) && !isSessionExpiredAlertShown) {
+        isSessionExpiredAlertShown = true;
 
-
-      console.log("API ERROR STATUS:", error?.response?.status);
-console.log("API ERROR DATA:", error?.response?.data);
-
-     if (status === 401 || status === 403) {
-        console.log("401 Unauthorized → clearing saved auth session");
-
-        // Remove saved session from storage
+        // Clear saved login session from phone
         await AsyncStorage.removeItem("token");
         await AsyncStorage.removeItem("user");
 
-        // Remove default auth header if previously set anywhere
-        delete api.defaults.headers.common["Authorization"];
+        // Remove default Authorization header if it exists
+        delete api.defaults.headers.common.Authorization;
+
+        // Show user-friendly alert
+        Alert.alert(
+          "Session Expired",
+          "Please login again.",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Allow alert to show again in future if needed
+                isSessionExpiredAlertShown = false;
+              },
+            },
+          ]
+        );
       }
-    } catch (storageError) {
-      console.error("RESPONSE INTERCEPTOR CLEANUP ERROR:", storageError);
+
+      // Helpful logs during testing
+      console.log("API ERROR STATUS:", status);
+      console.log("API ERROR DATA:", error?.response?.data);
+    } catch (cleanupError) {
+      console.log("RESPONSE INTERCEPTOR CLEANUP ERROR:", cleanupError);
     }
 
     return Promise.reject(error);

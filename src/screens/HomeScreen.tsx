@@ -250,19 +250,26 @@ const HomeScreen = ({ navigation }: Props) => {
       // Passed events disappear automatically
       // Hidden events disappear only from Home for this session
       const upcomingEventList = Array.isArray(eventsData)
-        ? eventsData
-            .filter(
-              (event) =>
-                new Date(event.eventDate).getTime() >= new Date().getTime() &&
-                !hiddenEventIds.includes(event.id)
-            )
-            .sort(
-              (a, b) =>
-                new Date(a.eventDate).getTime() -
-                new Date(b.eventDate).getTime()
-            )
-            .slice(0, 3)
-        : [];
+  ? eventsData
+      .filter((event) => {
+        const eventDate = new Date(event.eventDate);
+
+        const isUpcoming = eventDate.getTime() >= new Date().getTime();
+
+        const isNotGoing = event.myStatus === "NOT_GOING";
+
+        return (
+          isUpcoming &&
+          !isNotGoing &&
+          !hiddenEventIds.includes(event.id)
+        );
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.eventDate).getTime() -
+          new Date(b.eventDate).getTime()
+      )
+  : [];
 
       setUpcomingMatches(upcomingMatchList);
       setAnnouncements(latestAnnouncements);
@@ -407,11 +414,11 @@ const HomeScreen = ({ navigation }: Props) => {
 
             {/* Upcoming events with quick response and hide button */}
             <UpcomingEventsSection
-              events={upcomingEvents}
-              navigation={navigation}
-              onUpdated={loadHomeData}
-        
-            />
+  events={upcomingEvents}
+  navigation={navigation}
+  onUpdated={loadHomeData}
+  onHideEvent={handleHideEvent}
+/>
 
             {/* Shortcut buttons */}
             <QuickActionsGrid

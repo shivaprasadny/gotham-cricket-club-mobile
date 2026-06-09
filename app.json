@@ -17,7 +17,7 @@
       "backgroundColor": "#2b0540"
     },
     "ios": {
-      "buildNumber": "3",
+      "buildNumber": "5",
   "supportsTablet": true,
   "bundleIdentifier": "com.shivaprasadnyc.gothamcricketmobile",
   "infoPlist": {

@@ -131,3 +131,10 @@ export const updateSplitFee = async (feeId: number, data: any) => {
   const response = await api.put(`/fees/${feeId}/split`, data);
   return response.data;
 };
+/**
+ * Send push reminder to unpaid members for one fee
+ */
+export const sendFeeReminder = async (feeId: number) => {
+  const response = await api.post(`/fees/${feeId}/send-reminder`);
+  return response.data;
+};

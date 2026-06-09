@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,91 +26,128 @@ type Props = {
   events: EventItem[];
   navigation: any;
   onUpdated?: () => void;
+  onHideEvent?: (eventId: number) => void;
 };
 
 const STATUS_OPTIONS: {
   label: string;
   value: EventStatus;
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
 }[] = [
   { label: "Going", value: "GOING", icon: "checkmark-circle" },
   { label: "Maybe", value: "MAYBE", icon: "help-circle" },
   { label: "Not Going", value: "NOT_GOING", icon: "close-circle" },
 ];
 
+// Parse backend local datetime without UTC shifting
+const parseLocalDateTime = (dateString: string) => {
+  if (!dateString) return new Date();
+
+  const cleanDate = dateString.replace("Z", "").split(".")[0];
+
+  const [datePart, timePart = "00:00:00"] = cleanDate.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute, second] = timePart.split(":").map(Number);
+
+  return new Date(
+    year,
+    month - 1,
+    day,
+    hour || 0,
+    minute || 0,
+    second || 0
+  );
+};
+
+const formatDate = (dateString: string) => {
+  try {
+    const date = parseLocalDateTime(dateString);
+
+    return date.toLocaleString([], {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return dateString;
+  }
+};
+
+const getStatusLabel = (status?: EventStatus) => {
+  switch (status) {
+    case "GOING":
+      return "Going";
+    case "MAYBE":
+      return "Maybe";
+    case "NOT_GOING":
+      return "Not Going";
+    default:
+      return "No response";
+  }
+};
+
+const getStatusColor = (status?: EventStatus) => {
+  switch (status) {
+    case "GOING":
+      return "#22c55e";
+    case "MAYBE":
+      return "#facc15";
+    case "NOT_GOING":
+      return "#ef4444";
+    default:
+      return "#d1d5db";
+  }
+};
+
 const UpcomingEventsSection = ({
   events,
   navigation,
   onUpdated,
+  onHideEvent,
 }: Props) => {
-  // Which event is currently expanded
   const [expandedEventId, setExpandedEventId] = useState<number | null>(null);
-
-  // Which event is currently saving response
   const [savingEventId, setSavingEventId] = useState<number | null>(null);
 
-  // Local response state so UI updates immediately after submit
-  const [localStatuses, setLocalStatuses] = useState<
-    Record<number, EventStatus>
-  >({});
+  // Local state keeps event visible and updates response instantly
+  const [localStatuses, setLocalStatuses] = useState<Record<number, EventStatus>>(
+    {}
+  );
 
-  // If there are no events, show empty card
-  if (events.length === 0) {
-    return (
-      <>
-        <Text style={styles.sectionTitle}>Upcoming Events</Text>
+  // Count events with no response
+  const notRespondedCount = useMemo(() => {
+    return events.filter((event) => {
+      const currentStatus = localStatuses[event.id] || event.myStatus;
+      return !currentStatus;
+    }).length;
+  }, [events, localStatuses]);
 
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No upcoming events.</Text>
-        </View>
-      </>
-    );
-  }
-
-  // Format event date safely
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleString();
-    } catch {
-      return dateString;
-    }
-  };
-
-  // Convert status to clean label
-  const getStatusLabel = (status?: EventStatus) => {
-    switch (status) {
-      case "GOING":
-        return "Going";
-      case "MAYBE":
-        return "Maybe";
-      case "NOT_GOING":
-        return "Not Going";
-      default:
-        return "No response";
-    }
-  };
-
-  // Submit quick response from Home
   const handleQuickResponse = async (eventId: number, status: EventStatus) => {
     try {
       setSavingEventId(eventId);
 
-      await submitEventAvailability(eventId, {
-        status,
-        message: "",
-      });
+    await submitEventAvailability(eventId, {
+  status,
+  message: "",
+});
 
-      // Update local status immediately
-      setLocalStatuses((prev) => ({
-        ...prev,
-        [eventId]: status,
-      }));
+setLocalStatuses((prev) => ({
+  ...prev,
+  [eventId]: status,
+}));
 
-      // Collapse event after saving
-      setExpandedEventId(null);
+// Collapse event after saving
+setExpandedEventId(null);
 
-      // Refresh Home data if parent provides function
-      onUpdated?.();
+// If user selected Not Going, remove event from Home immediately
+if (status === "NOT_GOING") {
+  onHideEvent?.(eventId);
+}
+
+// DO NOT refresh HomeScreen
+// onUpdated?.();
     } catch (error: any) {
       console.log("HOME EVENT RESPONSE ERROR:", error);
 
@@ -125,7 +162,6 @@ const UpcomingEventsSection = ({
     }
   };
 
-  // Open full event page if user wants to add message
   const openEventDetails = (event: EventItem) => {
     navigation.navigate("EventDetails", {
       event,
@@ -134,130 +170,136 @@ const UpcomingEventsSection = ({
 
   return (
     <View style={styles.wrapper}>
-      {/* Section title */}
-      <Text style={styles.sectionTitle}>Upcoming Events</Text>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.sectionTitle}>Upcoming Events</Text>
 
-      {/* Event list */}
-      {events.map((event) => {
-        const isExpanded = expandedEventId === event.id;
-        const isSaving = savingEventId === event.id;
+          <Text style={styles.sectionSubTitle}>
+            {notRespondedCount === 0
+              ? "All events responded"
+              : `${notRespondedCount} event${
+                  notRespondedCount > 1 ? "s" : ""
+                } need response`}
+          </Text>
+        </View>
+      </View>
 
-        // Prefer local status first, then backend status
-        const currentStatus = localStatuses[event.id] || event.myStatus;
+      {events.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyText}>No upcoming events.</Text>
+        </View>
+      ) : (
+        events.map((event) => {
+          const isExpanded = expandedEventId === event.id;
+          const isSaving = savingEventId === event.id;
 
-        const statusLabel = getStatusLabel(currentStatus);
+          const currentStatus = localStatuses[event.id] || event.myStatus;
+          const statusLabel = getStatusLabel(currentStatus);
+          const statusColor = getStatusColor(currentStatus);
 
-        return (
-          <View key={event.id} style={styles.rowCard}>
-            {/* Main compact event row */}
-           {/* Main compact event row */}
-<TouchableOpacity
-  style={styles.eventRow}
-  activeOpacity={0.85}
-  onPress={() => setExpandedEventId(isExpanded ? null : event.id)}
->
-  <View style={styles.eventInfo}>
-    <Text style={styles.title} numberOfLines={1}>
-      {event.title}
-    </Text>
+          return (
+            <View key={event.id} style={styles.rowCard}>
+              <TouchableOpacity
+                style={styles.eventRow}
+                activeOpacity={0.85}
+                onPress={() => setExpandedEventId(isExpanded ? null : event.id)}
+              >
+                <View style={styles.eventInfo}>
+                  <Text style={styles.title} numberOfLines={1}>
+                    {event.title}
+                  </Text>
 
-    <Text style={styles.date} numberOfLines={1}>
-      {formatDate(event.eventDate)}
-    </Text>
+                  <Text style={styles.date} numberOfLines={1}>
+                    {formatDate(event.eventDate)}
+                  </Text>
 
-    {!!event.location && (
-      <Text style={styles.location} numberOfLines={1}>
-        📍 {event.location}
-      </Text>
-    )}
-  </View>
+                  {!!event.location && (
+                    <Text style={styles.location} numberOfLines={1}>
+                      📍 {event.location}
+                    </Text>
+                  )}
+                </View>
 
-  <View style={styles.statusRow}>
-    <Text
-      style={[
-        styles.responseText,
-        !currentStatus && styles.noResponseText,
-      ]}
-    >
-      {statusLabel}
-    </Text>
+                <View style={styles.statusBox}>
+                  <Text style={[styles.responseText, { color: statusColor }]}>
+                    {statusLabel}
+                  </Text>
 
-    <Ionicons
-      name={isExpanded ? "chevron-up" : "chevron-down"}
-      size={22}
-      color="#da9306"
-    />
-  </View>
-</TouchableOpacity>
+                  <Ionicons
+                    name={isExpanded ? "chevron-up" : "chevron-down"}
+                    size={22}
+                    color="#da9306"
+                  />
+                </View>
+              </TouchableOpacity>
 
-                
-
-            {/* Expanded response area */}
-            {isExpanded && (
-              <View style={styles.expandedBox}>
-                {isSaving ? (
-                  <View style={styles.savingBox}>
-                    <ActivityIndicator color="#da9306" />
-                    <Text style={styles.savingText}>Saving...</Text>
-                  </View>
-                ) : (
-                  <>
-                    {/* Quick response buttons */}
-                    <View style={styles.optionsGrid}>
-                      {STATUS_OPTIONS.map((option) => (
-                        <TouchableOpacity
-                          key={option.value}
-                          style={styles.optionButton}
-                          activeOpacity={0.85}
-                          onPress={() =>
-                            handleQuickResponse(event.id, option.value)
-                          }
-                        >
-                       <View style={styles.statusRow}>
-  <Text
-    style={[
-      styles.responseText,
-      !currentStatus && styles.noResponseText,
-    ]}
-  >
-    {statusLabel}
-  </Text>
-
-  <Ionicons
-    name={isExpanded ? "chevron-up" : "chevron-down"}
-    size={22}
-    color="#da9306"
-  />
-</View>
-
-                          <Text style={styles.optionText}>{option.label}</Text>
-                        </TouchableOpacity>
-                      ))}
+              {isExpanded && (
+                <View style={styles.expandedBox}>
+                  {isSaving ? (
+                    <View style={styles.savingBox}>
+                      <ActivityIndicator color="#da9306" />
+                      <Text style={styles.savingText}>Saving...</Text>
                     </View>
+                  ) : (
+                    <>
+                      <View style={styles.optionsGrid}>
+                        {STATUS_OPTIONS.map((option) => {
+                          const isSelected = currentStatus === option.value;
 
-                    {/* Open full details screen for message */}
-                    <TouchableOpacity
-                      style={styles.messageButton}
-                      activeOpacity={0.85}
-                      onPress={() => openEventDetails(event)}
-                    >
-                      <Ionicons
-                        name="chatbubble-ellipses-outline"
-                        size={17}
-                        color="#da9306"
-                      />
+                          return (
+                            <TouchableOpacity
+                              key={option.value}
+                              style={[
+                                styles.optionButton,
+                                isSelected && styles.optionButtonSelected,
+                              ]}
+                              activeOpacity={0.85}
+                              onPress={() =>
+                                handleQuickResponse(event.id, option.value)
+                              }
+                            >
+                              <Ionicons
+                                name={option.icon}
+                                size={22}
+                                color={isSelected ? "#2b0540" : "#da9306"}
+                              />
 
-                      <Text style={styles.messageButtonText}>
-                        Add message / more details
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            )}
-          </View>
-        );
-      })}
+                              <Text
+                                style={[
+                                  styles.optionText,
+                                  isSelected && styles.optionTextSelected,
+                                ]}
+                              >
+                                {option.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.messageButton}
+                        activeOpacity={0.85}
+                        onPress={() => openEventDetails(event)}
+                      >
+                        <Ionicons
+                          name="chatbubble-ellipses-outline"
+                          size={17}
+                          color="#da9306"
+                        />
+
+                        <Text style={styles.messageButtonText}>
+                          Add message / more details
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              )}
+            </View>
+          );
+        })
+      )}
     </View>
   );
 };
@@ -269,12 +311,22 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
 
+  headerRow: {
+    marginTop: 6,
+    marginBottom: 10,
+  },
+
   sectionTitle: {
     color: "#fff",
     fontSize: 20,
     fontWeight: "700",
-    marginBottom: 10,
-    marginTop: 6,
+  },
+
+  sectionSubTitle: {
+    color: "#d1d5db",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 3,
   },
 
   emptyCard: {
@@ -318,7 +370,6 @@ const styles = StyleSheet.create({
   date: {
     color: "#d1d5db",
     fontSize: 13,
-    marginTop: 6,
     marginBottom: 3,
   },
 
@@ -328,28 +379,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  statusBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#2b0540",
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: "rgba(218,147,6,0.5)",
+  statusBox: {
+    alignItems: "center",
+    minWidth: 82,
   },
 
-  statusBadgeText: {
-    color: "#da9306",
-    fontSize: 11,
+  responseText: {
     fontWeight: "800",
-  },
-
-  noResponseBadge: {
-    borderColor: "rgba(209,213,219,0.35)",
-  },
-
-  noResponseText: {
-    color: "#d1d5db",
+    fontSize: 12,
+    marginBottom: 4,
+    textAlign: "center",
   },
 
   expandedBox: {
@@ -372,6 +411,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(218,147,6,0.35)",
+  },
+
+  optionButtonSelected: {
+    backgroundColor: "#da9306",
+    borderColor: "#da9306",
   },
 
   optionText: {
@@ -380,6 +426,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     textAlign: "center",
+  },
+
+  optionTextSelected: {
+    color: "#2b0540",
   },
 
   messageButton: {
@@ -411,16 +461,4 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontWeight: "700",
   },
-  statusRow: {
-  alignItems: "center",
-},
-
-responseText: {
-  color: "#da9306",
-  fontWeight: "700",
-  fontSize: 12,
-  marginBottom: 4,
-},
-
-
 });

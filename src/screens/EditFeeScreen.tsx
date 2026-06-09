@@ -339,10 +339,18 @@ const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
   };
 
   // Format date text
-  const formatDate = (date: Date | null) => {
-    if (!date) return "Select due date & time";
-    return date.toLocaleString();
-  };
+const formatDate = (date: Date | null) => {
+  if (!date) return "Select due date & time";
+
+  return date.toLocaleString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
 
   // Build one selected member row
   const buildSelectedSplit = (
@@ -526,7 +534,50 @@ const visibleSelectedSplits = useMemo(() => {
     }, 0);
   }, [selectedSplits]);
 
-  // Create fee
+
+
+
+
+
+
+  const formatLocalDateTime = (date: Date) => {
+  const pad = (num: number) => String(num).padStart(2, "0");
+
+  return (
+    date.getFullYear() +
+    "-" +
+    pad(date.getMonth() + 1) +
+    "-" +
+    pad(date.getDate()) +
+    "T" +
+    pad(date.getHours()) +
+    ":" +
+    pad(date.getMinutes()) +
+    ":00"
+  );
+};
+
+
+const parseLocalDateTime = (dateString: string) => {
+  if (!dateString) return new Date();
+
+  const cleanDate = dateString.replace("Z", "").split(".")[0];
+
+  const [datePart, timePart = "00:00:00"] = cleanDate.split("T");
+
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute, second] = timePart.split(":").map(Number);
+
+  return new Date(
+    year,
+    month - 1,
+    day,
+    hour || 0,
+    minute || 0,
+    second || 0
+  );
+};
+  // update fee
 
 
 const handleUpdateFee = async () => {
@@ -583,7 +634,7 @@ const handleUpdateFee = async () => {
   title: title.trim(),
   feeType,
   amount: totalAmount,
-  dueDate: dueDate.toISOString(),
+dueDate: formatLocalDateTime(dueDate),
   description: description.trim(),
   splits: finalSplits,
 });
@@ -647,8 +698,13 @@ const loadFeeData = async () => {
 
     setTitle(fee.title || "");
     setFeeType(fee.feeType || "MATCH_FEE");
-    setDueDate(fee.dueDate ? new Date(fee.dueDate) : null);
-    setTempDueDate(fee.dueDate ? new Date(fee.dueDate) : new Date());
+    setDueDate(
+  fee.dueDate ? parseLocalDateTime(fee.dueDate) : null
+);
+
+setTempDueDate(
+  fee.dueDate ? parseLocalDateTime(fee.dueDate) : new Date()
+);
     setDescription(fee.description || "");
 
     if (fee.assignments && Array.isArray(fee.assignments)) {

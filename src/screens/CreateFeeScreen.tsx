@@ -510,6 +510,23 @@ const visibleSelectedSplits = useMemo(() => {
     }, 0);
   }, [selectedSplits]);
 
+
+  const formatLocalDateTime = (date: Date) => {
+  const pad = (num: number) => String(num).padStart(2, "0");
+
+  return (
+    date.getFullYear() +
+    "-" +
+    pad(date.getMonth() + 1) +
+    "-" +
+    pad(date.getDate()) +
+    "T" +
+    pad(date.getHours()) +
+    ":" +
+    pad(date.getMinutes()) +
+    ":00"
+  );
+};
   // Create fee
   const handleCreateFee = async () => {
     if (!title.trim()) {
@@ -540,7 +557,7 @@ const fixedSplits = selectedSplits.map((item) => ({
 const response = await createSplitFee({
   title: title.trim(),
   feeType,
-  dueDate: dueDate.toISOString(),
+dueDate: formatLocalDateTime(dueDate),
   description: description.trim(),
   splits: fixedSplits,
 });
@@ -578,7 +595,7 @@ return;
         const response = await createSplitFee({
           title: title.trim(),
           feeType,
-          dueDate: dueDate.toISOString(),
+        dueDate: formatLocalDateTime(dueDate),
           description: description.trim(),
           splits: fixedSplits,
         });

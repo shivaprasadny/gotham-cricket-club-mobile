@@ -175,6 +175,27 @@ const [pickerMode, setPickerMode] = useState<"date" | "time">("date");
   const finalMatchFormat =
     matchFormat === "CUSTOM" ? customFormat.trim() : matchFormat;
 
+
+    // Keeps date/time exactly as user selected.
+// Does NOT convert to UTC.
+const formatLocalDateTime = (date: Date) => {
+  const pad = (num: number) => String(num).padStart(2, "0");
+
+  return (
+    date.getFullYear() +
+    "-" +
+    pad(date.getMonth() + 1) +
+    "-" +
+    pad(date.getDate()) +
+    "T" +
+    pad(date.getHours()) +
+    ":" +
+    pad(date.getMinutes()) +
+    ":00"
+  );
+};
+
+
   // Create match handler
   const handleCreateMatch = async () => {
     if (!homeTeamId) {
@@ -223,7 +244,7 @@ const [pickerMode, setPickerMode] = useState<"date" | "time">("date");
         externalOpponentName:
           opponentMode === "EXTERNAL" ? externalOpponentName.trim() : "",
         leagueId,
-        matchDate: matchDate.toISOString(),
+      matchDate: formatLocalDateTime(matchDate),
         venue: venue.trim(),
         matchType,
         matchFormat: finalMatchFormat,
@@ -231,9 +252,9 @@ const [pickerMode, setPickerMode] = useState<"date" | "time">("date");
         matchFeeAmount: matchFeeAmount.trim()
           ? Number(matchFeeAmount)
           : null,
-        matchFeeDueDate: matchFeeDueDate
-          ? matchFeeDueDate.toISOString()
-          : null,
+       matchFeeDueDate: matchFeeDueDate
+  ? formatLocalDateTime(matchFeeDueDate)
+  : null,
         matchFeeDescription: matchFeeDescription.trim(),
         notes: notes.trim(),
         status,

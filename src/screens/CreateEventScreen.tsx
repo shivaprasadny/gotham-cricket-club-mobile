@@ -88,6 +88,27 @@ const CreateEventScreen = ({ navigation }: Props) => {
     setShowDatePicker(false);
   };
 
+
+
+// Keeps the exact local date/time user selected.
+// This avoids UTC conversion from toISOString().
+const formatLocalDateTime = (date: Date) => {
+  const pad = (num: number) => String(num).padStart(2, "0");
+
+  return (
+    date.getFullYear() +
+    "-" +
+    pad(date.getMonth() + 1) +
+    "-" +
+    pad(date.getDate()) +
+    "T" +
+    pad(date.getHours()) +
+    ":" +
+    pad(date.getMinutes()) +
+    ":00"
+  );
+};
+
   // =========================
   // CREATE EVENT
   // =========================
@@ -114,7 +135,7 @@ const CreateEventScreen = ({ navigation }: Props) => {
         title: title.trim(),
         description: description.trim(),
         location: location.trim(),
-        eventDate: eventDate.toISOString(),
+eventDate: formatLocalDateTime(eventDate),
       });
 
       Alert.alert(
@@ -170,14 +191,23 @@ const CreateEventScreen = ({ navigation }: Props) => {
         />
 
         {/* DATE PICKER BUTTON */}
-        <Text style={styles.label}>Event Date & Time</Text>
-        <TouchableOpacity style={styles.input} onPress={openDatePicker}>
-          <Text style={styles.inputText}>
-            {eventDate
-              ? eventDate.toLocaleString()
-              : "Select Event Date & Time"}
-          </Text>
-        </TouchableOpacity>
+      {/* DATE PICKER BUTTON */}
+<Text style={styles.label}>Event Date & Time</Text>
+
+<TouchableOpacity style={styles.input} onPress={openDatePicker}>
+  <Text style={styles.inputText}>
+    {eventDate
+      ? eventDate.toLocaleString([], {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "Select Event Date & Time"}
+  </Text>
+</TouchableOpacity>
 
         {/* IOS PICKER ONLY */}
         {Platform.OS === "ios" && showDatePicker && (

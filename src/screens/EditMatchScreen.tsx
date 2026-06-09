@@ -138,7 +138,11 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
       setLeagueId(matchData?.leagueId ?? null);
       setVenue(matchData?.venue || "");
       setNotes(matchData?.notes || "");
-      setMatchDate(matchData?.matchDate ? new Date(matchData.matchDate) : null);
+setMatchDate(
+  matchData?.matchDate
+    ? parseLocalDateTime(matchData.matchDate)
+    : null
+);
 
       setMatchFeeAmount(
         matchData?.matchFeeAmount !== null &&
@@ -147,9 +151,11 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
           : ""
       );
 
-      setMatchFeeDueDate(
-        matchData?.matchFeeDueDate ? new Date(matchData.matchFeeDueDate) : null
-      );
+     setMatchFeeDueDate(
+  matchData?.matchFeeDueDate
+    ? parseLocalDateTime(matchData.matchFeeDueDate)
+    : null
+);
 
       setMatchFeeDescription(matchData?.matchFeeDescription || "");
 
@@ -249,6 +255,42 @@ const openAndroidDateTimePicker = (
   });
 };
 
+
+const parseLocalDateTime = (dateString: string) => {
+  if (!dateString) return new Date();
+
+  const cleanDate = dateString.replace("Z", "").split(".")[0];
+
+  const [datePart, timePart = "00:00:00"] = cleanDate.split("T");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour, minute, second] = timePart.split(":").map(Number);
+
+  return new Date(
+    year,
+    month - 1,
+    day,
+    hour || 0,
+    minute || 0,
+    second || 0
+  );
+};
+
+const formatLocalDateTime = (date: Date) => {
+  const pad = (num: number) => String(num).padStart(2, "0");
+
+  return (
+    date.getFullYear() +
+    "-" +
+    pad(date.getMonth() + 1) +
+    "-" +
+    pad(date.getDate()) +
+    "T" +
+    pad(date.getHours()) +
+    ":" +
+    pad(date.getMinutes()) +
+    ":00"
+  );
+};
   const handleUpdateMatch = async () => {
     if (!homeTeamId) {
       Alert.alert("Error", "Please select a home team");
@@ -296,13 +338,15 @@ const openAndroidDateTimePicker = (
         externalOpponentName:
           opponentMode === "EXTERNAL" ? externalOpponentName.trim() : "",
         leagueId,
-        matchDate: matchDate.toISOString(),
+       matchDate: formatLocalDateTime(matchDate),
         venue: venue.trim(),
         matchType,
         matchFormat: finalMatchFormat,
         matchFee: null,
         matchFeeAmount: matchFeeAmount.trim() ? Number(matchFeeAmount) : null,
-        matchFeeDueDate: matchFeeDueDate ? matchFeeDueDate.toISOString() : null,
+matchFeeDueDate: matchFeeDueDate
+  ? formatLocalDateTime(matchFeeDueDate)
+  : null,
         matchFeeDescription: matchFeeDescription.trim(),
         notes: notes.trim(),
         status,
