@@ -33,14 +33,18 @@ export const registerForPushNotificationsAsync = async (): Promise<string | null
       return null;
     }
 
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "default",
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#da9306",
-      });
-    }
+    // Android notification channel
+if (Platform.OS === "android") {
+  await Notifications.setNotificationChannelAsync("default", {
+    name: "Gotham Notifications",
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: "#da9306",
+    sound: "default",
+    lockscreenVisibility:
+      Notifications.AndroidNotificationVisibility.PUBLIC,
+  });
+}
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
