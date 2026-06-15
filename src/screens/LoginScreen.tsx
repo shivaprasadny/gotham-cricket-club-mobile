@@ -96,21 +96,28 @@ const LoginScreen = ({ navigation }: Props) => {
   // =========================
   // BIOMETRIC LOGIN
   // =========================
-  const handleBiometricLogin = async () => {
-    try {
-      setBiometricLoading(true);
+ const handleBiometricLogin = async () => {
+  try {
+    setBiometricLoading(true);
 
-      const result = await biometricLogin();
+    const result = await biometricLogin();
 
-      if (!result.success) {
-        Alert.alert("Biometric Login", result.message || "Login failed");
-      }
-    } catch (error) {
-      Alert.alert("Error", "Biometric login failed");
-    } finally {
-      setBiometricLoading(false);
+    if (!result.success) {
+      Alert.alert("Biometric Login", result.message || "Login failed");
+      return;
     }
-  };
+
+    // ✅ Force navigation after successful biometric login
+    navigation.reset({
+      index: 0,
+      routes: [{ name: "Home" }],
+    });
+  } catch (error) {
+    Alert.alert("Error", "Biometric login failed");
+  } finally {
+    setBiometricLoading(false);
+  }
+};
 
   // =========================
   // UI
@@ -180,7 +187,7 @@ const LoginScreen = ({ navigation }: Props) => {
             </TouchableOpacity>
 
             {/* Biometric login button */}
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={styles.secondaryButton}
               onPress={handleBiometricLogin}
               disabled={biometricLoading}
@@ -188,7 +195,7 @@ const LoginScreen = ({ navigation }: Props) => {
               <Text style={styles.secondaryButtonText}>
                 {biometricLoading ? "Checking..." : "Login with Biometrics"}
               </Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
             {/* Forgot password link */}
             <TouchableOpacity

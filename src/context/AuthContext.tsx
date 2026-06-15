@@ -92,31 +92,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    * Save session after successful login
    */
   const login = async (newToken: string, newUser: UserType) => {
-    try {
-      setToken(newToken);
-      setUser(newUser);
+  try {
+    setToken(newToken);
+    setUser(newUser);
 
-      await AsyncStorage.setItem("token", newToken);
-      await AsyncStorage.setItem("user", JSON.stringify(newUser));
+    await AsyncStorage.setItem("token", newToken);
+    await AsyncStorage.setItem("user", JSON.stringify(newUser));
+  } catch (error) {
+    console.error("Error saving auth data:", error);
+    return;
+  }
 
-      /**
-       * Register push notifications after successful login
-       * Safe to keep here for real-device builds
-       */
-     console.log("LOGIN SUCCESS - START PUSH REGISTER");
+  // Push token should not break login
+  try {
+    console.log("LOGIN SUCCESS - START PUSH REGISTER");
 
-const pushToken = await registerForPushNotificationsAsync();
+    const pushToken = await registerForPushNotificationsAsync();
 
-console.log("PUSH TOKEN FROM LOGIN:", pushToken);
+    console.log("PUSH TOKEN FROM LOGIN:", pushToken);
 
-if (pushToken) {
-  await savePushTokenToBackend(pushToken);
-  console.log("PUSH TOKEN SAVED TO BACKEND");
-}
-    } catch (error) {
-      console.error("Error saving auth data:", error);
+    if (pushToken) {
+      await savePushTokenToBackend(pushToken);
+      console.log("PUSH TOKEN SAVED TO BACKEND");
     }
-  };
+  } catch (error: any) {
+    console.log("PUSH TOKEN SAVE ERROR:", error?.response?.data || error);
+  }
+};
 
   /**
    * Biometric login:
@@ -161,16 +163,23 @@ if (pushToken) {
         };
       }
 
-      const loaded = await loadUserFromStorage();
+   const loaded = await loadUserFromStorage();
 
-      if (!loaded) {
-        return {
-          success: false,
-          message: "No saved login found. Please login with password first.",
-        };
-      }
+if (!loaded) {
+  return {
+    success: false,
+    message: "No saved login found. Please login with password first.",
+  };
+}
 
-      return { success: true };
+// optional: save push token again
+const pushToken = await registerForPushNotificationsAsync();
+
+if (pushToken) {
+  await savePushTokenToBackend(pushToken);
+}
+
+return { success: true };
     } catch (error) {
       console.error("BIOMETRIC ERROR:", error);
       return {
