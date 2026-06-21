@@ -49,7 +49,7 @@ const VerifyEmailScreen = ({ route, navigation }: Props) => {
           : "Email verified. Waiting for admin approval."
       );
 
-      navigation.navigate("Login");
+      navigation.popTo("Login");
     } catch (error: any) {
       Alert.alert(
         "Error",
@@ -131,7 +131,7 @@ const VerifyEmailScreen = ({ route, navigation }: Props) => {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+        <TouchableOpacity onPress={() => navigation.popTo("Login")}>
           <Text style={styles.loginText}>Back to Login</Text>
         </TouchableOpacity>
       </View>

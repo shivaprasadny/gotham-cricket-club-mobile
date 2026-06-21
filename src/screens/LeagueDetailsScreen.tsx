@@ -175,6 +175,16 @@ const LeagueDetailsScreen = ({ route, navigation }: Props) => {
         </Text>
       </View>
 
+      <TouchableOpacity
+        style={styles.statisticsButton}
+        onPress={() =>
+          navigation.navigate("LeagueStatistics", { leagueId: league.id })
+        }
+      >
+        <Ionicons name="stats-chart" size={18} color="#2b0540" />
+        <Text style={styles.statisticsButtonText}>View League Statistics</Text>
+      </TouchableOpacity>
+
       {/* Actions */}
       {canManage && (
         <View style={styles.actionRow}>
@@ -202,6 +212,20 @@ const LeagueDetailsScreen = ({ route, navigation }: Props) => {
 export default LeagueDetailsScreen;
 
 const styles = StyleSheet.create({
+  statisticsButton: {
+    backgroundColor: "#da9306",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+  statisticsButtonText: {
+    color: "#2b0540",
+    fontWeight: "900",
+  },
   container: {
     flex: 1,
     backgroundColor: "#2b0540",

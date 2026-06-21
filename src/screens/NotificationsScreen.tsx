@@ -19,7 +19,7 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from "../services/notificationService";
-import { getEventById } from "../services/eventService";
+import { openNotificationDestination } from "../services/notificationNavigationService";
 
 type Props = {
   navigation: any;
@@ -125,8 +125,11 @@ const getNotificationIcon = (
       return "trophy-outline";
     case "MEMBER":
       return "people-outline";
+    case "SCORECARD":
+      return "stats-chart-outline";
+    case "AVAILABILITY":
+      return "checkmark-circle-outline";
     default:
-      console.log("UNKNOWN NOTIFICATION TYPE:", type);
       return "information-circle-outline";
   }
 };
@@ -147,6 +150,10 @@ const getNotificationIconColor = (type?: string) => {
       return "#f59e0b";
     case "MEMBER":
       return "#ec4899";
+    case "SCORECARD":
+      return "#7c3aed";
+    case "AVAILABILITY":
+      return "#16a34a";
     default:
       return "#6b7280";
   }
@@ -170,138 +177,7 @@ const getNotificationIconColor = (type?: string) => {
       console.log("MARK READ ERROR:", error);
     }
 
-   // Handle event notifications first
-if (isEventType(item.type) && item.targetId) {
-  try {
-    console.log("EVENT NOTIFICATION CLICKED:", item);
-
-    const fullEvent = await getEventById(item.targetId);
-    console.log("FULL EVENT FROM API:", fullEvent);
-
-    navigation.navigate("EventDetails", {
-      event: fullEvent,
-    });
-  } catch (error) {
-    console.log("FETCH EVENT ERROR:", error);
-    navigation.navigate("MainTabs", { screen: "Events" });
-  }
-
-  return;
-}
-
-    // Direct navigation using targetScreen
-    if (item.targetScreen === "Events") {
-      navigation.navigate("MainTabs", { screen: "Events" });
-      return;
-    }
-
-    if (item.targetScreen === "MatchDetails") {
-      if (item.targetId) {
-        navigation.navigate("MatchDetails", { matchId: item.targetId });
-      } else {
-        navigation.navigate("MainTabs", { screen: "Matches" });
-      }
-      return;
-    }
-
-    // Tab screens
-    if (item.targetScreen === "Announcements") {
-      navigation.navigate("MainTabs", { screen: "Announcements" });
-      return;
-    }
-
-    if (item.targetScreen === "Matches") {
-      navigation.navigate("MainTabs", { screen: "Matches" });
-      return;
-    }
-
-    if (item.targetScreen === "Home") {
-      navigation.navigate("MainTabs", { screen: "Home" });
-      return;
-    }
-
-    if (item.targetScreen === "Profile") {
-      navigation.navigate("MainTabs", { screen: "Profile" });
-      return;
-    }
-
-    if (item.targetScreen === "Members") {
-      navigation.navigate("MainTabs", { screen: "Members" });
-      return;
-    }
-
-    if (item.targetScreen === "Teams") {
-      navigation.navigate("MainTabs", { screen: "Teams" });
-      return;
-    }
-
-    // Stack screens
-   // Open My Fees screen when user taps fee notification
-// targetId is the individual FeeAssignment ID from backend
-if (item.targetScreen === "MyFees") {
-  navigation.navigate("MyFees", {
-    feeAssignmentId: item.targetId,
-  });
-  return;
-}
-
-    if (item.targetScreen === "Leagues") {
-      navigation.navigate("Leagues");
-      return;
-    }
-
-    if (item.targetScreen === "AdminApproval") {
-      navigation.navigate("AdminApproval");
-      return;
-    }
-
-    if (item.targetScreen === "Notifications") {
-      navigation.navigate("Notifications");
-      return;
-    }
-
-    // Fallback by type if targetScreen is missing
-    switch (normalizeType(item.type)) {
-      case "MATCH":
-        if (item.targetId) {
-          navigation.navigate("MatchDetails", { matchId: item.targetId });
-        } else {
-          navigation.navigate("MainTabs", { screen: "Matches" });
-        }
-        return;
-
-      case "ANNOUNCEMENT":
-        navigation.navigate("MainTabs", { screen: "Announcements" });
-        return;
-
-     case "FEE":
-  navigation.navigate("MyFees", {
-    feeAssignmentId: item.targetId,
-  });
-  return;
-
-      case "TEAM":
-        navigation.navigate("MainTabs", { screen: "Teams" });
-        return;
-
-      case "LEAGUE":
-        navigation.navigate("Leagues");
-        return;
-
-      case "MEMBER":
-        navigation.navigate("AdminApproval");
-        return;
-
-      case "EVENT":
-      case "EVENT_NOTIFICATION":
-      case "EVENTS":
-        navigation.navigate("MainTabs", { screen: "Events" });
-        return;
-
-      default:
-        navigation.navigate("MainTabs", { screen: "Home" });
-        return;
-    }
+    await openNotificationDestination(navigation, item);
   };
 
   // Format backend timestamp

@@ -173,10 +173,6 @@ const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
         getMatches(),
       ]);
 
-      console.log("MEMBERS DATA:", memberData);
-      console.log("TEAMS DATA:", teamData);
-      console.log("MATCHES DATA:", matchData);
-
       setMembers(Array.isArray(memberData) ? memberData : []);
       setTeams(Array.isArray(teamData) ? teamData : []);
       setMatches(Array.isArray(matchData) ? matchData : []);

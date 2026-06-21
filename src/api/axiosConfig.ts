@@ -8,6 +8,17 @@ import { Alert } from "react-native";
  */
 let isSessionExpiredAlertShown = false;
 
+let onSessionExpired: (() => void) | null = null;
+
+export const setSessionExpiredHandler = (handler: (() => void) | null) => {
+  onSessionExpired = handler;
+};
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+if (!API_URL) {
+  throw new Error("Missing EXPO_PUBLIC_API_URL");
+}
 /**
  * Shared Axios instance for the whole app.
  *
@@ -17,17 +28,7 @@ let isSessionExpiredAlertShown = false;
  * 3. expired/invalid token is handled globally
  */
 const api = axios.create({
-  // Production backend API
- //  baseURL: "http://32.194.245.83:8080/api",
-
-
-
-  baseURL:"https://api.shivaprasadofficial.com/api",
-
-
-
-  //  baseURL: "http://192.168.1.127:8080/api",
-
+  baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -74,9 +75,18 @@ api.interceptors.response.use(
     try {
       const status = error?.response?.status;
 
-      // 401 = Unauthorized / token expired
-      // 403 = Forbidden / token invalid or no permission
-      if ((status === 401 || status === 403) && !isSessionExpiredAlertShown) {
+      // 401 means the login session is missing, invalid, or expired.
+      // 403 means the user is logged in but is not allowed to perform an action,
+      // so it must not log the user out.
+      if (status === 401 && !isSessionExpiredAlertShown) {
+        const storedToken = await AsyncStorage.getItem("token");
+
+        // Login and other public endpoints may also return 401. Only expire a
+        // session when the app actually had a saved authenticated session.
+        if (!storedToken) {
+          return Promise.reject(error);
+        }
+
         isSessionExpiredAlertShown = true;
 
         // Clear saved login session from phone
@@ -85,6 +95,8 @@ api.interceptors.response.use(
 
         // Remove default Authorization header if it exists
         delete api.defaults.headers.common.Authorization;
+
+        onSessionExpired?.();
 
         // Show user-friendly alert
         Alert.alert(
@@ -102,9 +114,15 @@ api.interceptors.response.use(
         );
       }
 
-      // Helpful logs during testing
-      console.log("API ERROR STATUS:", status);
-      console.log("API ERROR DATA:", error?.response?.data);
+      const requestUrl = String(error?.config?.url || "");
+      const isExpectedMissingScorecard =
+        status === 404 && /\/matches\/\d+\/scorecard$/.test(requestUrl);
+
+      // A missing scorecard is normal before the first draft is created.
+      if (!isExpectedMissingScorecard) {
+        console.log("API ERROR STATUS:", status);
+        console.log("API ERROR DATA:", error?.response?.data);
+      }
     } catch (cleanupError) {
       console.log("RESPONSE INTERCEPTOR CLEANUP ERROR:", cleanupError);
     }

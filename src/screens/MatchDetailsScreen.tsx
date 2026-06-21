@@ -278,6 +278,18 @@ const canManageSquad = isAdmin || isCaptain;
 )}
       </View>
 
+      <TouchableOpacity
+        style={styles.scorecardBtn}
+        onPress={() =>
+          navigation.navigate("Scorecard", {
+            matchId: match.id,
+            match,
+          })
+        }
+      >
+        <Text style={styles.scorecardBtnText}>View Match Scorecard</Text>
+      </TouchableOpacity>
+
       {/* Availability summary */}
       <Text style={styles.sectionTitle}>Availability Summary</Text>
 
@@ -336,6 +348,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f5fb",
   
+  },
+  scorecardBtn: {
+    backgroundColor: "#da9306",
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    marginBottom: 18,
+  },
+  scorecardBtnText: {
+    color: "#2b0540",
+    fontWeight: "900",
+    fontSize: 15,
   },
   content: {
     padding: 16,

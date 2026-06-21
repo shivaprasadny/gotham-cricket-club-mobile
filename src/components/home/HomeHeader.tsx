@@ -1,7 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import HomeFeeCard from "./HomeFeeCard";
 
 type Props = {
   user: any;
@@ -14,8 +13,6 @@ const HomeHeader = ({ user, navigation, unreadCount, onOpenMenu }: Props) => {
   return (
     <View style={styles.topRow}>
       <View style={{ flex: 1 }}>
-        <HomeFeeCard navigation={navigation} />
-
         <Text style={styles.heading}>Welcome back</Text>
         <Text style={styles.name}>{user?.fullName}</Text>
         <Text style={styles.roleText}>{user?.role}</Text>

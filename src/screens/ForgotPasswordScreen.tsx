@@ -110,7 +110,7 @@ const handleResetPassword = async () => {
       typeof response === "string" ? response : "Password reset successful"
     );
 
-    navigation.navigate("Login");
+    navigation.popTo("Login");
   } catch (error: any) {
     Alert.alert(
       "Error",
@@ -239,7 +239,7 @@ const handleResetPassword = async () => {
             {/* Back to login link */}
             <TouchableOpacity
               style={styles.linkButton}
-              onPress={() => navigation.navigate("Login")}
+              onPress={() => navigation.popTo("Login")}
             >
               <Text style={styles.linkText}>Back to Login</Text>
             </TouchableOpacity>

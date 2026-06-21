@@ -164,7 +164,7 @@ const EditTeamScreen = ({ route, navigation }: Props) => {
         typeof response === "string" ? response : "Team deleted successfully"
       );
 
-      navigation.navigate("MainTabs", { screen: "Teams" });
+      navigation.popTo("Teams");
     } catch (error: any) {
       Alert.alert(
         "Error",

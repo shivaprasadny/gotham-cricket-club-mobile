@@ -37,15 +37,26 @@ import FeeDetailsScreen from "../screens/FeeDetailsScreen";
 import EditFeeScreen from "../screens/EditFeeScreen";
 import TeamsScreen from "../screens/TeamsScreen";
 import MembersScreen from "../screens/MembersScreen";
+import MemberProfileScreen from "../screens/MemberProfileScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import VerifyEmailScreen from "../screens/VerifyEmailScreen";
+import ScorecardScreen from "../screens/ScorecardScreen";
+import ScorecardEditorScreen from "../screens/ScorecardEditorScreen";
+import PlayerStatisticsScreen from "../screens/PlayerStatisticsScreen";
+import TeamStatisticsScreen from "../screens/TeamStatisticsScreen";
+import LeagueStatisticsScreen from "../screens/LeagueStatisticsScreen";
+import LeaderboardScreen from "../screens/LeaderboardScreen";
 import { navigationRef } from "./navigationRef";
 
 
 
 const Stack = createNativeStackNavigator();
 
-const AppNavigator = () => {
+type Props = {
+  onNavigationReady?: () => void;
+};
+
+const AppNavigator = ({ onNavigationReady }: Props) => {
   const { token, loading } = useAuth();
 
   if (loading) {
@@ -53,7 +64,7 @@ const AppNavigator = () => {
   }
 
   return (
-   <NavigationContainer ref={navigationRef}>
+   <NavigationContainer ref={navigationRef} onReady={onNavigationReady}>
       {!token ? (
         <Stack.Navigator>
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -107,7 +118,38 @@ const AppNavigator = () => {
   }}
 />
 <Stack.Screen name="Members" component={MembersScreen} />
+<Stack.Screen
+  name="MemberProfile"
+  component={MemberProfileScreen}
+  options={{ title: "Player Profile" }}
+/>
 <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+<Stack.Screen name="Scorecard" component={ScorecardScreen} />
+<Stack.Screen
+  name="ScorecardEditor"
+  component={ScorecardEditorScreen}
+  options={{ title: "Scorecard Editor" }}
+/>
+<Stack.Screen
+  name="PlayerStatistics"
+  component={PlayerStatisticsScreen}
+  options={{ title: "Player Statistics" }}
+/>
+<Stack.Screen
+  name="TeamStatistics"
+  component={TeamStatisticsScreen}
+  options={{ title: "Team Statistics" }}
+/>
+<Stack.Screen
+  name="LeagueStatistics"
+  component={LeagueStatisticsScreen}
+  options={{ title: "League Statistics" }}
+/>
+<Stack.Screen
+  name="Leaderboard"
+  component={LeaderboardScreen}
+  options={{ title: "Leaderboards" }}
+/>
 
           <Stack.Screen
             name="Splash"

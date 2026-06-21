@@ -1,81 +1,90 @@
-import React from "react";
-import { AuthProvider } from "./src/context/AuthContext";
-import AppNavigator from "./src/navigation/AppNavigator";
-import { useEffect } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
-import { navigate } from "./src/navigation/navigationRef";
+
+import { AuthProvider, useAuth } from "./src/context/AuthContext";
+import AppNavigator from "./src/navigation/AppNavigator";
+import { navigationRef } from "./src/navigation/navigationRef";
+import {
+  NotificationNavigationData,
+  openNotificationDestination,
+} from "./src/services/notificationNavigationService";
+
+const AppContent = () => {
+  const { token, loading } = useAuth();
+  const authStateRef = useRef({ token, loading });
+  const pendingNotificationRef =
+    useRef<NotificationNavigationData | null>(null);
+  const handledNotificationIdsRef = useRef(new Set<string>());
+
+  authStateRef.current = { token, loading };
+
+  const tryOpenNotification = useCallback(
+    async (data: NotificationNavigationData) => {
+      const authState = authStateRef.current;
+
+      if (authState.loading || !authState.token || !navigationRef.isReady()) {
+        pendingNotificationRef.current = data;
+        return;
+      }
+
+      pendingNotificationRef.current = null;
+      await openNotificationDestination(navigationRef, data);
+    },
+    []
+  );
+
+  const openPendingNotification = useCallback(() => {
+    const pendingNotification = pendingNotificationRef.current;
+
+    if (pendingNotification) {
+      void tryOpenNotification(pendingNotification);
+    }
+  }, [tryOpenNotification]);
+
+  const handleNotificationResponse = useCallback(
+    (response: Notifications.NotificationResponse) => {
+      const notificationId = response.notification.request.identifier;
+
+      if (handledNotificationIdsRef.current.has(notificationId)) {
+        return;
+      }
+
+      handledNotificationIdsRef.current.add(notificationId);
+
+      const data = response.notification.request.content
+        .data as NotificationNavigationData;
+      void tryOpenNotification(data);
+    },
+    [tryOpenNotification]
+  );
+
+  useEffect(() => {
+    const subscription =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        handleNotificationResponse(response);
+      });
+
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        handleNotificationResponse(response);
+        void Notifications.clearLastNotificationResponseAsync();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [handleNotificationResponse]);
+
+  useEffect(() => {
+    openPendingNotification();
+  }, [token, loading, openPendingNotification]);
+
+  return <AppNavigator onNavigationReady={openPendingNotification} />;
+};
 
 export default function App() {
-
-useEffect(() => {
-  // Reusable function to handle notification tap navigation
-  const handleNotificationTap = (data: any) => {
-    const targetScreen = data?.targetScreen as string | undefined;
-    const targetId = data?.targetId as number | undefined;
-
-    // Announcement notification
-    if (targetScreen === "AnnouncementDetails") {
-      navigate("MainTabs", {
-        screen: "Announcements",
-      });
-      return;
-    }
-
-    // Match notification
-    if (targetScreen === "MatchDetails" && targetId) {
-      navigate("MatchDetails", {
-        matchId: targetId,
-      });
-      return;
-    }
-
-    // Fee notification
-    if (targetScreen === "MyFees") {
-      navigate("MyFees", {
-        feeAssignmentId: targetId,
-      });
-      return;
-    }
-
-    // Availability reminder
-    if (targetScreen === "Matches") {
-      navigate("MainTabs", {
-        screen: "Matches",
-      });
-      return;
-    }
-
-    // Default fallback
-    navigate("MainTabs", {
-      screen: "Home",
-    });
-  };
-
-  // Handles notification tap when app is already background/open
-  const subscription =
-    Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      handleNotificationTap(data);
-    });
-
-  // Handles notification tap when app was fully closed
-  Notifications.getLastNotificationResponseAsync().then((response) => {
-    if (response) {
-      const data = response.notification.request.content.data;
-
-      // Small delay so NavigationContainer is ready
-      setTimeout(() => {
-        handleNotificationTap(data);
-      }, 800);
-    }
-  });
-
-  return () => subscription.remove();
-}, []);
-
   return (
     <AuthProvider>
-      <AppNavigator />
+      <AppContent />
     </AuthProvider>
   );
 }

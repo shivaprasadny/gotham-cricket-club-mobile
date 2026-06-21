@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -21,6 +21,7 @@ import {
   getNotifications,
 } from "../services/notificationService";
 import { getEvents } from "../services/eventService";
+import { getMyFees } from "../services/feeService";
 
 // Home components
 import HomeHeader from "../components/home/HomeHeader";
@@ -32,6 +33,9 @@ import UpcomingEventsSection from "../components/home/UpcomingEventsSection";
 import QuickActionsGrid from "../components/home/QuickActionsGrid";
 import LatestAnnouncementsSection from "../components/home/LatestAnnouncementsSection";
 import HomeMenuModal from "../components/home/HomeMenuModal";
+import HomeFeeCard, {
+  MyFeeItem,
+} from "../components/home/HomeFeeCard";
 
 type Props = {
   navigation: any;
@@ -99,6 +103,10 @@ const HomeScreen = ({ navigation }: Props) => {
   // Pull-to-refresh loading state
   const [refreshing, setRefreshing] = useState(false);
 
+  // Keep existing Home content visible while refreshing in the background.
+  const hasLoadedHomeRef = useRef(false);
+  const homeRequestRef = useRef<Promise<void> | null>(null);
+
   // =========================
   // DATA STATE
   // =========================
@@ -110,6 +118,7 @@ const HomeScreen = ({ navigation }: Props) => {
   const [pendingMembers, setPendingMembers] = useState<PendingMember[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
+  const [fees, setFees] = useState<MyFeeItem[]>([]);
 
   // =========================
   // LOCAL HIDE STATE
@@ -191,9 +200,16 @@ const HomeScreen = ({ navigation }: Props) => {
   // LOAD HOME DATA
   // =========================
 
-  const loadHomeData = async () => {
-    try {
-      setLoadingHome(true);
+  const loadHomeData = useCallback(async (showLoader = false) => {
+    if (homeRequestRef.current) {
+      return homeRequestRef.current;
+    }
+
+    const request = (async () => {
+      try {
+        if (showLoader && !hasLoadedHomeRef.current) {
+          setLoadingHome(true);
+        }
 
       const requests: Promise<any>[] = [
         getMatches(),
@@ -201,6 +217,7 @@ const HomeScreen = ({ navigation }: Props) => {
         getPinnedAnnouncement(),
         getNotifications(),
         getEvents(),
+        getMyFees(),
       ];
 
       // Only Admin needs pending member requests
@@ -225,9 +242,12 @@ const HomeScreen = ({ navigation }: Props) => {
       const eventsData =
         results[4].status === "fulfilled" ? results[4].value : [];
 
+      const feesData =
+        results[5].status === "fulfilled" ? results[5].value : [];
+
       const pendingData =
-        isAdmin && results[5] && results[5].status === "fulfilled"
-          ? results[5].value
+        isAdmin && results[6] && results[6].status === "fulfilled"
+          ? results[6].value
           : [];
 
       // Upcoming matches only
@@ -258,11 +278,7 @@ const HomeScreen = ({ navigation }: Props) => {
 
         const isNotGoing = event.myStatus === "NOT_GOING";
 
-        return (
-          isUpcoming &&
-          !isNotGoing &&
-          !hiddenEventIds.includes(event.id)
-        );
+        return isUpcoming && !isNotGoing;
       })
       .sort(
         (a, b) =>
@@ -279,19 +295,27 @@ const HomeScreen = ({ navigation }: Props) => {
       );
       setPendingMembers(Array.isArray(pendingData) ? pendingData : []);
       setUpcomingEvents(upcomingEventList);
-    } catch (error) {
-      console.log("HOME LOAD ERROR:", error);
-    } finally {
-      setLoadingHome(false);
-      setRefreshing(false);
-    }
-  };
+      setFees(Array.isArray(feesData) ? feesData : []);
+        hasLoadedHomeRef.current = true;
+      } catch (error) {
+        console.log("HOME LOAD ERROR:", error);
+      } finally {
+        setLoadingHome(false);
+        setRefreshing(false);
+        homeRequestRef.current = null;
+      }
+    })();
 
-  // Reload home data every time Home screen focuses
+    homeRequestRef.current = request;
+    return request;
+  }, [isAdmin]);
+
+  // Refresh in the background whenever Home regains focus. Existing content
+  // remains visible instead of flashing a full-page loading state.
   useFocusEffect(
     useCallback(() => {
-      void loadHomeData();
-    }, [isAdmin, hiddenEventIds])
+      void loadHomeData(!hasLoadedHomeRef.current);
+    }, [loadHomeData])
   );
 
   // =========================
@@ -305,7 +329,7 @@ const HomeScreen = ({ navigation }: Props) => {
     setDismissedMatchIds([]);
     setHiddenEventIds([]);
 
-    await loadHomeData();
+    await loadHomeData(false);
   };
 
   // =========================
@@ -342,6 +366,12 @@ const HomeScreen = ({ navigation }: Props) => {
       (match) => !match.myAvailability && !dismissedMatchIds.includes(match.id)
     );
   }, [weeklyMatches, dismissedMatchIds]);
+
+  const visibleUpcomingEvents = useMemo(() => {
+    return upcomingEvents.filter(
+      (event) => !hiddenEventIds.includes(event.id)
+    );
+  }, [upcomingEvents, hiddenEventIds]);
 
   // =========================
   // HANDLERS
@@ -390,12 +420,14 @@ const HomeScreen = ({ navigation }: Props) => {
           </View>
         ) : (
           <>
+            <HomeFeeCard navigation={navigation} fees={fees} />
+
             {/* Inline weekly availability quick response */}
             <AvailabilityReminderCard
               matches={weeklyUnmarkedMatches}
               navigation={navigation}
               getOpponentName={getOpponentName}
-              onUpdated={loadHomeData}
+              onUpdated={() => loadHomeData(false)}
             />
 
             {/* Weekly matches where user marked Available */}
@@ -414,9 +446,9 @@ const HomeScreen = ({ navigation }: Props) => {
 
             {/* Upcoming events with quick response and hide button */}
             <UpcomingEventsSection
-  events={upcomingEvents}
+  events={visibleUpcomingEvents}
   navigation={navigation}
-  onUpdated={loadHomeData}
+  onUpdated={() => loadHomeData(false)}
   onHideEvent={handleHideEvent}
 />
 

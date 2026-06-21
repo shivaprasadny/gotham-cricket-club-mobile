@@ -56,7 +56,7 @@ const CreateAnnouncementScreen = ({ navigation }: Props) => {
       setMessage("");
 
       // Navigate back to announcements tab
-      navigation.navigate("MainTabs", { screen: "Announcements" });
+      navigation.popTo("MainTabs", { screen: "Announcements" });
     } catch (error: any) {
       Alert.alert(
         "Error",

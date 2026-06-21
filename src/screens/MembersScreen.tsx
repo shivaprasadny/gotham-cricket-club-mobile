@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -10,13 +12,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import {
   ApprovalRole,
-
+  getAllMembers as getAdminMembers,
   updateMemberRole,
+  deactivateMember,
+  activateMember,
 } from "../services/adminService";
-import { deactivateMember,activateMember } from "../services/adminService";
 import { getAllMembers } from "../services/memberService";
 
 
@@ -27,26 +31,34 @@ type Member = {
   email?: string;
   role?: string;
   status?: string;
+  nickname?: string;
+  phone?: string;
+  battingStyle?: string;
+  bowlingStyle?: string;
+  playerType?: string;
+  jerseyNumber?: number;
 };
 
-type RoleFilter = "ALL" | "PLAYER" | "CAPTAIN" | "ADMIN";
+const ROLE_OPTIONS: ApprovalRole[] = ["PLAYER", "CAPTAIN", "ADMIN"];
 type SortType = "NAME" | "ROLE";
 
-const ROLE_OPTIONS: ApprovalRole[] = ["PLAYER", "CAPTAIN", "ADMIN"];
+type Props = {
+  navigation: any;
+};
 
-const MembersScreen = () => {
+const MembersScreen = ({ navigation }: Props) => {
   const { user } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
   const [sortBy, setSortBy] = useState<SortType>("NAME");
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
   const loadMembers = async () => {
   try {
-    const data = await getAllMembers();
-    console.log("MEMBERS DATA:", data);
+    const data =
+      user?.role === "ADMIN" ? await getAdminMembers() : await getAllMembers();
     setMembers(Array.isArray(data) ? data : []);
   } catch (error: any) {
     console.log("LOAD MEMBERS FULL ERROR:", error);
@@ -75,34 +87,39 @@ const MembersScreen = () => {
   };
 
   const filteredMembers = useMemo(() => {
-    let result = members.filter((member) => {
-      const matchesSearch = (member.fullName || "")
+    const result = members.filter((member) =>
+        (member.fullName || "")
         .toLowerCase()
-        .includes(search.toLowerCase());
+        .includes(search.trim().toLowerCase())
+      );
 
-      const matchesRole =
-        roleFilter === "ALL" ? true : member.role === roleFilter;
+    return [...result].sort((a, b) => {
+      if (sortBy === "ROLE") {
+        const roleOrder: Record<string, number> = {
+          ADMIN: 0,
+          CAPTAIN: 1,
+          PLAYER: 2,
+        };
+        const roleDifference =
+          (roleOrder[a.role || ""] ?? 3) - (roleOrder[b.role || ""] ?? 3);
 
-      return matchesSearch && matchesRole;
-    });
+        if (roleDifference !== 0) {
+          return roleDifference;
+        }
+      }
 
-    if (sortBy === "NAME") {
-      result = [...result].sort((a, b) =>
+      return (
         (a.fullName || "").localeCompare(b.fullName || "")
       );
-    } else {
-      result = [...result].sort((a, b) =>
-        (a.role || "").localeCompare(b.role || "")
-      );
-    }
-
-    return result;
-  }, [members, search, roleFilter, sortBy]);
+    });
+  }, [members, search, sortBy]);
 
   const handleRoleChange = async (
     memberId: number,
     role: ApprovalRole
   ) => {
+    setSelectedMember(null);
+
     try {
       const response = await updateMemberRole(memberId, role);
       Alert.alert(
@@ -121,6 +138,8 @@ const MembersScreen = () => {
 
 
   const handleDeactivateMember = (memberId: number, fullName: string) => {
+  setSelectedMember(null);
+
   Alert.alert(
     "Deactivate Member",
     `Are you sure you want to deactivate ${fullName}?`,
@@ -152,6 +171,8 @@ const MembersScreen = () => {
 };
 
 const handleActivateMember = (memberId: number, fullName: string) => {
+  setSelectedMember(null);
+
   Alert.alert(
     "Activate Member",
     `Activate ${fullName}?`,
@@ -181,97 +202,88 @@ const handleActivateMember = (memberId: number, fullName: string) => {
   );
 };
 
-  const getRoleChipStyle = (role?: string) => {
+  const getRoleIcon = (role?: string) => {
     switch (role) {
       case "ADMIN":
-        return styles.adminChip;
+        return "👑";
       case "CAPTAIN":
-        return styles.captainChip;
+        return "🧢";
       case "PLAYER":
-        return styles.playerChip;
+        return "🏏";
       default:
-        return styles.defaultChip;
+        return "👤";
+    }
+  };
+
+  const getRoleLabel = (role?: string) => {
+    switch (role) {
+      case "ADMIN":
+        return "Admin";
+      case "CAPTAIN":
+        return "Captain";
+      case "PLAYER":
+        return "Player";
+      default:
+        return "Member";
+    }
+  };
+
+  const getRoleStyle = (role?: string) => {
+    switch (role) {
+      case "ADMIN":
+        return {
+          card: styles.adminCard,
+          icon: styles.adminRoleIcon,
+        };
+      case "CAPTAIN":
+        return {
+          card: styles.captainCard,
+          icon: styles.captainRoleIcon,
+        };
+      default:
+        return {
+          card: styles.playerCard,
+          icon: styles.playerRoleIcon,
+        };
     }
   };
 
   const renderItem = ({ item }: { item: Member }) => {
     const memberId = item.userId ?? item.id ?? 0;
+    const roleStyle = getRoleStyle(item.role);
 
     return (
-      <View style={styles.card}>
-        <View style={styles.rowTop}>
-  <View style={{ flex: 1 }}>
-    <Text
-      style={[
-        styles.name,
-        { color: item.status === "INACTIVE" ? "#9ca3af" : "#111" },
-      ]}
-    >
-      {item.fullName || "No Name"}
-    </Text>
-
-    {item.status === "INACTIVE" && (
-      <Text style={styles.inactiveText}>INACTIVE 🚫</Text>
-    )}
-  </View>
-
-  <Text style={[styles.roleChip, getRoleChipStyle(item.role)]}>
-    {item.role === "ADMIN"
-      ? "ADMIN 👑"
-      : item.role === "CAPTAIN"
-      ? "CAPTAIN 🧢"
-      : "PLAYER 🏏"}
-  </Text>
-</View>
-
-        <Text>{item.email || "No Email"}</Text>
-        <Text>Status: {item.status || "N/A"}</Text>
-
-       {user?.role === "ADMIN" && (
-  <>
-    <Text style={styles.roleLabel}>Change Role:</Text>
-
-    <View style={styles.roleRow}>
-      {ROLE_OPTIONS.map((role) => (
-        <TouchableOpacity
-          key={role}
-          style={styles.roleButton}
-          onPress={() => handleRoleChange(memberId, role)}
+      <TouchableOpacity
+        style={[styles.card, roleStyle.card]}
+        activeOpacity={0.7}
+        delayLongPress={350}
+        onPress={() => {
+          if (memberId) {
+            navigation.navigate("MemberProfile", { userId: memberId });
+          }
+        }}
+        onLongPress={() => {
+          if (user?.role === "ADMIN" && memberId) {
+            setSelectedMember(item);
+          }
+        }}
+      >
+        <Text style={styles.name}>{item.fullName || "No Name"}</Text>
+        <View
+          style={[styles.roleIcon, roleStyle.icon]}
+          accessibilityLabel={`${item.role || "Member"} role`}
         >
-          <Text style={styles.roleButtonText}>{role}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-
-    {/* Deactivate button */}
-    {item.status === "APPROVED" && (
-      <TouchableOpacity
-        style={styles.deactivateBtn}
-        onPress={() =>
-          handleDeactivateMember(memberId, item.fullName || "this member")
-        }
-      >
-        <Text style={styles.deactivateBtnText}>Deactivate</Text>
+          <Text style={styles.roleIconText}>
+            {getRoleIcon(item.role)}
+          </Text>
+          <Text style={styles.roleLabel}>{getRoleLabel(item.role)}</Text>
+        </View>
       </TouchableOpacity>
-    )}
-
-    {/* Activate button */}
-    {item.status === "INACTIVE" && (
-      <TouchableOpacity
-        style={styles.activateBtn}
-        onPress={() =>
-          handleActivateMember(memberId, item.fullName || "this member")
-        }
-      >
-        <Text style={styles.activateBtnText}>Activate</Text>
-      </TouchableOpacity>
-    )}
-  </>
-)}
-      </View>
-      
     );
   };
+
+  const selectedMemberId =
+    selectedMember?.userId ?? selectedMember?.id ?? 0;
 
   if (loading) {
     return (
@@ -283,189 +295,384 @@ const handleActivateMember = (memberId: number, fullName: string) => {
   }
 
   return (
-    <FlatList
-      data={filteredMembers}
-      keyExtractor={(item, index) => String(item.userId ?? item.id ?? index)}
-      renderItem={renderItem}
-      contentContainerStyle={
-        filteredMembers.length === 0 ? styles.center : styles.container
-      }
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by player name"
-            value={search}
-            onChangeText={setSearch}
-          />
+    <>
+      <FlatList
+        data={filteredMembers}
+        keyExtractor={(item, index) => String(item.userId ?? item.id ?? index)}
+        renderItem={renderItem}
+        style={styles.screen}
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <View style={styles.hero}>
+              <View>
+                <Text style={styles.heroEyebrow}>GOTHAM CRICKET CLUB</Text>
+                <Text style={styles.heroTitle}>Club Members</Text>
+                <Text style={styles.heroSubtitle}>
+                  {filteredMembers.length}{" "}
+                  {filteredMembers.length === 1 ? "member" : "members"}
+                </Text>
+              </View>
 
-          <Text style={styles.headerTitle}>Filter by Role</Text>
-          <View style={styles.filterRow}>
-            {(["ALL", "PLAYER", "CAPTAIN", "ADMIN"] as RoleFilter[]).map(
-              (item) => (
+              <View style={styles.heroIcon}>
+                <Ionicons name="people" size={28} color="#2b0540" />
+              </View>
+            </View>
+
+            <View style={styles.searchWrap}>
+              <Ionicons name="search" size={20} color="#7c6f82" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search player name"
+                placeholderTextColor="#918799"
+                value={search}
+                onChangeText={setSearch}
+              />
+              {search ? (
+                <TouchableOpacity onPress={() => setSearch("")}>
+                  <Ionicons name="close-circle" size={20} color="#918799" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <View style={styles.sortSection}>
+              <View style={styles.sortHeading}>
+                <Ionicons name="swap-vertical" size={17} color="#2b0540" />
+                <Text style={styles.sortLabel}>Sort members</Text>
+              </View>
+
+              <View style={styles.sortControl}>
+                {(["NAME", "ROLE"] as SortType[]).map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.sortButton,
+                      sortBy === option && styles.sortButtonSelected,
+                    ]}
+                    onPress={() => setSortBy(option)}
+                  >
+                    <Ionicons
+                      name={option === "NAME" ? "text" : "ribbon-outline"}
+                      size={15}
+                      color={sortBy === option ? "#fff" : "#5b4268"}
+                    />
+                    <Text
+                      style={[
+                        styles.sortButtonText,
+                        sortBy === option && styles.sortButtonTextSelected,
+                      ]}
+                    >
+                      {option === "NAME" ? "Name" : "Role"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <Text style={styles.longPressHint}>
+              {user?.role === "ADMIN"
+                ? "Tap to view profile • Press and hold to manage"
+                : "Tap a member to view their profile"}
+            </Text>
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="people-outline" size={42} color="#b7aabc" />
+            <Text style={styles.emptyTitle}>No members found</Text>
+            <Text style={styles.emptyText}>
+              Try a different player name.
+            </Text>
+          </View>
+        }
+      />
+
+      <Modal
+        visible={selectedMember !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedMember(null)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setSelectedMember(null)}
+        >
+          <Pressable style={styles.actionSheet}>
+            <Text style={styles.actionTitle}>
+              {selectedMember?.fullName || "Manage member"}
+            </Text>
+            <Text style={styles.actionSubtitle}>Change role</Text>
+
+            <View style={styles.actionRoleRow}>
+              {ROLE_OPTIONS.map((role) => (
                 <TouchableOpacity
-                  key={item}
+                  key={role}
                   style={[
-                    styles.filterBtn,
-                    roleFilter === item && styles.filterBtnSelected,
+                    styles.actionRoleButton,
+                    selectedMember?.role === role &&
+                      styles.actionRoleButtonSelected,
                   ]}
-                  onPress={() => setRoleFilter(item)}
+                  onPress={() =>
+                    selectedMemberId &&
+                    void handleRoleChange(selectedMemberId, role)
+                  }
                 >
                   <Text
                     style={[
-                      styles.filterText,
-                      roleFilter === item && styles.filterTextSelected,
+                      styles.actionRoleText,
+                      selectedMember?.role === role &&
+                        styles.actionRoleTextSelected,
                     ]}
                   >
-                    {item}
+                    {role}
                   </Text>
                 </TouchableOpacity>
-              )
-            )}
-          </View>
+              ))}
+            </View>
 
-          <Text style={styles.headerTitle}>Sort By</Text>
-          <View style={styles.filterRow}>
-            {(["NAME", "ROLE"] as SortType[]).map((item) => (
+            {selectedMember?.status === "INACTIVE" ? (
               <TouchableOpacity
-                key={item}
-                style={[
-                  styles.filterBtn,
-                  sortBy === item && styles.filterBtnSelected,
-                ]}
-                onPress={() => setSortBy(item)}
+                style={styles.activateAction}
+                onPress={() =>
+                  selectedMemberId &&
+                  handleActivateMember(
+                    selectedMemberId,
+                    selectedMember?.fullName || "this member"
+                  )
+                }
               >
-                <Text
-                  style={[
-                    styles.filterText,
-                    sortBy === item && styles.filterTextSelected,
-                  ]}
-                >
-                  {item}
+                <Text style={styles.activateActionText}>Activate member</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.deactivateAction}
+                onPress={() =>
+                  selectedMemberId &&
+                  handleDeactivateMember(
+                    selectedMemberId,
+                    selectedMember?.fullName || "this member"
+                  )
+                }
+              >
+                <Text style={styles.deactivateActionText}>
+                  Deactivate member
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      }
-      ListEmptyComponent={<Text>No members found</Text>}
-    />
+            )}
+
+            <TouchableOpacity
+              style={styles.cancelAction}
+              onPress={() => setSelectedMember(null)}
+            >
+              <Text style={styles.cancelActionText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
   );
 };
 
 export default MembersScreen;
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: "#f5f0f7",
+  },
   container: {
     padding: 16,
-    backgroundColor: "#fff",
+    paddingBottom: 30,
+    flexGrow: 1,
   },
   header: {
-    marginBottom: 16,
-  },
-  headerTitle: {
-    fontWeight: "700",
     marginBottom: 8,
-    marginTop: 4,
   },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  filterRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 12,
-  },
-  filterBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 20,
-  },
-  filterBtnSelected: {
-    backgroundColor: "#111",
-    borderColor: "#111",
-  },
-  filterText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  filterTextSelected: {
-    color: "#fff",
-  },
-  card: {
-    backgroundColor: "#f7f7f7",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  rowTop: {
+  hero: {
+    backgroundColor: "#2b0540",
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
+    shadowColor: "#2b0540",
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    elevation: 7,
+  },
+  heroEyebrow: {
+    color: "#da9306",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  heroTitle: {
+    color: "#fff",
+    fontSize: 27,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  heroSubtitle: {
+    color: "#ddd6e8",
+    fontSize: 14,
+    marginTop: 4,
+  },
+  heroIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#f4b400",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchWrap: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    paddingHorizontal: 15,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#e8dfea",
+  },
+  searchInput: {
+    flex: 1,
+    color: "#1f1524",
+    fontSize: 15,
+    paddingVertical: 14,
+  },
+  sortSection: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#e8dfea",
+  },
+  sortHeading: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 9,
+  },
+  sortLabel: {
+    color: "#2b0540",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  sortControl: {
+    flexDirection: "row",
+    backgroundColor: "#f4eef6",
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  sortButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+  sortButtonSelected: {
+    backgroundColor: "#2b0540",
+  },
+  sortButtonText: {
+    color: "#5b4268",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  sortButtonTextSelected: {
+    color: "#fff",
+  },
+  card: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderLeftWidth: 5,
+    shadowColor: "#2b0540",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 7,
+    elevation: 2,
+  },
+  adminCard: {
+    borderLeftColor: "#da9306",
+  },
+  captainCard: {
+    borderLeftColor: "#6d28d9",
+  },
+  playerCard: {
+    borderLeftColor: "#16a34a",
   },
   name: {
     fontSize: 18,
     fontWeight: "700",
+    color: "#111827",
     flex: 1,
-    marginRight: 8,
-    color: "#fff",
+    marginRight: 12,
   },
-  roleChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    overflow: "hidden",
-    fontSize: 12,
-    fontWeight: "700",
+  roleIcon: {
+    minWidth: 92,
+    height: 40,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  adminChip: {
-    backgroundColor: "#111",
-    color: "#fff",
+  adminRoleIcon: {
+    backgroundColor: "#fef3c7",
   },
-  captainChip: {
-    backgroundColor: "#1d4ed8",
-    color: "#fff",
+  captainRoleIcon: {
+    backgroundColor: "#ede9fe",
   },
-  playerChip: {
-    backgroundColor: "#16a34a",
-    color: "#fff",
+  playerRoleIcon: {
+    backgroundColor: "#dcfce7",
   },
-  defaultChip: {
-    backgroundColor: "#ccc",
-    color: "#111",
+  roleIconText: {
+    fontSize: 17,
   },
   roleLabel: {
-    marginTop: 12,
-    marginBottom: 8,
-    fontWeight: "600",
-  },
-  roleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  roleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: "#111",
-  },
-  roleButtonText: {
-    color: "#fff",
-    textAlign: "center",
-    fontWeight: "700",
+    color: "#2b2430",
     fontSize: 12,
+    fontWeight: "800",
+  },
+  longPressHint: {
+    color: "#75677c",
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 11,
+    marginBottom: 10,
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 55,
+  },
+  emptyTitle: {
+    color: "#2b0540",
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 10,
+  },
+  emptyText: {
+    color: "#7c6f82",
+    fontSize: 13,
+    marginTop: 4,
   },
   center: {
     flex: 1,
@@ -474,33 +681,82 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     padding: 20,
   },
-  deactivateBtn: {
-  marginTop: 12,
-  backgroundColor: "#c0392b",
-  paddingVertical: 10,
-  borderRadius: 8,
-},
-deactivateBtnText: {
-  color: "#fff",
-  textAlign: "center",
-  fontWeight: "700",
-},
-activateBtn: {
-  marginTop: 10,
-  backgroundColor: "#27ae60",
-  paddingVertical: 10,
-  borderRadius: 8,
-},
-activateBtnText: {
-  color: "#fff",
-  textAlign: "center",
-  fontWeight: "700",
-},
-inactiveText: {
-  color: "#030914",
-  fontSize: 12,
-  marginTop: 4,
-  fontWeight: "600",
-},
-  
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  actionSheet: {
+    backgroundColor: "#fff",
+    padding: 20,
+    paddingBottom: 30,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+  },
+  actionTitle: {
+    color: "#111827",
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  actionSubtitle: {
+    color: "#6b7280",
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  actionRoleRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  actionRoleButton: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 10,
+  },
+  actionRoleButtonSelected: {
+    backgroundColor: "#2b0540",
+    borderColor: "#2b0540",
+  },
+  actionRoleText: {
+    color: "#374151",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  actionRoleTextSelected: {
+    color: "#fff",
+  },
+  deactivateAction: {
+    alignItems: "center",
+    backgroundColor: "#fee2e2",
+    paddingVertical: 13,
+    borderRadius: 10,
+    marginTop: 16,
+  },
+  deactivateActionText: {
+    color: "#b91c1c",
+    fontWeight: "800",
+  },
+  activateAction: {
+    alignItems: "center",
+    backgroundColor: "#dcfce7",
+    paddingVertical: 13,
+    borderRadius: 10,
+    marginTop: 16,
+  },
+  activateActionText: {
+    color: "#15803d",
+    fontWeight: "800",
+  },
+  cancelAction: {
+    alignItems: "center",
+    paddingVertical: 13,
+    marginTop: 6,
+  },
+  cancelActionText: {
+    color: "#4b5563",
+    fontWeight: "700",
+  },
 });

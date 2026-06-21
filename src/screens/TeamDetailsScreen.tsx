@@ -23,6 +23,7 @@ import {
 
 type Props = {
   route: any;
+  navigation: any;
 };
 
 type Team = {
@@ -60,7 +61,7 @@ type ClubMember = {
 
 type ViewMode = "ADDED" | "AVAILABLE" | "ALL";
 
-const TeamDetailsScreen = ({ route }: Props) => {
+const TeamDetailsScreen = ({ route, navigation }: Props) => {
   const { user } = useAuth();
   const { teamId } = route.params;
 
@@ -219,6 +220,12 @@ const canManageTeamInfo = isAdmin;
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
+      <TouchableOpacity
+        style={styles.statisticsButton}
+        onPress={() => navigation.navigate("TeamStatistics", { teamId })}
+      >
+        <Text style={styles.statisticsButtonText}>View Team Statistics</Text>
+      </TouchableOpacity>
       <View style={styles.headerCard}>
         <Image
           source={require("../../assets/logo.png")}
@@ -414,6 +421,17 @@ const canManageTeamInfo = isAdmin;
 export default TeamDetailsScreen;
 
 const styles = StyleSheet.create({
+  statisticsButton: {
+    backgroundColor: "#da9306",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  statisticsButtonText: {
+    color: "#2b0540",
+    fontWeight: "900",
+  },
   screen: {
     flex: 1,
     backgroundColor: "#2b0540",

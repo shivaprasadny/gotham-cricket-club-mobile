@@ -571,7 +571,7 @@ const SquadSelectionScreen = ({ route, navigation }: Props) => {
           {
             text: "OK",
             onPress: () =>
-              navigation.navigate("MainTabs", {
+              navigation.popTo("MainTabs", {
                 screen: "Announcements",
               }),
           },

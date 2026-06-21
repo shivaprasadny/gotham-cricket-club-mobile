@@ -1,19 +1,12 @@
-import React, { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import { getMyFees } from "../../services/feeService";
+import React, { useMemo } from "react";
+import { StyleSheet, Text, TouchableOpacity } from "react-native";
 
 type Props = {
   navigation: any;
+  fees: MyFeeItem[];
 };
 
-type MyFeeItem = {
+export type MyFeeItem = {
   assignmentId: number;
   title: string;
   amount: number;
@@ -21,31 +14,7 @@ type MyFeeItem = {
   status: "UNPAID" | "PAYMENT_SUBMITTED" | "PAID" | "WAIVED";
 };
 
-const HomeFeeCard = ({ navigation }: Props) => {
-  const [fees, setFees] = useState<MyFeeItem[]>([]); // store user fees
-  const [loading, setLoading] = useState(true); // loading state
-
-  // Load user fees
-  const loadFees = async () => {
-
-    setLoading(true);
-    try {
-      const data = await getMyFees();
-      setFees(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.log("HOME FEE LOAD ERROR:", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Reload when screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      void loadFees();
-    }, [])
-  );
-
+const HomeFeeCard = ({ navigation, fees }: Props) => {
   // Filter pending fees
   const pendingFees = useMemo(
     () =>
@@ -66,15 +35,6 @@ const HomeFeeCard = ({ navigation }: Props) => {
     const now = new Date();
     return pendingFees.filter((f) => new Date(f.dueDate) < now).length;
   }, [pendingFees]);
-
-  // Loading UI
-  if (loading) {
-    return (
-      <View style={styles.card}>
-        <ActivityIndicator color="#da9306" />
-      </View>
-    );
-  }
 
   // Hide card if no pending fees
   if (pendingFees.length === 0) {

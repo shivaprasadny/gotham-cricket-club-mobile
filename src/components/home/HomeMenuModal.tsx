@@ -117,6 +117,14 @@ const HomeMenuModal = ({
             <Text style={styles.menuText}>Events</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => goTo("Leaderboard", { scope: "CLUB" })}
+          >
+            <Ionicons name="stats-chart-outline" size={20} color="#da9306" />
+            <Text style={styles.menuText}>Club Leaderboards</Text>
+          </TouchableOpacity>
+
           {/* Logout button */}
           <TouchableOpacity
             style={styles.logoutItem}

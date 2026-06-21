@@ -5,6 +5,7 @@ import {
   registerForPushNotificationsAsync,
   savePushTokenToBackend,
 } from "../services/pushNotificationService";
+import { setSessionExpiredHandler } from "../api/axiosConfig";
 
 type UserType = {
   id: number;
@@ -48,6 +49,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    */
   useEffect(() => {
     void initializeAuth();
+  }, []);
+
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setToken(null);
+      setUser(null);
+    });
+
+    return () => setSessionExpiredHandler(null);
   }, []);
 
   /**
