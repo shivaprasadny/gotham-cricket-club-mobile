@@ -111,6 +111,17 @@ const emptyFielding = (playerId = 0): FieldingEntryRequest => ({
   stumpings: 0,
 });
 
+const moveListItem = <T,>(rows: T[], fromIndex: number, toIndex: number) => {
+  if (toIndex < 0 || toIndex >= rows.length || fromIndex === toIndex) {
+    return rows;
+  }
+
+  const reordered = [...rows];
+  const [moved] = reordered.splice(fromIndex, 1);
+  reordered.splice(toIndex, 0, moved);
+  return reordered;
+};
+
 const createInnings = (
   inningsNumber: number,
   battingTeamId: number | null,
@@ -441,6 +452,32 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
     updateInnings(inningsIndex, { bowlingEntries: rows });
   };
 
+  const moveBatter = (
+    inningsIndex: number,
+    rowIndex: number,
+    direction: -1 | 1
+  ) => {
+    const reordered = moveListItem(
+      payload.innings[inningsIndex].battingEntries,
+      rowIndex,
+      rowIndex + direction
+    ).map((row, index) => ({ ...row, battingPosition: index + 1 }));
+    updateInnings(inningsIndex, { battingEntries: reordered });
+  };
+
+  const moveBowler = (
+    inningsIndex: number,
+    rowIndex: number,
+    direction: -1 | 1
+  ) => {
+    const reordered = moveListItem(
+      payload.innings[inningsIndex].bowlingEntries,
+      rowIndex,
+      rowIndex + direction
+    );
+    updateInnings(inningsIndex, { bowlingEntries: reordered });
+  };
+
   const updateFielder = (
     inningsIndex: number,
     rowIndex: number,
@@ -709,13 +746,14 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
     ...current,
     innings: current.innings.map((innings) => ({
       ...innings,
-      battingEntries: innings.battingEntries.map((row) => {
+      battingEntries: innings.battingEntries.map((row, index) => {
         const hasBattingInput =
           row.runs > 0 || row.ballsFaced > 0 || row.fours > 0 || row.sixes > 0;
         return hasBattingInput
-          ? row
+          ? { ...row, battingPosition: index + 1 }
           : {
               ...row,
+              battingPosition: index + 1,
               dismissed: false,
               dismissalType: "DID_NOT_BAT" as DismissalType,
               dismissalText: "Did not bat",
@@ -1027,6 +1065,7 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     style={styles.compactPlayerHeader}
                     onPress={() => toggleEntry("BATTER", inningsIndex, rowIndex)}
                   >
+                    <Text style={styles.orderNumber}>#{rowIndex + 1}</Text>
                     <Ionicons name="person-circle-outline" size={22} color="#6d28d9" />
                     <View style={styles.compactPlayerText}>
                       <Text style={styles.playerSelectorText}>
@@ -1044,17 +1083,39 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                       color="#796b80"
                     />
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() =>
-                      updateInnings(inningsIndex, {
-                        battingEntries: innings.battingEntries.filter(
-                          (_, index) => index !== rowIndex
-                        ),
-                      })
-                    }
-                  >
-                    <Ionicons name="trash-outline" size={19} color="#b91c1c" />
-                  </TouchableOpacity>
+                  <View style={styles.orderActions}>
+                    <TouchableOpacity
+                      disabled={rowIndex === 0}
+                      style={rowIndex === 0 && styles.orderActionDisabled}
+                      onPress={() => moveBatter(inningsIndex, rowIndex, -1)}
+                    >
+                      <Ionicons name="arrow-up" size={18} color="#4B1D6B" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      disabled={rowIndex === innings.battingEntries.length - 1}
+                      style={
+                        rowIndex === innings.battingEntries.length - 1 &&
+                        styles.orderActionDisabled
+                      }
+                      onPress={() => moveBatter(inningsIndex, rowIndex, 1)}
+                    >
+                      <Ionicons name="arrow-down" size={18} color="#4B1D6B" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() =>
+                        updateInnings(inningsIndex, {
+                          battingEntries: innings.battingEntries
+                            .filter((_, index) => index !== rowIndex)
+                            .map((entry, index) => ({
+                              ...entry,
+                              battingPosition: index + 1,
+                            })),
+                        })
+                      }
+                    >
+                      <Ionicons name="trash-outline" size={19} color="#b91c1c" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 {expandedEntry ===
                 entryKey("BATTER", inningsIndex, rowIndex) ? (
@@ -1184,6 +1245,7 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     style={styles.compactPlayerHeader}
                     onPress={() => toggleEntry("BOWLER", inningsIndex, rowIndex)}
                   >
+                    <Text style={styles.orderNumber}>#{rowIndex + 1}</Text>
                     <Ionicons name="person-circle-outline" size={22} color="#6d28d9" />
                     <View style={styles.compactPlayerText}>
                       <Text style={styles.playerSelectorText}>
@@ -1201,17 +1263,36 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                       color="#796b80"
                     />
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() =>
-                      updateInnings(inningsIndex, {
-                        bowlingEntries: innings.bowlingEntries.filter(
-                          (_, index) => index !== rowIndex
-                        ),
-                      })
-                    }
-                  >
-                    <Ionicons name="trash-outline" size={19} color="#b91c1c" />
-                  </TouchableOpacity>
+                  <View style={styles.orderActions}>
+                    <TouchableOpacity
+                      disabled={rowIndex === 0}
+                      style={rowIndex === 0 && styles.orderActionDisabled}
+                      onPress={() => moveBowler(inningsIndex, rowIndex, -1)}
+                    >
+                      <Ionicons name="arrow-up" size={18} color="#4B1D6B" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      disabled={rowIndex === innings.bowlingEntries.length - 1}
+                      style={
+                        rowIndex === innings.bowlingEntries.length - 1 &&
+                        styles.orderActionDisabled
+                      }
+                      onPress={() => moveBowler(inningsIndex, rowIndex, 1)}
+                    >
+                      <Ionicons name="arrow-down" size={18} color="#4B1D6B" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() =>
+                        updateInnings(inningsIndex, {
+                          bowlingEntries: innings.bowlingEntries.filter(
+                            (_, index) => index !== rowIndex
+                          ),
+                        })
+                      }
+                    >
+                      <Ionicons name="trash-outline" size={19} color="#b91c1c" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 {expandedEntry ===
                 entryKey("BOWLER", inningsIndex, rowIndex) ? (
@@ -1754,6 +1835,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   compactPlayerText: { flex: 1 },
+  orderNumber: {
+    minWidth: 22,
+    color: "#4B1D6B",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  orderActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  orderActionDisabled: { opacity: 0.25 },
   entrySummary: { color: "#817287", fontSize: 10, marginTop: 2 },
   expandedStats: {
     borderTopWidth: StyleSheet.hairlineWidth,

@@ -50,6 +50,30 @@ const squadRoleSuffix = (player?: SquadPlayer | null) => {
   return roles.length ? ` (${roles.join(", ")})` : "";
 };
 
+const formatMatchSchedule = (matchDate?: string) => {
+  if (!matchDate) {
+    return { date: "Not set", time: "Not set" };
+  }
+
+  const date = new Date(matchDate);
+  if (Number.isNaN(date.getTime())) {
+    return { date: matchDate, time: "Not set" };
+  }
+
+  return {
+    date: date.toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }),
+    time: date.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+  };
+};
+
 const SquadSelectionScreen = ({ route, navigation }: any) => {
   const {
     matchId,
@@ -312,6 +336,10 @@ const SquadSelectionScreen = ({ route, navigation }: any) => {
   const announceSquad = async () => {
     setAnnouncing(true);
     try {
+      const schedule = formatMatchSchedule(matchDate);
+      const homeAwayLabel = homeAway === "AWAY" ? "Away" : "Home";
+      const ourTeam = teamName || "Gotham";
+      const opponent = opponentName || "Opponent";
       const xiText = playingXi
         .map((player, index) => {
           return `${index + 1}. ${player.fullName}${squadRoleSuffix(player)}`;
@@ -322,10 +350,17 @@ const SquadSelectionScreen = ({ route, navigation }: any) => {
         : "None";
 
       await createAnnouncement({
-        title: `${teamName || "Gotham"} vs ${opponentName || "Opponent"} Squad`,
+        title: `${ourTeam} vs ${opponent} Squad`,
         message:
           `${announcementMessage.trim() ? `${announcementMessage.trim()}\n\n` : ""}` +
-          `Location: ${venue || "Not set"}\n\n` +
+          `Match Details\n` +
+          `Our Team: ${ourTeam}\n` +
+          `Opponent: ${opponent}\n` +
+          `Home/Away: ${homeAwayLabel}\n` +
+          `Date: ${schedule.date}\n` +
+          `Time: ${schedule.time}\n` +
+          `Format: ${matchFormat || "Not set"}\n` +
+          `Venue: ${venue || "Not set"}\n\n` +
           `Playing XI:\n${xiText || "Not completed"}\n\n` +
           `Impact Player: ${
             impactPlayer
