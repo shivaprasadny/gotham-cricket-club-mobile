@@ -2,7 +2,6 @@ import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +17,7 @@ import {
   getMyAvailabilityByMatch,
   markAvailability,
 } from "../services/availabilityService";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 
 type Props = {
   route: any;
@@ -42,7 +42,7 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
   externalOpponentName,
   venue,
   matchDate,
-  matchType,
+  homeAway,
   matchFormat,
   matchFeeAmount,
   matchFeeDueDate,
@@ -173,15 +173,14 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
   }
 
   return (
-    // 🔥 THIS FIXES EVERYTHING (Android + iOS)
     <KeyboardAwareScrollView
-  contentContainerStyle={styles.container}
-  keyboardShouldPersistTaps="handled"
-  enableOnAndroid={true}
-  extraScrollHeight={120}
-  extraHeight={140} // 🔥 ADD THIS
-  keyboardOpeningTime={0} // 🔥 ADD THIS (faster response)
->
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      enableOnAndroid
+      extraScrollHeight={120}
+      extraHeight={140}
+      keyboardOpeningTime={0}
+    >
       <Text style={styles.title}>Match Availability</Text>
 
      {/* Match information card */}
@@ -189,7 +188,9 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
 <View style={styles.matchCard}>
   <Text style={styles.matchTitle}>{getMatchTitle()}</Text>
 
-  <Text style={styles.matchText}>Type: {matchType}</Text>
+  <Text style={styles.matchText}>
+    Home / Away: {homeAway === "AWAY" ? "Away" : "Home"}
+  </Text>
   <Text style={styles.matchText}>Format: {matchFormat || "N/A"}</Text>
   <Text style={styles.matchText}>Venue: {venue}</Text>
 
@@ -215,7 +216,9 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
     Date: {new Date(matchDate).toLocaleString()}
   </Text>
 
-  <Text style={styles.matchText}>Status: {status || "UPCOMING"}</Text>
+  <Text style={styles.matchText}>
+    Status: {formatEnumLabel(status, "Upcoming")}
+  </Text>
 </View>
       {/* STATUS */}
       <Text style={styles.sectionTitle}>Select Status</Text>
@@ -277,8 +280,8 @@ export default AvailabilityScreen;
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    paddingBottom: 100,
-    backgroundColor: "#fff",
+    paddingBottom: 140,
+    backgroundColor: "#f7f4f9",
     flexGrow: 1,
   },
 
@@ -286,6 +289,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f7f4f9",
   },
 
   loaderText: {
@@ -294,48 +298,59 @@ const styles = StyleSheet.create({
 
   title: {
     fontSize: 26,
-    fontWeight: "700",
-    textAlign: "center",
+    fontWeight: "900",
     marginBottom: 20,
+    color: "#2b0540",
   },
 
   matchCard: {
-    backgroundColor: "#f7f7f7",
-    padding: 16,
-    borderRadius: 10,
+    backgroundColor: "#2b0540",
+    padding: 20,
+    borderRadius: 18,
     marginBottom: 20,
+    borderBottomWidth: 4,
+    borderBottomColor: "#da9306",
   },
 
   matchTitle: {
     fontSize: 20,
-    fontWeight: "700",
+    fontWeight: "900",
+    color: "#fff",
+    marginBottom: 8,
   },
 
   matchText: {
     marginTop: 4,
+    color: "#e8deed",
+    lineHeight: 20,
   },
 
   sectionTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "900",
     marginTop: 10,
     marginBottom: 10,
+    color: "#2b0540",
   },
 
   statusButton: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#ded2e4",
     padding: 14,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 10,
+    backgroundColor: "#fff",
   },
 
   selectedStatusButton: {
-    backgroundColor: "#111",
+    backgroundColor: "#4B1D6B",
+    borderColor: "#da9306",
   },
 
   statusButtonText: {
     textAlign: "center",
+    color: "#4B1D6B",
+    fontWeight: "800",
   },
 
   selectedStatusButtonText: {
@@ -344,23 +359,25 @@ const styles = StyleSheet.create({
 
   messageInput: {
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#d9ccdf",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     minHeight: 100,
     marginBottom: 20,
+    backgroundColor: "#fff",
+    color: "#2b0540",
   },
 
   saveButton: {
-    backgroundColor: "#111",
+    backgroundColor: "#da9306",
     padding: 14,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: "center",
   },
 
   saveButtonText: {
-    color: "#fff",
-    fontWeight: "700",
+    color: "#2b0540",
+    fontWeight: "900",
   },
 
   disabledButton: {

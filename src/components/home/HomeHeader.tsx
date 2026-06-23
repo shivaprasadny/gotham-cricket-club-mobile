@@ -20,7 +20,15 @@ const HomeHeader = ({ user, navigation, unreadCount, onOpenMenu }: Props) => {
 
       <View style={styles.topRightIcons}>
         <TouchableOpacity
-          style={styles.bellBtn}
+          style={styles.iconBtn}
+          accessibilityLabel="Open chats"
+          onPress={() => navigation.navigate("ChatList")}
+        >
+          <Ionicons name="chatbubbles-outline" size={24} color="#da9306" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.iconBtn}
           onPress={() => navigation.navigate("Notifications")}
         >
           <View>
@@ -73,7 +81,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  bellBtn: {
+  iconBtn: {
     backgroundColor: "#3a0a57",
     padding: 10,
     borderRadius: 14,

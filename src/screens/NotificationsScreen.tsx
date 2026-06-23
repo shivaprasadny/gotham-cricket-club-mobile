@@ -127,6 +127,8 @@ const getNotificationIcon = (
       return "people-outline";
     case "SCORECARD":
       return "stats-chart-outline";
+    case "CHAT":
+      return "chatbubbles-outline";
     case "AVAILABILITY":
       return "checkmark-circle-outline";
     default:
@@ -148,6 +150,8 @@ const getNotificationIconColor = (type?: string) => {
       return "#8b5cf6";
     case "LEAGUE":
       return "#f59e0b";
+    case "CHAT":
+      return "#7c3c9e";
     case "MEMBER":
       return "#ec4899";
     case "SCORECARD":

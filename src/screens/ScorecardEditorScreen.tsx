@@ -57,6 +57,7 @@ type PickerState = {
 
 const stepLabels = ["Match Setup", "First Innings", "Second Innings", "Review"];
 const dismissalOptions = [
+  ["Did Not Bat", "DID_NOT_BAT"],
   ["Not Out", "NOT_OUT"],
   ["Bowled", "BOWLED"],
   ["Caught", "CAUGHT"],
@@ -65,7 +66,6 @@ const dismissalOptions = [
   ["Stumped", "STUMPED"],
   ["Hit Wicket", "HIT_WICKET"],
   ["Retired Hurt", "RETIRED_HURT"],
-  ["Did Not Bat", "DID_NOT_BAT"],
   ["Other", "OTHER"],
 ] as const satisfies readonly (readonly [string, DismissalType])[];
 
@@ -73,6 +73,8 @@ const numberValue = (value: string) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 };
+
+const numberText = (value: number) => (value === 0 ? "" : String(value));
 
 const emptyBatting = (position: number): BattingEntryRequest => ({
   playerId: null,
@@ -83,9 +85,9 @@ const emptyBatting = (position: number): BattingEntryRequest => ({
   fours: 0,
   sixes: 0,
   dismissed: false,
-  dismissalType: "NOT_OUT",
-  dismissalText: "",
-  didNotBat: false,
+  dismissalType: "DID_NOT_BAT",
+  dismissalText: "Did not bat",
+  didNotBat: true,
   retiredHurt: false,
 });
 
@@ -98,6 +100,7 @@ const emptyBowling = (): BowlingEntryRequest => ({
   wickets: 0,
   wides: 0,
   noBalls: 0,
+  dotBalls: 0,
 });
 
 const emptyFielding = (playerId = 0): FieldingEntryRequest => ({
@@ -169,16 +172,18 @@ const OversField = ({
   legalBalls: number;
   onLegalBallsChange: (legalBalls: number) => void;
 }) => {
-  const [text, setText] = useState(() => legalBallsToOvers(legalBalls));
+  const [text, setText] = useState(() =>
+    legalBalls === 0 ? "" : legalBallsToOvers(legalBalls)
+  );
 
   useEffect(() => {
-    setText(legalBallsToOvers(legalBalls));
+    setText(legalBalls === 0 ? "" : legalBallsToOvers(legalBalls));
   }, [legalBalls]);
 
   const commit = () => {
     if (!text.trim()) {
       onLegalBallsChange(0);
-      setText("0.0");
+      setText("");
       return;
     }
 
@@ -278,6 +283,10 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
   const [playerSearch, setPlayerSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [expandedEntry, setExpandedEntry] = useState<string | null>(null);
+  const [expandedLists, setExpandedLists] = useState<Record<string, boolean>>(
+    {}
+  );
 
   usePreventRemove(dirty && !saving, ({ data }) => {
     Alert.alert(
@@ -349,6 +358,44 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
           ? `${squad.length} players loaded from the match squad`
           : `${team.length} players loaded from ${ourTeamName}`
       );
+
+      // For a new scorecard, pre-load selected match players into the editable
+      // batting, bowling and fielding cards. Managers may still add/remove rows.
+      if (!scorecard && preferred.length) {
+        const selected = preferred.filter(
+          (player) =>
+            player.isPlayingXi || player.roleInMatch === "IMPACT_PLAYER"
+        );
+        setPayload((current) => ({
+          ...current,
+          innings: current.innings.map((innings) => {
+            const ours = innings.battingTeamId === ourTeamId;
+            return {
+              ...innings,
+              battingEntries:
+                ours && innings.battingEntries.length === 0
+                  ? selected.slice(0, 11).map((player, index) => ({
+                      ...emptyBatting(index + 1),
+                      playerId: player.userId,
+                    }))
+                  : innings.battingEntries,
+              bowlingEntries:
+                !ours && innings.bowlingEntries.length === 0
+                  ? selected.slice(0, 11).map((player) => ({
+                      ...emptyBowling(),
+                      playerId: player.userId,
+                    }))
+                  : innings.bowlingEntries,
+              fieldingEntries:
+                !ours && innings.fieldingEntries.length === 0
+                  ? selected.slice(0, 12).map((player) =>
+                      emptyFielding(player.userId)
+                    )
+                  : innings.fieldingEntries,
+            };
+          }),
+        }));
+      }
     };
     void loadPlayers();
   }, [matchId, ourTeamId]);
@@ -410,6 +457,20 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
     rowIndex: number,
     dismissalType: DismissalType
   ) => {
+    if (dismissalType === "NOT_OUT") {
+      const notOutCount = payload.innings[inningsIndex].battingEntries.filter(
+        (row, index) =>
+          index !== rowIndex && currentDismissal(row) === "NOT_OUT"
+      ).length;
+      if (notOutCount >= 2) {
+        Alert.alert(
+          "Not Out limit",
+          "Only 2 batters can be marked Not Out in one innings."
+        );
+        return;
+      }
+    }
+
     if (dismissalType === "DID_NOT_BAT") {
       updateBatter(inningsIndex, rowIndex, {
         dismissed: false,
@@ -457,20 +518,110 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
   };
 
   const currentDismissal = (row: BattingEntryRequest) => {
-    return row.dismissalType || "NOT_OUT";
+    return row.dismissalType || "DID_NOT_BAT";
+  };
+
+  const entryKey = (
+    type: "BATTER" | "BOWLER" | "FIELDER",
+    inningsIndex: number,
+    rowIndex: number
+  ) => `${type}-${inningsIndex}-${rowIndex}`;
+
+  const toggleEntry = (
+    type: "BATTER" | "BOWLER" | "FIELDER",
+    inningsIndex: number,
+    rowIndex: number
+  ) => {
+    const key = entryKey(type, inningsIndex, rowIndex);
+    setExpandedEntry((current) => (current === key ? null : key));
+  };
+
+  const toggleList = (key: string) => {
+    setExpandedLists((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  const battingSummary = (row: BattingEntryRequest) => {
+    const hasInput =
+      row.runs > 0 || row.ballsFaced > 0 || row.fours > 0 || row.sixes > 0;
+    if (!hasInput) return "Did Not Bat";
+    return `${row.runs} (${row.ballsFaced}) · ${
+      currentDismissal(row) === "NOT_OUT"
+        ? "Not Out"
+        : currentDismissal(row).replaceAll("_", " ")
+    }`;
+  };
+
+  const bowlingSummary = (row: BowlingEntryRequest) => {
+    const hasInput =
+      row.legalBalls > 0 ||
+      row.maidens > 0 ||
+      row.runsConceded > 0 ||
+      row.wickets > 0 ||
+      row.wides > 0 ||
+      row.noBalls > 0 ||
+      row.dotBalls > 0;
+    return hasInput
+      ? `${row.wickets}/${row.runsConceded} · ${legalBallsToOvers(
+          row.legalBalls
+        )} ov · ${row.dotBalls} dots`
+      : "Did Not Bowl";
+  };
+
+  const fieldingSummary = (row: FieldingEntryRequest) => {
+    const total =
+      row.catches + row.droppedCatches + row.runOuts + row.stumpings;
+    return total
+      ? `C ${row.catches} · RO ${row.runOuts} · St ${row.stumpings}`
+      : "No Fielding Stats";
   };
 
   const isOurInnings = (innings: SaveInningsRequest) =>
     innings.battingTeamId === ourTeamId;
 
-  const selectBattingFirst = (ourTeamBatsFirst: boolean) => {
-    const first = ourTeamBatsFirst
-      ? createInnings(1, ourTeamId, ourTeamName)
-      : createInnings(1, opponentTeamId, opponentName);
-    const second = ourTeamBatsFirst
-      ? createInnings(2, opponentTeamId, opponentName)
-      : createInnings(2, ourTeamId, ourTeamName);
-    changePayload((current) => ({ ...current, innings: [first, second] }));
+  const deriveBattingOrder = (
+    current: SaveScorecardRequest,
+    tossWinnerIsOurs: boolean,
+    decision: TossDecision
+  ) => {
+    const ourTeamBatsFirst =
+      (tossWinnerIsOurs && decision === "BAT") ||
+      (!tossWinnerIsOurs && decision === "BOWL");
+    const ourInnings =
+      current.innings.find((innings) => isOurInnings(innings)) ||
+      createInnings(1, ourTeamId, ourTeamName);
+    const opponentInnings =
+      current.innings.find((innings) => !isOurInnings(innings)) ||
+      createInnings(2, opponentTeamId, opponentName);
+    const ordered = ourTeamBatsFirst
+      ? [ourInnings, opponentInnings]
+      : [opponentInnings, ourInnings];
+    return {
+      ...current,
+      innings: ordered.map((innings, index) => ({
+        ...innings,
+        inningsNumber: index + 1,
+      })),
+    };
+  };
+
+  const updateExtra = (
+    inningsIndex: number,
+    key: "wides" | "noBalls" | "byes" | "legByes" | "penaltyRuns",
+    value: string
+  ) => {
+    const updated = {
+      ...payload.innings[inningsIndex],
+      [key]: numberValue(value),
+    };
+    updateInnings(inningsIndex, {
+      [key]: updated[key],
+      totalExtras:
+        updated.wides +
+        updated.noBalls +
+        updated.byes +
+        updated.legByes +
+        updated.penaltyRuns,
+    });
   };
 
   const selectedPlayerName = (playerId: number | null) =>
@@ -554,6 +705,27 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
     };
   };
 
+  const normalizeEmptyBatters = (current: SaveScorecardRequest) => ({
+    ...current,
+    innings: current.innings.map((innings) => ({
+      ...innings,
+      battingEntries: innings.battingEntries.map((row) => {
+        const hasBattingInput =
+          row.runs > 0 || row.ballsFaced > 0 || row.fours > 0 || row.sixes > 0;
+        return hasBattingInput
+          ? row
+          : {
+              ...row,
+              dismissed: false,
+              dismissalType: "DID_NOT_BAT" as DismissalType,
+              dismissalText: "Did not bat",
+              didNotBat: true,
+              retiredHurt: false,
+            };
+      }),
+    })),
+  });
+
   const goNext = () => {
     if (step === 0 && isIntraClub) {
       Alert.alert(
@@ -569,7 +741,7 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
   };
 
   const saveDraft = async () => {
-    const calculated = applyCalculatedResult(payload);
+    const calculated = applyCalculatedResult(normalizeEmptyBatters(payload));
     const validation = validateScorecard(calculated);
     if (validation) {
       Alert.alert("Check Scorecard", validation);
@@ -643,12 +815,11 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
   );
 
   const renderSetup = () => {
-    const ourTeamBatsFirst = isOurInnings(payload.innings[0]);
     return (
       <View style={styles.card}>
         <Text style={styles.stepTitle}>Match and Toss</Text>
         <Text style={styles.helpText}>
-          Confirm the toss and which side batted first.
+          Batting order is calculated automatically from the toss decision.
         </Text>
 
         <Text style={styles.sectionLabel}>Who won the toss?</Text>
@@ -657,22 +828,34 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
             label={ourTeamName}
             selected={payload.tossWinnerTeamId === ourTeamId}
             onPress={() =>
-              changePayload((current) => ({
-                ...current,
-                tossWinnerTeamId: ourTeamId,
-                tossWinnerName: null,
-              }))
+              changePayload((current) =>
+                deriveBattingOrder(
+                  {
+                    ...current,
+                    tossWinnerTeamId: ourTeamId,
+                    tossWinnerName: null,
+                  },
+                  true,
+                  current.tossDecision || "BAT"
+                )
+              )
             }
           />
           <Choice
             label={opponentName}
             selected={payload.tossWinnerName === opponentName}
             onPress={() =>
-              changePayload((current) => ({
-                ...current,
-                tossWinnerTeamId: null,
-                tossWinnerName: opponentName,
-              }))
+              changePayload((current) =>
+                deriveBattingOrder(
+                  {
+                    ...current,
+                    tossWinnerTeamId: null,
+                    tossWinnerName: opponentName,
+                  },
+                  false,
+                  current.tossDecision || "BAT"
+                )
+              )
             }
           />
         </View>
@@ -685,27 +868,16 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
               label={decision === "BAT" ? "Bat First" : "Bowl First"}
               selected={payload.tossDecision === decision}
               onPress={() =>
-                changePayload((current) => ({
-                  ...current,
-                  tossDecision: decision,
-                }))
+                changePayload((current) =>
+                  deriveBattingOrder(
+                    { ...current, tossDecision: decision },
+                    current.tossWinnerTeamId === ourTeamId,
+                    decision
+                  )
+                )
               }
             />
           ))}
-        </View>
-
-        <Text style={styles.sectionLabel}>Who batted first?</Text>
-        <View style={styles.choiceRow}>
-          <Choice
-            label={ourTeamName}
-            selected={ourTeamBatsFirst}
-            onPress={() => selectBattingFirst(true)}
-          />
-          <Choice
-            label={opponentName}
-            selected={!ourTeamBatsFirst}
-            onPress={() => selectBattingFirst(false)}
-          />
         </View>
 
         <View style={styles.sourceCard}>
@@ -724,6 +896,18 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
     const ours = isOurInnings(innings);
     const target =
       inningsIndex === 1 ? payload.innings[0].runs + 1 : null;
+    const battingListKey = `BATTING-${inningsIndex}`;
+    const bowlingListKey = `BOWLING-${inningsIndex}`;
+    const fieldingListKey = `FIELDING-${inningsIndex}`;
+    const visibleBattingEntries = innings.battingEntries
+      .map((row, rowIndex) => ({ row, rowIndex }))
+      .slice(0, expandedLists[battingListKey] ? undefined : 5);
+    const visibleBowlingEntries = innings.bowlingEntries
+      .map((row, rowIndex) => ({ row, rowIndex }))
+      .slice(0, expandedLists[bowlingListKey] ? undefined : 5);
+    const visibleFieldingEntries = innings.fieldingEntries
+      .map((row, rowIndex) => ({ row, rowIndex }))
+      .slice(0, expandedLists[fieldingListKey] ? undefined : 5);
 
     return (
       <View style={styles.card}>
@@ -752,7 +936,8 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
         <View style={styles.scoreFields}>
           <Field
             label="Runs"
-            value={String(innings.runs)}
+            value={numberText(innings.runs)}
+            placeholder="Runs"
             numeric
             onChangeText={(value) =>
               updateInnings(inningsIndex, { runs: numberValue(value) })
@@ -760,7 +945,8 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
           />
           <Field
             label="Wickets"
-            value={String(innings.wickets)}
+            value={numberText(innings.wickets)}
+            placeholder="Wickets"
             numeric
             onChangeText={(value) =>
               updateInnings(inningsIndex, { wickets: numberValue(value) })
@@ -772,26 +958,33 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
               updateInnings(inningsIndex, { legalBalls })
             }
           />
-          <Field
-            label="Extras"
-            value={String(innings.totalExtras)}
-            numeric
-            onChangeText={(value) =>
-              updateInnings(inningsIndex, {
-                totalExtras: numberValue(value),
-                wides: numberValue(value),
-                noBalls: 0,
-                byes: 0,
-                legByes: 0,
-                penaltyRuns: 0,
-              })
-            }
-          />
+        </View>
+
+        <Text style={styles.sectionLabel}>
+          Extras breakdown · Total {innings.totalExtras}
+        </Text>
+        <View style={styles.scoreFields}>
+          {([
+            ["Wides", "wides"],
+            ["No Balls", "noBalls"],
+            ["Byes", "byes"],
+            ["Leg Byes", "legByes"],
+            ["Penalty", "penaltyRuns"],
+          ] as const).map(([label, key]) => (
+            <Field
+              key={key}
+              label={label}
+              value={numberText(innings[key])}
+              placeholder="0"
+              numeric
+              onChangeText={(value) => updateExtra(inningsIndex, key, value)}
+            />
+          ))}
         </View>
 
         <View style={styles.optionalRow}>
           <Text style={styles.optionalText}>
-            Extras are stored as wides by default. Detailed breakdown is optional.
+            Total extras is calculated from the five fields above.
           </Text>
           <View style={styles.switchWrap}>
             <Text style={styles.switchLabel}>All out</Text>
@@ -824,26 +1017,32 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                   })
                 }
               >
-                <Text style={styles.addButtonText}>+ Batter</Text>
+                <Text style={styles.addButtonText}>+ Add Batter</Text>
               </TouchableOpacity>
             </View>
-            {innings.battingEntries.map((row, rowIndex) => (
+            {visibleBattingEntries.map(({ row, rowIndex }) => (
               <View key={rowIndex} style={styles.playerEntry}>
                 <View style={styles.playerEntryHeader}>
                   <TouchableOpacity
-                    style={styles.playerSelector}
-                    onPress={() =>
-                      setPicker({
-                        type: "BATTER",
-                        inningsIndex,
-                        rowIndex,
-                      })
-                    }
+                    style={styles.compactPlayerHeader}
+                    onPress={() => toggleEntry("BATTER", inningsIndex, rowIndex)}
                   >
                     <Ionicons name="person-circle-outline" size={22} color="#6d28d9" />
-                    <Text style={styles.playerSelectorText}>
-                      {selectedPlayerName(row.playerId)}
-                    </Text>
+                    <View style={styles.compactPlayerText}>
+                      <Text style={styles.playerSelectorText}>
+                        {selectedPlayerName(row.playerId)}
+                      </Text>
+                      <Text style={styles.entrySummary}>{battingSummary(row)}</Text>
+                    </View>
+                    <Ionicons
+                      name={
+                        expandedEntry === entryKey("BATTER", inningsIndex, rowIndex)
+                          ? "chevron-up"
+                          : "chevron-down"
+                      }
+                      size={18}
+                      color="#796b80"
+                    />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() =>
@@ -857,6 +1056,17 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     <Ionicons name="trash-outline" size={19} color="#b91c1c" />
                   </TouchableOpacity>
                 </View>
+                {expandedEntry ===
+                entryKey("BATTER", inningsIndex, rowIndex) ? (
+                <View style={styles.expandedStats}>
+                  <TouchableOpacity
+                    style={styles.changePlayerButton}
+                    onPress={() =>
+                      setPicker({ type: "BATTER", inningsIndex, rowIndex })
+                    }
+                  >
+                    <Text style={styles.changePlayerText}>Change player</Text>
+                  </TouchableOpacity>
                 <View style={styles.scoreFields}>
                   {([
                     ["Runs", "runs"],
@@ -867,7 +1077,8 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     <Field
                       key={key}
                       label={label}
-                      value={String(row[key])}
+                      value={numberText(row[key])}
+                      placeholder={label}
                       numeric
                       onChangeText={(value) =>
                         updateBatter(inningsIndex, rowIndex, {
@@ -928,8 +1139,20 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     />
                   ) : null}
                 </View>
+                </View>
+                ) : null}
               </View>
             ))}
+            {innings.battingEntries.length > 5 ? (
+              <TouchableOpacity
+                style={styles.seeMoreButton}
+                onPress={() => toggleList(battingListKey)}
+              >
+                <Text style={styles.seeMoreText}>
+                  {expandedLists[battingListKey] ? "See Less" : "See More"}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </>
         ) : (
           <>
@@ -951,26 +1174,32 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                   })
                 }
               >
-                <Text style={styles.addButtonText}>+ Bowler</Text>
+                <Text style={styles.addButtonText}>+ Add Bowler</Text>
               </TouchableOpacity>
             </View>
-            {innings.bowlingEntries.map((row, rowIndex) => (
+            {visibleBowlingEntries.map(({ row, rowIndex }) => (
               <View key={rowIndex} style={styles.playerEntry}>
                 <View style={styles.playerEntryHeader}>
                   <TouchableOpacity
-                    style={styles.playerSelector}
-                    onPress={() =>
-                      setPicker({
-                        type: "BOWLER",
-                        inningsIndex,
-                        rowIndex,
-                      })
-                    }
+                    style={styles.compactPlayerHeader}
+                    onPress={() => toggleEntry("BOWLER", inningsIndex, rowIndex)}
                   >
                     <Ionicons name="person-circle-outline" size={22} color="#6d28d9" />
-                    <Text style={styles.playerSelectorText}>
-                      {selectedPlayerName(row.playerId)}
-                    </Text>
+                    <View style={styles.compactPlayerText}>
+                      <Text style={styles.playerSelectorText}>
+                        {selectedPlayerName(row.playerId)}
+                      </Text>
+                      <Text style={styles.entrySummary}>{bowlingSummary(row)}</Text>
+                    </View>
+                    <Ionicons
+                      name={
+                        expandedEntry === entryKey("BOWLER", inningsIndex, rowIndex)
+                          ? "chevron-up"
+                          : "chevron-down"
+                      }
+                      size={18}
+                      color="#796b80"
+                    />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() =>
@@ -984,6 +1213,17 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     <Ionicons name="trash-outline" size={19} color="#b91c1c" />
                   </TouchableOpacity>
                 </View>
+                {expandedEntry ===
+                entryKey("BOWLER", inningsIndex, rowIndex) ? (
+                <View style={styles.expandedStats}>
+                  <TouchableOpacity
+                    style={styles.changePlayerButton}
+                    onPress={() =>
+                      setPicker({ type: "BOWLER", inningsIndex, rowIndex })
+                    }
+                  >
+                    <Text style={styles.changePlayerText}>Change player</Text>
+                  </TouchableOpacity>
                 <View style={styles.scoreFields}>
                   <OversField
                     legalBalls={row.legalBalls}
@@ -997,11 +1237,13 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     ["W", "wickets"],
                     ["WD", "wides"],
                     ["NB", "noBalls"],
+                    ["Dot", "dotBalls"],
                   ] as const).map(([label, key]) => (
                     <Field
                       key={key}
                       label={label}
-                      value={String(row[key])}
+                      value={numberText(row[key])}
+                      placeholder={label}
                       numeric
                       onChangeText={(value) =>
                         updateBowler(inningsIndex, rowIndex, {
@@ -1017,8 +1259,20 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     ? ((row.runsConceded * 6) / row.legalBalls).toFixed(2)
                     : "0.00"}
                 </Text>
+                </View>
+                ) : null}
               </View>
             ))}
+            {innings.bowlingEntries.length > 5 ? (
+              <TouchableOpacity
+                style={styles.seeMoreButton}
+                onPress={() => toggleList(bowlingListKey)}
+              >
+                <Text style={styles.seeMoreText}>
+                  {expandedLists[bowlingListKey] ? "See Less" : "See More"}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             <View style={styles.sectionHeader}>
               <View>
@@ -1038,32 +1292,38 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                   })
                 }
               >
-                <Text style={styles.addButtonText}>+ Fielder</Text>
+                <Text style={styles.addButtonText}>+ Add Fielder</Text>
               </TouchableOpacity>
             </View>
-            {innings.fieldingEntries.map((row, rowIndex) => (
+            {visibleFieldingEntries.map(({ row, rowIndex }) => (
               <View key={rowIndex} style={styles.playerEntry}>
                 <View style={styles.playerEntryHeader}>
                   <TouchableOpacity
-                    style={styles.playerSelector}
-                    onPress={() =>
-                      setPicker({
-                        type: "FIELDER",
-                        inningsIndex,
-                        rowIndex,
-                      })
-                    }
+                    style={styles.compactPlayerHeader}
+                    onPress={() => toggleEntry("FIELDER", inningsIndex, rowIndex)}
                   >
                     <Ionicons
                       name="hand-left-outline"
                       size={21}
                       color="#6d28d9"
                     />
-                    <Text style={styles.playerSelectorText}>
-                      {row.playerId
-                        ? selectedPlayerName(row.playerId)
-                        : "Select fielder"}
-                    </Text>
+                    <View style={styles.compactPlayerText}>
+                      <Text style={styles.playerSelectorText}>
+                        {row.playerId
+                          ? selectedPlayerName(row.playerId)
+                          : "Select fielder"}
+                      </Text>
+                      <Text style={styles.entrySummary}>{fieldingSummary(row)}</Text>
+                    </View>
+                    <Ionicons
+                      name={
+                        expandedEntry === entryKey("FIELDER", inningsIndex, rowIndex)
+                          ? "chevron-up"
+                          : "chevron-down"
+                      }
+                      size={18}
+                      color="#796b80"
+                    />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() =>
@@ -1081,6 +1341,17 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     />
                   </TouchableOpacity>
                 </View>
+                {expandedEntry ===
+                entryKey("FIELDER", inningsIndex, rowIndex) ? (
+                <View style={styles.expandedStats}>
+                  <TouchableOpacity
+                    style={styles.changePlayerButton}
+                    onPress={() =>
+                      setPicker({ type: "FIELDER", inningsIndex, rowIndex })
+                    }
+                  >
+                    <Text style={styles.changePlayerText}>Change player</Text>
+                  </TouchableOpacity>
                 <View style={styles.scoreFields}>
                   {([
                     ["Catches", "catches"],
@@ -1091,7 +1362,8 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     <Field
                       key={key}
                       label={label}
-                      value={String(row[key])}
+                      value={numberText(row[key])}
+                      placeholder={label}
                       numeric
                       onChangeText={(value) =>
                         updateFielder(inningsIndex, rowIndex, {
@@ -1101,8 +1373,20 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                     />
                   ))}
                 </View>
+                </View>
+                ) : null}
               </View>
             ))}
+            {innings.fieldingEntries.length > 5 ? (
+              <TouchableOpacity
+                style={styles.seeMoreButton}
+                onPress={() => toggleList(fieldingListKey)}
+              >
+                <Text style={styles.seeMoreText}>
+                  {expandedLists[fieldingListKey] ? "See Less" : "See More"}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </>
         )}
       </View>
@@ -1449,16 +1733,50 @@ const styles = StyleSheet.create({
   },
   addButtonText: { color: "#15803d", fontSize: 11, fontWeight: "900" },
   playerEntry: {
-    backgroundColor: "#f7f2f9",
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#e3d8e8",
     borderRadius: 14,
-    padding: 11,
-    marginBottom: 9,
+    padding: 10,
+    marginBottom: 7,
   },
   playerEntryHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 8,
   },
+  compactPlayerHeader: {
+    flex: 1,
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  compactPlayerText: { flex: 1 },
+  entrySummary: { color: "#817287", fontSize: 10, marginTop: 2 },
+  expandedStats: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#e6dce9",
+    marginTop: 8,
+    paddingTop: 10,
+  },
+  changePlayerButton: {
+    alignSelf: "flex-start",
+    backgroundColor: "#f1ebf4",
+    borderRadius: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 9,
+  },
+  changePlayerText: { color: "#4B1D6B", fontSize: 10, fontWeight: "900" },
+  seeMoreButton: {
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    marginBottom: 7,
+  },
+  seeMoreText: { color: "#4B1D6B", fontSize: 12, fontWeight: "900" },
   playerSelector: {
     flex: 1,
     flexDirection: "row",

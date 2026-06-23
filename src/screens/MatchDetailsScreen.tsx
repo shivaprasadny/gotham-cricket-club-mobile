@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 import { getMatchById } from "../services/matchService";
 import { getAvailabilityByMatch } from "../services/availabilityService";
 
@@ -32,7 +33,7 @@ type MatchDetails = {
   leagueName?: string | null;
   matchDate: string;
   venue: string;
-  matchType: string;
+  homeAway?: "HOME" | "AWAY";
   matchFee?: number | null;
   matchFeeAmount?: number | null;
 matchFeeDueDate?: string | null;
@@ -154,18 +155,29 @@ const canManageSquad = isAdmin || isCaptain;
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
+      <View style={styles.hero}>
+        <Text style={styles.heroEyebrow}>MATCH DETAILS</Text>
+        <Text style={styles.title}>{getMatchTitle()}</Text>
+        <View style={styles.badgeRow}>
+          <Text style={styles.goldBadge}>
+            {match.homeAway === "AWAY" ? "Away" : "Home"}
+          </Text>
+          <Text style={styles.lightBadge}>
+            {match.matchFormat || "Format TBA"}
+          </Text>
+          <Text style={styles.lightBadge}>
+            {formatEnumLabel(match.status, "Upcoming")}
+          </Text>
+        </View>
+      </View>
+
       {/* Match information card */}
       <View style={styles.card}>
-        <Text style={styles.title}>{getMatchTitle()}</Text>
-
+        <Text style={styles.cardTitle}>Match Information</Text>
         {match.leagueName ? (
           <Text style={styles.detail}>League: {match.leagueName}</Text>
         ) : null}
 
-        <Text style={styles.detail}>Type: {match.matchType}</Text>
-
-        
-<Text style={styles.detail}>Format: {match.matchFormat || "N/A"}</Text>
         <Text style={styles.detail}>Venue: {match.venue}</Text>
 
 <Text style={styles.detail}>
@@ -190,8 +202,6 @@ const canManageSquad = isAdmin || isCaptain;
         <Text style={styles.detail}>
           Date: {new Date(match.matchDate).toLocaleString()}
         </Text>
-        <Text style={styles.detail}>Status: {match.status || "UPCOMING"}</Text>
-
         {match.notes ? (
           <Text style={styles.detail}>Notes: {match.notes}</Text>
         ) : null}
@@ -216,7 +226,7 @@ const canManageSquad = isAdmin || isCaptain;
                 : styles.statusDefault,
             ]}
           >
-            {match.myAvailability || "Not marked"}
+            {formatEnumLabel(match.myAvailability, "Not Marked")}
           </Text>
         </View>
 
@@ -231,7 +241,7 @@ const canManageSquad = isAdmin || isCaptain;
   externalOpponentName: match.externalOpponentName,
   venue: match.venue,
   matchDate: match.matchDate,
-  matchType: match.matchType,
+  homeAway: match.homeAway,
   matchFormat: match.matchFormat,
   matchFeeAmount: match.matchFeeAmount,
   matchFeeDueDate: match.matchFeeDueDate,
@@ -252,30 +262,30 @@ const canManageSquad = isAdmin || isCaptain;
           </View>
         )}
 
-       {canManageSquad && (
-  <TouchableOpacity
+       <TouchableOpacity
     style={styles.squadBtn}
     onPress={() =>
-      navigation.navigate("SquadSelection", {
+      navigation.navigate("MatchSquadHub", {
   matchId: match.id,
   teamId: match.homeTeamId,
+  awayTeamId: match.awayTeamId,
+  awayTeamName: match.awayTeamName,
+  externalOpponentName: match.externalOpponentName,
   opponentName: match.awayTeamName || match.externalOpponentName,
   teamName: match.homeTeamName,
   matchDate: match.matchDate,
   venue: match.venue,
-  matchType: match.matchType,
+  homeAway: match.homeAway,
   matchFormat: match.matchFormat,
-
-  // ✅ ADD THESE
   matchFeeAmount: match.matchFeeAmount,
   matchFeeDueDate: match.matchFeeDueDate,
   matchFeeDescription: match.matchFeeDescription,
 })
     }
   >
-    <Text style={styles.squadBtnText}>Open Squad Selection</Text>
+    <Text style={styles.squadBtnText}>Open Match Squad Hub</Text>
   </TouchableOpacity>
-)}
+
       </View>
 
       <TouchableOpacity
@@ -330,7 +340,9 @@ const canManageSquad = isAdmin || isCaptain;
         responses.map((item) => (
           <View key={item.id} style={styles.responseCard}>
             <Text style={styles.responseName}>{item.fullName}</Text>
-            <Text style={styles.responseStatus}>Status: {item.status}</Text>
+            <Text style={styles.responseStatus}>
+              Status: {formatEnumLabel(item.status)}
+            </Text>
             {item.message ? (
               <Text style={styles.responseMessage}>Note: {item.message}</Text>
             ) : null}
@@ -363,6 +375,45 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 48,
+  },
+  hero: {
+    backgroundColor: "#2b0540",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 14,
+    borderBottomWidth: 4,
+    borderBottomColor: "#da9306",
+  },
+  heroEyebrow: {
+    color: "#da9306",
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1.1,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+  goldBadge: {
+    color: "#2b0540",
+    backgroundColor: "#da9306",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    fontWeight: "900",
+    fontSize: 11,
+  },
+  lightBadge: {
+    color: "#fff",
+    backgroundColor: "#5b2c72",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    fontWeight: "800",
+    fontSize: 11,
   },
   card: {
     backgroundColor: "#fff",
@@ -374,14 +425,22 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: "700",
+    fontWeight: "900",
     marginBottom: 10,
+    marginTop: 7,
+    color: "#fff",
+  },
+  cardTitle: {
     color: "#2b0540",
+    fontSize: 18,
+    fontWeight: "900",
+    marginBottom: 10,
   },
   detail: {
-    fontSize: 16,
-    marginBottom: 6,
-    color: "#2b0540",
+    fontSize: 15,
+    marginBottom: 7,
+    color: "#5e5065",
+    lineHeight: 20,
   },
   sectionTitle: {
     fontSize: 22,

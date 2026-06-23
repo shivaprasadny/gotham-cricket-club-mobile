@@ -16,6 +16,7 @@ import {
   getEventAvailability,
   submitEventAvailability,
 } from "../services/eventService";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 
 
 type Props = {
@@ -203,7 +204,9 @@ const onRefresh = async () => {
       renderItem={({ item }) => (
   <View style={styles.responseCard}>
     <Text style={styles.responseName}>{item.fullName}</Text>
-    <Text style={styles.responseText}>Status: {item.status}</Text>
+    <Text style={styles.responseText}>
+      Status: {formatEnumLabel(item.status)}
+    </Text>
     {item.message ? (
       <Text style={styles.responseText}>Note: {item.message}</Text>
     ) : null}

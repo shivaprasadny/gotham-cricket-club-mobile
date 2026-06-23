@@ -18,13 +18,19 @@ import {
   publishScorecard,
   reopenScorecard,
 } from "../services/scorecardService";
-import { ScorecardResponse } from "../types/scorecard";
+import {
+  BattingPerformanceResponse,
+  BowlingPerformanceResponse,
+  FieldingPerformanceResponse,
+  ScorecardResponse,
+} from "../types/scorecard";
 import {
   BattingTable,
   BowlingTable,
   FieldingTable,
 } from "../components/scorecard/ScorecardTable";
 import { getMatchById } from "../services/matchService";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 
 type Props = {
   route: any;
@@ -33,6 +39,25 @@ type Props = {
 
 const errorMessage = (error: any, fallback: string) =>
   error?.response?.data?.message || fallback;
+
+// Keep the read-only view close to a traditional cricket scorecard.
+const didNotBat = (row: BattingPerformanceResponse) =>
+  row.dismissalType === "DID_NOT_BAT";
+
+const hasBowlingStats = (row: BowlingPerformanceResponse) =>
+  row.oversDisplay !== "0.0" ||
+  row.maidens > 0 ||
+  row.runsConceded > 0 ||
+  row.wickets > 0 ||
+  (row.dotBalls ?? 0) > 0 ||
+  (row.wides ?? row.totalBowlingExtras ?? 0) > 0 ||
+  (row.noBalls ?? 0) > 0;
+
+const hasFieldingStats = (row: FieldingPerformanceResponse) =>
+  row.catches > 0 ||
+  row.droppedCatches > 0 ||
+  row.runOuts > 0 ||
+  row.stumpings > 0;
 
 const ScorecardScreen = ({ route, navigation }: Props) => {
   const { matchId, match, savedScorecard } = route.params;
@@ -176,7 +201,7 @@ const ScorecardScreen = ({ route, navigation }: Props) => {
     >
       <View style={styles.hero}>
         <View style={styles.statusRow}>
-          <Text style={styles.status}>{scorecard.status}</Text>
+          <Text style={styles.status}>{formatEnumLabel(scorecard.status)}</Text>
           {scorecard.publishedAt ? (
             <Text style={styles.published}>
               {new Date(scorecard.publishedAt).toLocaleDateString()}
@@ -214,7 +239,13 @@ const ScorecardScreen = ({ route, navigation }: Props) => {
         </Text>
       </View>
 
-      {scorecard.innings.map((innings) => (
+      {scorecard.innings.map((innings) => {
+        const battingRows = innings.batting.filter((row) => !didNotBat(row));
+        const didNotBatRows = innings.batting.filter(didNotBat);
+        const bowlingRows = innings.bowling.filter(hasBowlingStats);
+        const fieldingRows = innings.fielding.filter(hasFieldingStats);
+
+        return (
         <View key={innings.id} style={styles.inningsCard}>
           <View style={styles.inningsHeader}>
             <View>
@@ -230,27 +261,46 @@ const ScorecardScreen = ({ route, navigation }: Props) => {
             </Text>
           </View>
 
+          <Text style={styles.inningsSub}>
+            Extras {innings.totalExtras}: WD {innings.wides || 0}, NB{" "}
+            {innings.noBalls || 0}, B {innings.byes || 0}, LB{" "}
+            {innings.legByes || 0}, P {innings.penaltyRuns || 0}
+          </Text>
+
           <Text style={styles.tableTitle}>Batting</Text>
           <BattingTable
-            rows={innings.batting}
+            rows={battingRows}
             onPlayerPress={(playerId) =>
               navigation.navigate("PlayerStatistics", { playerId })
             }
           />
 
-          <Text style={styles.tableTitle}>Bowling</Text>
-          <BowlingTable
-            rows={innings.bowling}
-            onPlayerPress={(playerId) =>
-              navigation.navigate("PlayerStatistics", { playerId })
-            }
-          />
+          {didNotBatRows.length ? (
+            <View style={styles.didNotBatRow}>
+              <Text style={styles.didNotBatLabel}>Did not bat</Text>
+              <Text style={styles.didNotBatNames}>
+                {didNotBatRows.map((row) => row.playerName).join(", ")}
+              </Text>
+            </View>
+          ) : null}
 
-          {innings.fielding?.length ? (
+          {bowlingRows.length ? (
+            <>
+              <Text style={styles.tableTitle}>Bowling</Text>
+              <BowlingTable
+                rows={bowlingRows}
+                onPlayerPress={(playerId) =>
+                  navigation.navigate("PlayerStatistics", { playerId })
+                }
+              />
+            </>
+          ) : null}
+
+          {fieldingRows.length ? (
             <>
               <Text style={styles.tableTitle}>Fielding</Text>
               <FieldingTable
-                rows={innings.fielding}
+                rows={fieldingRows}
                 onPlayerPress={(playerId) =>
                   navigation.navigate("PlayerStatistics", { playerId })
                 }
@@ -266,7 +316,8 @@ const ScorecardScreen = ({ route, navigation }: Props) => {
             </Text>
           </View>
         </View>
-      ))}
+        );
+      })}
 
       {canManage ? (
         <View style={styles.actions}>
@@ -371,6 +422,15 @@ const styles = StyleSheet.create({
   inningsSub: { color: "#827487", fontSize: 12, marginTop: 3 },
   total: { color: "#2b0540", fontSize: 25, fontWeight: "900" },
   tableTitle: { color: "#2b0540", fontSize: 14, fontWeight: "800", marginTop: 10, marginBottom: 7 },
+  didNotBatRow: {
+    backgroundColor: "#f8f5fa",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  didNotBatLabel: { color: "#6f6274", fontSize: 11, fontWeight: "800" },
+  didNotBatNames: { color: "#2b0540", fontSize: 13, marginTop: 2 },
   extras: { backgroundColor: "#f6f0f8", borderRadius: 10, padding: 10, marginTop: 12 },
   extrasTitle: { color: "#2b0540", fontWeight: "800" },
   extrasText: { color: "#6f6274", fontSize: 12, marginTop: 3 },

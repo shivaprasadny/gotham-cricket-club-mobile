@@ -11,6 +11,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { getMyProfile } from "../services/profileService";
 import { useAuth } from "../context/AuthContext";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 
 import { registerForPushNotificationsAsync } from "../services/pushNotificationService";
 
@@ -206,7 +207,11 @@ const ProfileScreen = ({ navigation }: Props) => {
           value={formatPrettyDate(profile?.joinedClubDate)}
           icon="🏏"
         />
-        <InfoRow label="Status" value={profile?.status} icon="✅" />
+        <InfoRow
+          label="Status"
+          value={formatEnumLabel(profile?.status)}
+          icon="✅"
+        />
       </View>
 
       {/* ================= CRICKET PROFILE ================= */}

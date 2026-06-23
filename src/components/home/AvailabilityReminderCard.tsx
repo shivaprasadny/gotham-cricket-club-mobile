@@ -88,7 +88,7 @@ const AvailabilityReminderCard = ({
       externalOpponentName: match.externalOpponentName,
       venue: match.venue,
       matchDate: match.matchDate,
-      matchType: match.matchType,
+      homeAway: match.homeAway,
       matchFormat: match.matchFormat,
       matchFeeAmount: match.matchFeeAmount,
       matchFeeDueDate: match.matchFeeDueDate,
@@ -156,7 +156,7 @@ const getLeagueLabel = (match: any) => {
 
 <Text style={styles.matchMeta} numberOfLines={1}>
   {getLeagueLabel(match)} •{" "}
-  {match.matchFormat || match.matchType || "T20"} •{" "}
+  {match.matchFormat || "Match"} •{" "}
   {formatDate(match.matchDate)}
 </Text>
 
@@ -380,4 +380,4 @@ const styles = StyleSheet.create({
   fontWeight: "600",
   marginBottom: 3,
 },
-}); 
+});

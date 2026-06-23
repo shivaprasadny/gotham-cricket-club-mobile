@@ -45,6 +45,13 @@ const validateInnings = (innings: SaveInningsRequest): string | null => {
   if (innings.battingEntries.length > 11 || innings.bowlingEntries.length > 11) {
     return `Innings ${innings.inningsNumber}: maximum 11 batting and bowling rows.`;
   }
+  if (
+    innings.battingEntries.filter(
+      (row) => (row.dismissalType || "DID_NOT_BAT") === "NOT_OUT"
+    ).length > 2
+  ) {
+    return `Innings ${innings.inningsNumber}: only 2 batters can be Not Out.`;
+  }
   if (innings.fieldingEntries.length > 12) {
     return `Innings ${innings.inningsNumber}: maximum 12 fielding rows.`;
   }
@@ -94,8 +101,11 @@ const validateInnings = (innings: SaveInningsRequest): string | null => {
         (bowler.playerId && bowler.externalPlayerName?.trim())) {
       return `Innings ${innings.inningsNumber}: each bowler needs one player or external name.`;
     }
-    if ([bowler.legalBalls, bowler.maidens, bowler.runsConceded, bowler.wickets, bowler.wides, bowler.noBalls].some((value) => value < 0)) {
+    if ([bowler.legalBalls, bowler.maidens, bowler.runsConceded, bowler.wickets, bowler.wides, bowler.noBalls, bowler.dotBalls].some((value) => value < 0)) {
       return `Innings ${innings.inningsNumber}: bowling values cannot be negative.`;
+    }
+    if (bowler.dotBalls > bowler.legalBalls) {
+      return `Innings ${innings.inningsNumber}: dot balls cannot exceed legal balls.`;
     }
     if (bowler.maidens > Math.floor(bowler.legalBalls / 6)) {
       return `Innings ${innings.inningsNumber}: maidens cannot exceed completed overs.`;
@@ -178,12 +188,21 @@ export const responseToDraft = (scorecard: ScorecardResponse): SaveScorecardRequ
     runs: innings.runs,
     wickets: innings.wickets,
     legalBalls: innings.legalBalls,
-    totalExtras: innings.totalExtras,
-    wides: innings.wides,
-    noBalls: innings.noBalls,
-    byes: innings.byes,
-    legByes: innings.legByes,
-    penaltyRuns: innings.penaltyRuns,
+    totalExtras: innings.totalExtras || 0,
+    // Old scorecards may only have totalExtras; preserve their former
+    // wides-based interpretation until the editor saves a detailed breakdown.
+    wides:
+      innings.wides ??
+      (innings.noBalls == null &&
+      innings.byes == null &&
+      innings.legByes == null &&
+      innings.penaltyRuns == null
+        ? innings.totalExtras || 0
+        : 0),
+    noBalls: innings.noBalls || 0,
+    byes: innings.byes || 0,
+    legByes: innings.legByes || 0,
+    penaltyRuns: innings.penaltyRuns || 0,
     declared: innings.declared,
     allOut: innings.allOut,
     battingEntries: innings.batting.map((row, index) => ({
@@ -215,8 +234,9 @@ export const responseToDraft = (scorecard: ScorecardResponse): SaveScorecardRequ
       maidens: row.maidens,
       runsConceded: row.runsConceded,
       wickets: row.wickets,
-      wides: row.wides,
-      noBalls: row.noBalls,
+      wides: row.wides ?? row.totalBowlingExtras ?? 0,
+      noBalls: row.noBalls || 0,
+      dotBalls: row.dotBalls || 0,
     })),
     fieldingEntries: (innings.fielding || []).map((row) => ({
       playerId: row.playerId,

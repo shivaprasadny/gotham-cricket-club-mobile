@@ -1,17 +1,26 @@
 import React, { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
-import { getLeagueStatistics } from "../services/statisticsService";
-import { LeagueStatistics } from "../types/scorecard";
+import { getLeagueCharts, getLeagueStatistics } from "../services/statisticsService";
+import { LeagueCharts, LeagueStatistics } from "../types/scorecard";
 import { LeaderboardList, StatGrid } from "../components/statistics/StatisticsUI";
+import { DistributionBars, MatchBarChart } from "../components/statistics/SimpleCharts";
 
 const LeagueStatisticsScreen = ({ route, navigation }: any) => {
   const { leagueId } = route.params;
   const [stats, setStats] = useState<LeagueStatistics | null>(null);
+  const [charts, setCharts] = useState<LeagueCharts | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const load = async () => {
-    try { setStats(await getLeagueStatistics(leagueId)); }
+    try {
+      const [statistics, chartData] = await Promise.all([
+        getLeagueStatistics(leagueId),
+        getLeagueCharts(leagueId, undefined, 10),
+      ]);
+      setStats(statistics);
+      setCharts(chartData);
+    }
     catch (error: any) { Alert.alert("Statistics", error?.response?.data?.message || "League statistics are unavailable"); }
     finally { setLoading(false); setRefreshing(false); }
   };
@@ -21,6 +30,22 @@ const LeagueStatisticsScreen = ({ route, navigation }: any) => {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); void load(); }} />}>
       <View style={styles.hero}><Text style={styles.heroTitle}>{stats.leagueName}</Text><Text style={styles.heroText}>League Statistics</Text></View>
+      {charts ? <>
+        <Text style={styles.title}>League Charts</Text>
+        <MatchBarChart
+          title="Team Runs Scored"
+          points={charts.teamRecords.map((item) => ({
+            label: item.teamName,
+            value: item.runsScored,
+          }))}
+        />
+        <DistributionBars title="Result Distribution" items={[
+          { label: "Wins", value: charts.resultDistribution.wins, color: "#15803d" },
+          { label: "Ties", value: charts.resultDistribution.ties, color: "#da9306" },
+          { label: "No Result", value: charts.resultDistribution.noResults, color: "#7a6c80" },
+          { label: "Abandoned", value: charts.resultDistribution.abandoned, color: "#b91c1c" },
+        ]} />
+      </> : null}
       <Text style={styles.title}>Overview</Text>
       <StatGrid items={[
         { label: "Matches", value: stats.matchesPlayed }, { label: "Completed", value: stats.completedMatches },

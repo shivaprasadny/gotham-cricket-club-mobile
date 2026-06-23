@@ -39,12 +39,7 @@ type League = {
 
 type MatchStatus = "UPCOMING" | "COMPLETED" | "CANCELLED";
 
-type MatchType =
-  | "LEAGUE"
-  | "FRIENDLY"
-  | "PRACTICE"
-  | "INTRA_CLUB"
-  | "TOURNAMENT";
+type HomeAway = "HOME" | "AWAY";
 
 type MatchFormat =
   | "T20"
@@ -55,13 +50,7 @@ type MatchFormat =
   | "TEST"
   | "CUSTOM";
 
-const MATCH_TYPES: MatchType[] = [
-  "LEAGUE",
-  "FRIENDLY",
-  "PRACTICE",
-  "INTRA_CLUB",
-  "TOURNAMENT",
-];
+const HOME_AWAY_OPTIONS: HomeAway[] = ["HOME", "AWAY"];
 
 const MATCH_FORMATS: MatchFormat[] = [
   "T20",
@@ -90,7 +79,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   const [matchDate, setMatchDate] = useState<Date | null>(null);
   const [tempMatchDate, setTempMatchDate] = useState<Date>(new Date());
 
-  const [matchType, setMatchType] = useState<MatchType>("LEAGUE");
+  const [homeAway, setHomeAway] = useState<HomeAway>("HOME");
   const [matchFormat, setMatchFormat] = useState<MatchFormat>("T20");
   const [customFormat, setCustomFormat] = useState("");
   const [status, setStatus] = useState<MatchStatus>("UPCOMING");
@@ -159,10 +148,11 @@ setMatchDate(
 
       setMatchFeeDescription(matchData?.matchFeeDescription || "");
 
-      const loadedType = (matchData?.matchType || "LEAGUE").toUpperCase();
-      if (MATCH_TYPES.includes(loadedType as MatchType)) {
-        setMatchType(loadedType as MatchType);
-      }
+      setHomeAway(
+        String(matchData?.homeAway || "HOME").toUpperCase() === "AWAY"
+          ? "AWAY"
+          : "HOME"
+      );
 
       const loadedFormat = (matchData?.matchFormat || "T20").toUpperCase();
       if (PRESET_FORMAT_VALUES.includes(loadedFormat)) {
@@ -340,7 +330,7 @@ const formatLocalDateTime = (date: Date) => {
         leagueId,
        matchDate: formatLocalDateTime(matchDate),
         venue: venue.trim(),
-        matchType,
+        homeAway,
         matchFormat: finalMatchFormat,
         matchFee: null,
         matchFeeAmount: matchFeeAmount.trim() ? Number(matchFeeAmount) : null,
@@ -403,24 +393,24 @@ matchFeeDueDate: matchFeeDueDate
         >
           <Text style={styles.title}>Edit Match</Text>
 
-          <Text style={styles.label}>Match Type</Text>
+          <Text style={styles.label}>Home / Away</Text>
           <View style={styles.rowWrap}>
-            {MATCH_TYPES.map((item) => (
+            {HOME_AWAY_OPTIONS.map((item) => (
               <TouchableOpacity
                 key={item}
                 style={[
                   styles.chipBtn,
-                  matchType === item && styles.chipBtnSelected,
+                  homeAway === item && styles.chipBtnSelected,
                 ]}
-                onPress={() => setMatchType(item)}
+                onPress={() => setHomeAway(item)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    matchType === item && styles.chipTextSelected,
+                    homeAway === item && styles.chipTextSelected,
                   ]}
                 >
-                  {item}
+                  {item === "HOME" ? "Home" : "Away"}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -599,10 +589,10 @@ matchFeeDueDate: matchFeeDueDate
             onChangeText={setVenue}
           />
 
-          <Text style={styles.label}>Match Fee Amount (Optional)</Text>
+          <Text style={styles.label}>Match Fee Per Player $ (Optional)</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter fee amount"
+            placeholder="Enter fee charged to each player"
             placeholderTextColor="#7a7a7a"
             value={matchFeeAmount}
             onChangeText={setMatchFeeAmount}

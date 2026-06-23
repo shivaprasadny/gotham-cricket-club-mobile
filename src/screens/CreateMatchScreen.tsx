@@ -40,12 +40,7 @@ type League = {
 
 type MatchStatus = "UPCOMING" | "COMPLETED" | "CANCELLED";
 
-type MatchType =
-  | "LEAGUE"
-  | "FRIENDLY"
-  | "PRACTICE"
-  | "INTRA_CLUB"
-  | "TOURNAMENT";
+type HomeAway = "HOME" | "AWAY";
 
 type MatchFormat =
   | "T20"
@@ -56,13 +51,7 @@ type MatchFormat =
   | "TEST"
   | "CUSTOM";
 
-const MATCH_TYPES: MatchType[] = [
-  "LEAGUE",
-  "FRIENDLY",
-  "PRACTICE",
-  "INTRA_CLUB",
-  "TOURNAMENT",
-];
+const HOME_AWAY_OPTIONS: HomeAway[] = ["HOME", "AWAY"];
 
 const MATCH_FORMATS: MatchFormat[] = [
   "T20",
@@ -93,7 +82,7 @@ const CreateMatchScreen = ({ navigation }: Props) => {
   const [tempMatchDate, setTempMatchDate] = useState<Date>(new Date());
 
   // Match configuration
-  const [matchType, setMatchType] = useState<MatchType>("LEAGUE");
+  const [homeAway, setHomeAway] = useState<HomeAway>("HOME");
   const [matchFormat, setMatchFormat] = useState<MatchFormat>("T20");
   const [customFormat, setCustomFormat] = useState("");
   const [status, setStatus] = useState<MatchStatus>("UPCOMING");
@@ -246,7 +235,7 @@ const formatLocalDateTime = (date: Date) => {
         leagueId,
       matchDate: formatLocalDateTime(matchDate),
         venue: venue.trim(),
-        matchType,
+        homeAway,
         matchFormat: finalMatchFormat,
         matchFee: matchFee.trim() ? Number(matchFee) : null,
         matchFeeAmount: matchFeeAmount.trim()
@@ -344,24 +333,24 @@ const openAndroidDateTimePicker = (
         >
           <Text style={styles.title}>Create Match</Text>
 
-          <Text style={styles.label}>Match Type</Text>
+          <Text style={styles.label}>Home / Away</Text>
           <View style={styles.rowWrap}>
-            {MATCH_TYPES.map((item) => (
+            {HOME_AWAY_OPTIONS.map((item) => (
               <TouchableOpacity
                 key={item}
                 style={[
                   styles.chipBtn,
-                  matchType === item && styles.chipBtnSelected,
+                  homeAway === item && styles.chipBtnSelected,
                 ]}
-                onPress={() => setMatchType(item)}
+                onPress={() => setHomeAway(item)}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    matchType === item && styles.chipTextSelected,
+                    homeAway === item && styles.chipTextSelected,
                   ]}
                 >
-                  {item}
+                  {item === "HOME" ? "Home" : "Away"}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -543,7 +532,7 @@ const openAndroidDateTimePicker = (
           <Text style={styles.label}>Match Fee Per Player $(Optional)</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter fee amount per player"
+            placeholder="Enter fee charged to each player"
             placeholderTextColor="#7a7a7a"
             value={matchFeeAmount}
             onChangeText={setMatchFeeAmount}

@@ -18,6 +18,7 @@ import {
   getMyFees,
   submitPayment,
 } from "../services/feeService";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 
 type Props = {
   navigation: any;
@@ -277,7 +278,9 @@ const MyFeesScreen = ({ navigation }: Props) => {
       <View style={styles.cardTopRow}>
         <View style={{ flex: 1 }}>
           <Text style={styles.cardTitle}>{item.title}</Text>
-          <Text style={styles.cardSubTitle}>{item.feeType}</Text>
+          <Text style={styles.cardSubTitle}>
+            {formatEnumLabel(item.feeType)}
+          </Text>
         </View>
 
         <Text style={[styles.statusBadge, getStatusStyle(item)]}>

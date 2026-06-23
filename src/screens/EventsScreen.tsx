@@ -13,6 +13,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import { deleteEvent, getEvents } from "../services/eventService";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 
 type Props = {
   navigation: any;
@@ -107,7 +108,9 @@ const EventsScreen = ({ navigation }: Props) => {
       </Text>
       <Text style={styles.cardText}>Location: {item.location}</Text>
       {item.myStatus ? (
-        <Text style={styles.statusText}>Your Response: {item.myStatus}</Text>
+        <Text style={styles.statusText}>
+          Your Response: {formatEnumLabel(item.myStatus)}
+        </Text>
       ) : null}
 
       {canManage && (

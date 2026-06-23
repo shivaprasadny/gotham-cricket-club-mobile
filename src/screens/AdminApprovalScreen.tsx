@@ -14,6 +14,7 @@ import {
   rejectMember,
   ApprovalRole,
 } from "../services/adminService";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 
 
 type PendingUser = {
@@ -150,7 +151,9 @@ const AdminApprovalScreen = () => {
     <View style={styles.card}>
       <Text style={styles.name}>{item.fullName}</Text>
       <Text style={styles.email}>{item.email}</Text>
-      <Text style={styles.status}>Status: {item.status}</Text>
+      <Text style={styles.status}>
+        Status: {formatEnumLabel(item.status)}
+      </Text>
 
       <Text style={styles.roleLabel}>Approve as:</Text>
       {renderRoleOptions(item.id)}

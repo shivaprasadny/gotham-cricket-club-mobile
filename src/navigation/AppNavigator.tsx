@@ -46,7 +46,11 @@ import PlayerStatisticsScreen from "../screens/PlayerStatisticsScreen";
 import TeamStatisticsScreen from "../screens/TeamStatisticsScreen";
 import LeagueStatisticsScreen from "../screens/LeagueStatisticsScreen";
 import LeaderboardScreen from "../screens/LeaderboardScreen";
+import MyDashboardScreen from "../screens/MyDashboardScreen";
 import { navigationRef } from "./navigationRef";
+import ChatListScreen from "../chat/ChatListScreen";
+import ChatRoomScreen from "../chat/ChatRoomScreen";
+import MatchSquadHubScreen from "../screens/MatchSquadHubScreen";
 
 
 
@@ -96,6 +100,11 @@ const AppNavigator = ({ onNavigationReady }: Props) => {
           <Stack.Screen name="CreateTeam" component={CreateTeamScreen} />
           <Stack.Screen name="EditTeam" component={EditTeamScreen} />
           <Stack.Screen name="SquadSelection" component={SquadSelectionScreen} />
+          <Stack.Screen
+            name="MatchSquadHub"
+            component={MatchSquadHubScreen}
+            options={{ title: "Match Squad Hub" }}
+          />
           <Stack.Screen name="Events" component={EventsScreen} />
           <Stack.Screen name="Leagues" component={LeaguesScreen} />
 <Stack.Screen name="CreateLeague" component={CreateLeagueScreen} />
@@ -149,6 +158,21 @@ const AppNavigator = ({ onNavigationReady }: Props) => {
   name="Leaderboard"
   component={LeaderboardScreen}
   options={{ title: "Leaderboards" }}
+/>
+<Stack.Screen
+  name="MyDashboard"
+  component={MyDashboardScreen}
+  options={{ title: "My Dashboard" }}
+/>
+<Stack.Screen
+  name="ChatList"
+  component={ChatListScreen}
+  options={{ title: "Chats" }}
+/>
+<Stack.Screen
+  name="ChatRoom"
+  component={ChatRoomScreen}
+  options={({ route }: any) => ({ title: route.params?.room?.name || "Chat" })}
 />
 
           <Stack.Screen

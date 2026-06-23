@@ -70,7 +70,21 @@ const HomeMenuModal = ({
             <Text style={styles.menuText}>Notifications</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => goTo("ChatList")}
+          >
+            <Ionicons name="chatbubbles-outline" size={20} color="#da9306" />
+            <Text style={styles.menuText}>Chats</Text>
+          </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => goTo("MyDashboard")}
+          >
+            <Ionicons name="speedometer-outline" size={20} color="#da9306" />
+            <Text style={styles.menuText}>My Dashboard</Text>
+          </TouchableOpacity>
 
 {/* Members */}
 <TouchableOpacity

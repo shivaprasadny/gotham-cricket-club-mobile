@@ -14,6 +14,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import { deleteMatch, getMatches } from "../services/matchService";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 
 type Props = {
   navigation: any;
@@ -30,7 +31,7 @@ type Match = {
   leagueName?: string | null;
   matchDate: string;
   venue: string;
-  matchType: string;
+  homeAway?: "HOME" | "AWAY";
   matchFeeAmount?: number | null;
   matchFeeDueDate?: string | null;
   matchFeeDescription?: string | null;
@@ -171,7 +172,7 @@ const MatchesScreen = ({ navigation }: Props) => {
 
   // Availability text
   const getAvailabilityText = (status?: string) => {
-    return status || "NOT MARKED";
+    return formatEnumLabel(status, "Not Marked");
   };
 
   // Delete match
@@ -282,7 +283,9 @@ const MatchesScreen = ({ navigation }: Props) => {
             {getMatchTitle(item)}
           </Text>
 
-          <Text style={styles.compactStatus}>{item.status || "UPCOMING"}</Text>
+          <Text style={styles.compactStatus}>
+            {formatEnumLabel(item.status, "Upcoming")}
+          </Text>
         </View>
 
         {/* Line 2 */}
@@ -293,7 +296,7 @@ const MatchesScreen = ({ navigation }: Props) => {
         {/* Line 3 */}
         <View style={styles.lineThree}>
           <Text style={styles.compactMetaSmall} numberOfLines={1}>
-            {item.venue}
+            {item.homeAway === "AWAY" ? "Away" : "Home"} · {item.venue}
           </Text>
 
           <Text

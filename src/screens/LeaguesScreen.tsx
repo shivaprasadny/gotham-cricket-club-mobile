@@ -17,6 +17,7 @@ import {
   getLeagues,
   League,
 } from "../services/leagueService";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 
 type Props = {
   navigation: any;
@@ -138,7 +139,9 @@ const LeaguesScreen = ({ navigation }: Props) => {
         </View>
       </View>
 
-      {item.type ? <Text style={styles.cardText}>Type: {item.type}</Text> : null}
+      {item.type ? (
+        <Text style={styles.cardText}>Type: {formatEnumLabel(item.type)}</Text>
+      ) : null}
 
       {item.description ? (
         <Text style={styles.cardText} numberOfLines={2}>

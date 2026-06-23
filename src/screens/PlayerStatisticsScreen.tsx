@@ -11,10 +11,12 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import {
   getPlayerStatistics,
+  getPlayerCharts,
   getStatisticsFilterOptions,
 } from "../services/statisticsService";
 import {
   PlayerStatistics,
+  PlayerCharts,
   StatisticsFilterOptions,
   StatisticsFilters,
 } from "../types/scorecard";
@@ -22,6 +24,11 @@ import {
   StatGrid,
   StatisticsFilterBar,
 } from "../components/statistics/StatisticsUI";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
+import {
+  DistributionBars,
+  MatchBarChart,
+} from "../components/statistics/SimpleCharts";
 
 const PlayerStatisticsScreen = ({ route }: any) => {
   const { playerId, leagueId } = route.params;
@@ -31,6 +38,7 @@ const PlayerStatisticsScreen = ({ route }: any) => {
   const [filterOptions, setFilterOptions] =
     useState<StatisticsFilterOptions | null>(null);
   const [stats, setStats] = useState<PlayerStatistics | null>(null);
+  const [charts, setCharts] = useState<PlayerCharts | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -42,7 +50,12 @@ const PlayerStatisticsScreen = ({ route }: any) => {
 
   const load = useCallback(async () => {
     try {
-      setStats(await getPlayerStatistics(playerId, filters));
+      const [statistics, chartData] = await Promise.all([
+        getPlayerStatistics(playerId, filters),
+        getPlayerCharts(playerId, filters, 10),
+      ]);
+      setStats(statistics);
+      setCharts(chartData);
     } catch (error: any) {
       Alert.alert(
         "Statistics",
@@ -106,6 +119,36 @@ const PlayerStatisticsScreen = ({ route }: any) => {
         <ActivityIndicator color="#da9306" style={styles.filterLoading} />
       ) : null}
 
+      {charts ? (
+        <>
+          <Text style={styles.title}>Performance Trends</Text>
+          <MatchBarChart
+            title="Runs by Match"
+            points={charts.matchPerformance.map((item) => ({
+              label: item.label,
+              value: item.runs,
+            }))}
+          />
+          <MatchBarChart
+            title="Wickets & Catches"
+            secondaryLabel="Catches"
+            color="#15803d"
+            points={charts.matchPerformance.map((item) => ({
+              label: item.label,
+              value: item.wickets,
+              secondaryValue: item.catches,
+            }))}
+          />
+          <DistributionBars
+            title="How Dismissals Happened"
+            items={charts.dismissalBreakdown.map((item) => ({
+              label: formatEnumLabel(item.type),
+              value: item.count,
+            }))}
+          />
+        </>
+      ) : null}
+
       <Text style={styles.title}>Batting</Text>
       <StatGrid
         items={[
@@ -130,6 +173,9 @@ const PlayerStatisticsScreen = ({ route }: any) => {
             value: `${stats.bestBowlingWickets}/${stats.bestBowlingRuns}`,
           },
           { label: "Overs", value: stats.oversDisplay },
+          { label: "Wides", value: stats.wides || 0 },
+          { label: "No Balls", value: stats.noBalls || 0 },
+          { label: "Dot Balls", value: stats.dotBalls || 0 },
         ]}
       />
 

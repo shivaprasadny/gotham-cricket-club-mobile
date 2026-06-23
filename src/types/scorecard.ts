@@ -45,6 +45,7 @@ export type BowlingEntryRequest = {
   wickets: number;
   wides: number;
   noBalls: number;
+  dotBalls: number;
 };
 
 export type SaveInningsRequest = {
@@ -115,6 +116,7 @@ export type BowlingPerformanceResponse = {
   economy: number;
   wides: number;
   noBalls: number;
+  dotBalls: number;
   totalBowlingExtras: number;
 };
 
@@ -225,6 +227,7 @@ export type PlayerStatistics = {
   bestBowlingRuns: number;
   wides: number;
   noBalls: number;
+  dotBalls: number;
   bowledDismissals: number;
   caughtDismissals: number;
   lbwDismissals: number;
@@ -255,6 +258,162 @@ export type StatisticsFilterOptions = {
   seasons: string[];
   leagues: { id: number; name: string; season: string }[];
   teams: { id: number; name: string }[];
+};
+
+export type PlayerDashboard = {
+  playerId: number;
+  fullName: string;
+  year: number | null;
+  summary: {
+    matches: number;
+    battingInnings: number;
+    totalRuns: number;
+    highestScore: number;
+    battingAverage: number;
+    battingStrikeRate: number;
+    fifties: number;
+    hundreds: number;
+    sixes: number;
+    bowlingInnings: number;
+    wickets: number;
+    bestBowling: string;
+    bowlingAverage: number;
+    economy: number;
+    catches: number;
+    droppedCatches: number;
+    runOuts: number;
+    stumpings: number;
+    catchEfficiency: number;
+    playerOfMatchAwards: number;
+  };
+  recentForm: {
+    matchId: number;
+    matchDate: string;
+    matchSummary: string;
+    leagueId: number | null;
+    leagueName: string | null;
+    teamId: number | null;
+    teamName: string | null;
+    result: string;
+    runs: number;
+    ballsFaced: number;
+    notOut: boolean;
+    wickets: number;
+    runsConceded: number;
+    oversDisplay: string;
+    catches: number;
+    droppedCatches: number;
+    runOuts: number;
+    stumpings: number;
+    playerOfMatch: boolean;
+  }[];
+  nextMatch: {
+    matchId: number;
+    matchDate: string;
+    opponentName: string;
+    venue: string;
+    teamName: string;
+    leagueName: string | null;
+    availability: string | null;
+    squadStatus: string;
+  } | null;
+  pendingFees: {
+    count: number;
+    totalAmount: number;
+    overdueCount: number;
+    nextDueDate: string | null;
+  } | null;
+};
+
+export type PlayerCharts = {
+  playerId: number;
+  fullName: string;
+  filters: StatisticsFilters;
+  matchPerformance: {
+    matchId: number;
+    matchDate: string;
+    label: string;
+    runs: number;
+    ballsFaced: number;
+    strikeRate: number;
+    notOut: boolean;
+    wickets: number;
+    runsConceded: number;
+    legalBalls: number;
+    oversDisplay: string;
+    economy: number;
+    catches: number;
+    droppedCatches: number;
+    runOuts: number;
+    stumpings: number;
+  }[];
+  dismissalBreakdown: { type: DismissalType; count: number }[];
+  resultSummary: {
+    matches: number;
+    wins: number;
+    losses: number;
+    ties: number;
+    noResults: number;
+  };
+};
+
+export type TeamCharts = {
+  teamId: number;
+  teamName: string;
+  matchPerformance: {
+    matchId: number;
+    matchDate: string;
+    label: string;
+    result: string;
+    runsScored: number;
+    runsConceded: number;
+    wicketsTaken: number;
+    wicketsLost: number;
+  }[];
+  resultSummary: {
+    matches: number;
+    wins: number;
+    losses: number;
+    ties: number;
+    noResults: number;
+    winPercentage: number;
+  };
+  topRunScorers: { playerId: number; fullName: string; value: number }[];
+  topWicketTakers: { playerId: number; fullName: string; value: number }[];
+};
+
+export type LeagueCharts = {
+  leagueId: number;
+  leagueName: string;
+  teamRecords: {
+    teamId: number;
+    teamName: string;
+    matches: number;
+    wins: number;
+    losses: number;
+    ties: number;
+    noResults: number;
+    winPercentage: number;
+    runsScored: number;
+    runsConceded: number;
+  }[];
+  topRunScorers: { playerId: number; fullName: string; value: number }[];
+  topWicketTakers: { playerId: number; fullName: string; value: number }[];
+  highestTeamScores: {
+    matchId: number;
+    teamId: number;
+    teamName: string;
+    opponentName: string;
+    runs: number;
+    wickets: number;
+    oversDisplay: string;
+  }[];
+  resultDistribution: {
+    wins: number;
+    ties: number;
+    noResults: number;
+    abandoned: number;
+  };
 };
 
 export type TeamStatistics = {

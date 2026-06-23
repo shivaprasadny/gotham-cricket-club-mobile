@@ -9,8 +9,13 @@ export const addOrUpdateSquadMember = async (
   matchId: number,
   payload: {
     userId: number;
+    replacingUserId?: number;
     isPlayingXi: boolean;
     roleInMatch?: string;
+    isCaptain?: boolean;
+    isViceCaptain?: boolean;
+    isWicketKeeper?: boolean;
+    squadPosition?: number;
   }
 ) => {
   const response = await api.post(`/matches/${matchId}/squad`, payload);

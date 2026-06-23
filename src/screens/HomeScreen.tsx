@@ -52,7 +52,7 @@ type Match = {
   leagueName?: string | null;
   venue: string;
   matchDate: string;
-  matchType: string;
+  homeAway?: "HOME" | "AWAY";
   matchFormat?: string | null;
   matchFeeAmount?: number | null;
   matchFeeDueDate?: string | null;

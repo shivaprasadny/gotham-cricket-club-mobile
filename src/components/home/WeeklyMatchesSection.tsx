@@ -39,7 +39,7 @@ const WeeklyMatchesSection = ({
   };
 
   const getFormatLabel = (match: any) => {
-    return match.matchFormat || match.matchType || "T20";
+    return match.matchFormat || "Match";
   };
 
   const formatDate = (dateString: string) => {
@@ -71,6 +71,7 @@ const WeeklyMatchesSection = ({
             </Text>
 
             <Text style={styles.matchMeta} numberOfLines={1}>
+              {match.homeAway === "AWAY" ? "Away" : "Home"} •{" "}
               {getLeagueLabel(match)} • {getFormatLabel(match)} •{" "}
               {formatDate(match.matchDate)}
             </Text>
@@ -98,7 +99,7 @@ const WeeklyMatchesSection = ({
                   externalOpponentName: match.externalOpponentName,
                   venue: match.venue,
                   matchDate: match.matchDate,
-                  matchType: match.matchType,
+                  homeAway: match.homeAway,
                   matchFormat: match.matchFormat,
                   matchFeeAmount: match.matchFeeAmount,
                   matchFeeDueDate: match.matchFeeDueDate,

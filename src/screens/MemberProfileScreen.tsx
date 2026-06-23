@@ -8,7 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { getMemberById } from "../services/memberService";
+import { createDirectChat } from "../chat/chatApi";
+import { useAuth } from "../context/AuthContext";
 
 type Props = {
   route: any;
@@ -49,8 +52,10 @@ const InfoRow = ({
 
 const MemberProfileScreen = ({ route, navigation }: Props) => {
   const { userId } = route.params;
+  const { user } = useAuth();
   const [profile, setProfile] = useState<MemberProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [openingChat, setOpeningChat] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -86,6 +91,22 @@ const MemberProfileScreen = ({ route, navigation }: Props) => {
     );
   }
 
+  const openDirectMessage = async () => {
+    if (openingChat) return;
+    setOpeningChat(true);
+    try {
+      const room = await createDirectChat(profile.userId);
+      navigation.navigate("ChatRoom", { room });
+    } catch (error: any) {
+      Alert.alert(
+        "Could not open chat",
+        error?.response?.data?.message || "Please try again."
+      );
+    } finally {
+      setOpeningChat(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -101,6 +122,20 @@ const MemberProfileScreen = ({ route, navigation }: Props) => {
         <View style={styles.rolePill}>
           <Text style={styles.roleText}>{profile.role || "MEMBER"}</Text>
         </View>
+        {profile.userId !== user?.id ? (
+          <TouchableOpacity
+            style={styles.messageButton}
+            disabled={openingChat}
+            onPress={() => void openDirectMessage()}
+          >
+            {openingChat ? (
+              <ActivityIndicator size="small" color="#2b0540" />
+            ) : (
+              <Ionicons name="chatbubble-outline" size={18} color="#2b0540" />
+            )}
+            <Text style={styles.messageButtonText}>Message</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <View style={styles.card}>
@@ -185,6 +220,22 @@ const styles = StyleSheet.create({
   roleText: {
     color: "#fff",
     fontSize: 12,
+    fontWeight: "800",
+  },
+  messageButton: {
+    marginTop: 14,
+    minWidth: 128,
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  messageButtonText: {
+    color: "#2b0540",
     fontWeight: "800",
   },
   card: {

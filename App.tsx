@@ -8,6 +8,7 @@ import {
   NotificationNavigationData,
   openNotificationDestination,
 } from "./src/services/notificationNavigationService";
+import { chatStompClient } from "./src/chat/stompClient";
 
 const AppContent = () => {
   const { token, loading } = useAuth();
@@ -77,6 +78,20 @@ const AppContent = () => {
   useEffect(() => {
     openPendingNotification();
   }, [token, loading, openPendingNotification]);
+
+  useEffect(() => {
+    if (token) {
+      void chatStompClient.connect(token);
+    } else {
+      void chatStompClient.disconnect();
+    }
+
+    return () => {
+      if (!token) {
+        void chatStompClient.disconnect();
+      }
+    };
+  }, [token]);
 
   return <AppNavigator onNavigationReady={openPendingNotification} />;
 };

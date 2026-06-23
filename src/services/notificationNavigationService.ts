@@ -1,4 +1,5 @@
 import { getEventById } from "./eventService";
+import { getChatRooms } from "../chat/chatApi";
 
 export type NotificationNavigationData = {
   type?: string | null;
@@ -37,6 +38,22 @@ export const openNotificationDestination = async (
   const targetScreen = normalize(data.targetScreen);
   const type = normalize(data.type);
   const targetId = parseTargetId(data.targetId);
+
+  if (targetScreen === "CHATROOM" || type === "CHAT") {
+    if (targetId) {
+      try {
+        const room = (await getChatRooms()).find((item) => item.id === targetId);
+        if (room) {
+          navigation.navigate("ChatRoom", { room });
+          return;
+        }
+      } catch (error) {
+        console.log("OPEN CHAT NOTIFICATION ERROR:", error);
+      }
+    }
+    navigation.navigate("ChatList");
+    return;
+  }
 
   if (targetScreen === "EVENTS" || type === "EVENT" || type === "EVENT_NOTIFICATION") {
     if (targetId) {

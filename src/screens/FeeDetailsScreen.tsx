@@ -19,6 +19,7 @@ import {
   waiveFee,
   sendFeeReminder,
 } from "../services/feeService";
+import { formatEnumLabel } from "../utils/formatEnumLabel";
 import * as Clipboard from "expo-clipboard";
 
 
@@ -433,7 +434,7 @@ const handleCopyList = async (option: CopyOption) => {
         </View>
 
         <Text style={[styles.statusBadge, getStatusStyle(item.status)]}>
-          {item.status}
+          {formatEnumLabel(item.status)}
         </Text>
       </View>
 

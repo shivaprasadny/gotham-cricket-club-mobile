@@ -17,6 +17,14 @@ type BattingProps = {
   onPlayerPress?: (playerId: number) => void;
 };
 
+// NOT_OUT is commonly saved without dismissal text, so derive its scorecard label.
+const battingStatusLabel = (row: BattingPerformanceResponse) => {
+  if (row.dismissal?.trim()) return row.dismissal;
+  if (row.dismissalType === "NOT_OUT") return "not out";
+  if (row.dismissalType === "RETIRED_HURT") return "retired hurt";
+  return null;
+};
+
 export const BattingTable = ({ rows, onPlayerPress }: BattingProps) => (
   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
     <View>
@@ -26,7 +34,10 @@ export const BattingTable = ({ rows, onPlayerPress }: BattingProps) => (
           <Text key={label} style={styles.headerCell}>{label}</Text>
         ))}
       </View>
-      {rows.map((row, index) => (
+      {rows.map((row, index) => {
+        const statusLabel = battingStatusLabel(row);
+
+        return (
         <View key={`${row.playerId || row.playerName}-${index}`} style={styles.row}>
           <View style={styles.nameCell}>
             <TouchableOpacity
@@ -37,7 +48,7 @@ export const BattingTable = ({ rows, onPlayerPress }: BattingProps) => (
                 {row.playerName}
               </Text>
             </TouchableOpacity>
-            {row.dismissal ? <Text style={styles.subText}>{row.dismissal}</Text> : null}
+            {statusLabel ? <Text style={styles.subText}>{statusLabel}</Text> : null}
           </View>
           {[row.runs, row.balls, row.fours, row.sixes, row.strikeRate.toFixed(2)].map(
             (value, valueIndex) => (
@@ -45,7 +56,8 @@ export const BattingTable = ({ rows, onPlayerPress }: BattingProps) => (
             )
           )}
         </View>
-      ))}
+        );
+      })}
     </View>
   </ScrollView>
 );
@@ -60,7 +72,7 @@ export const BowlingTable = ({ rows, onPlayerPress }: BowlingProps) => (
     <View>
       <View style={styles.headerRow}>
         <Text style={[styles.headerCell, styles.nameCell]}>Bowler</Text>
-        {["O", "M", "R", "W", "Econ", "Ext"].map((label) => (
+        {["O", "M", "R", "W", "Econ", "Dot", "WD", "NB"].map((label) => (
           <Text key={label} style={styles.headerCell}>{label}</Text>
         ))}
       </View>
@@ -82,7 +94,9 @@ export const BowlingTable = ({ rows, onPlayerPress }: BowlingProps) => (
             row.runsConceded,
             row.wickets,
             row.economy.toFixed(2),
-            row.totalBowlingExtras,
+            row.dotBalls ?? 0,
+            row.wides ?? row.totalBowlingExtras ?? 0,
+            row.noBalls ?? 0,
           ].map((value, valueIndex) => (
             <Text key={valueIndex} style={styles.cell}>{value}</Text>
           ))}
