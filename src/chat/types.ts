@@ -1,4 +1,4 @@
-export type ChatRoomType = "CLUB" | "MATCH" | "EVENT" | "DIRECT";
+export type ChatRoomType = "CLUB" | "MATCH" | "EVENT" | "DIRECT" | "GROUP";
 
 export type ChatMessage = {
   id: number;
@@ -44,4 +44,5 @@ export type ChatMember = {
   userId: number;
   fullName: string;
   nickname?: string | null;
+  roomAdmin?: boolean;
 };

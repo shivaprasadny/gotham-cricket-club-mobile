@@ -117,6 +117,19 @@ class ChatStompClient {
     );
   }
 
+    subscribeToRoomList(
+    onMessage: (message: ChatMessage) => void
+  ): StompSubscription {
+    if (!this.client?.connected) {
+      throw new Error("Chat is not connected");
+    }
+
+    return this.client.subscribe(
+      "/topic/chat/rooms",
+      (frame: IMessage) => onMessage(JSON.parse(frame.body) as ChatMessage)
+    );
+  }
+
   subscribeToErrors(
     onError: (error: ChatSocketError) => void
   ): StompSubscription {

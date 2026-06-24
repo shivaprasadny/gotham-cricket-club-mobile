@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -14,11 +15,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   createDirectChat,
+  createGroupChat,
   deleteChatForMe,
   getChatMembers,
   getChatRooms,
   setChatMuted,
 } from "./chatApi";
+import { chatStompClient } from "./stompClient";
+import { ChatConnectionStatus } from "./types";
 import { ChatMember, ChatRoom } from "./types";
 import { useAuth } from "../context/AuthContext";
 
@@ -56,6 +60,16 @@ const ChatListScreen = ({ navigation }: { navigation: any }) => {
   const [creatingFor, setCreatingFor] = useState<number | null>(null);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [memberError, setMemberError] = useState<string | null>(null);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [showGroupModal, setShowGroupModal] = useState(false);
+const [groupName, setGroupName] = useState("");
+const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
+const [creatingGroup, setCreatingGroup] = useState(false);
+const [status, setStatus] = useState<ChatConnectionStatus>(
+  chatStompClient.getStatus()
+);
+
+const roomListSubscribedRef = useRef(false);
 
   const loadRooms = useCallback(async () => {
     try {
@@ -75,10 +89,60 @@ const ChatListScreen = ({ navigation }: { navigation: any }) => {
     }, [loadRooms])
   );
 
+  useEffect(() => chatStompClient.addStatusListener(setStatus), []);
+
+ 
+  
+  useEffect(() => {
+  if (status !== "CONNECTED" || roomListSubscribedRef.current) {
+    return;
+  }
+
+  let subscription: ReturnType<typeof chatStompClient.subscribeToRoomList> | null =
+    null;
+
+  try {
+    roomListSubscribedRef.current = true;
+
+    subscription = chatStompClient.subscribeToRoomList(() => {
+      void loadRooms();
+    });
+  } catch (error) {
+    roomListSubscribedRef.current = false;
+    console.log("CHAT LIST SUBSCRIPTION ERROR:", error);
+  }
+
+  return () => {
+    roomListSubscribedRef.current = false;
+    subscription?.unsubscribe();
+  };
+}, [status, loadRooms]);
+
+  const openGroupPicker = async () => {
+  setShowGroupModal(true);
+  setLoadingMembers(true);
+  setMemberError(null);
+  setMemberSearch("");
+  setGroupName("");
+  setSelectedMemberIds([]);
+
+  try {
+    const result = await getChatMembers();
+    setMembers(result.filter((member) => member.userId !== user?.id));
+  } catch (loadError: any) {
+    setMemberError(
+      loadError?.response?.data?.message || "Could not load members"
+    );
+  } finally {
+    setLoadingMembers(false);
+  }
+};
+
   const openDirectChatPicker = async () => {
     setShowMembers(true);
     setLoadingMembers(true);
     setMemberError(null);
+    setMemberSearch("");
     try {
       const result = await getChatMembers();
       setMembers(result.filter((member) => member.userId !== user?.id));
@@ -91,11 +155,13 @@ const ChatListScreen = ({ navigation }: { navigation: any }) => {
     }
   };
 
+
   const startDirectChat = async (member: ChatMember) => {
     setCreatingFor(member.userId);
     try {
       const room = await createDirectChat(member.userId);
       setShowMembers(false);
+      void loadRooms();
       navigation.navigate("ChatRoom", { room });
     } catch (createError: any) {
       setError(createError?.response?.data?.message || "Could not create direct chat");
@@ -103,6 +169,47 @@ const ChatListScreen = ({ navigation }: { navigation: any }) => {
       setCreatingFor(null);
     }
   };
+
+  const toggleSelectedMember = (memberId: number) => {
+  setSelectedMemberIds((current) =>
+    current.includes(memberId)
+      ? current.filter((id) => id !== memberId)
+      : [...current, memberId]
+  );
+};
+
+const handleCreateGroup = async () => {
+  const cleanName = groupName.trim();
+
+  if (!cleanName) {
+    Alert.alert("Group name required", "Please enter a group name.");
+    return;
+  }
+
+  if (selectedMemberIds.length === 0) {
+    Alert.alert("Select members", "Please select at least one player.");
+    return;
+  }
+
+  setCreatingGroup(true);
+
+  try {
+    const room = await createGroupChat(cleanName, selectedMemberIds);
+    setShowGroupModal(false);
+    setGroupName("");
+    setSelectedMemberIds([]);
+    setMemberSearch("");
+    void loadRooms();
+    navigation.navigate("ChatRoom", { room });
+  } catch (createError: any) {
+    Alert.alert(
+      "Could not create group",
+      createError?.response?.data?.message || "Please try again."
+    );
+  } finally {
+    setCreatingGroup(false);
+  }
+};
 
   const confirmDeleteChat = (room: ChatRoom) => {
     Alert.alert(
@@ -158,13 +265,36 @@ const ChatListScreen = ({ navigation }: { navigation: any }) => {
       </View>
     );
   }
+ const filteredMembers = members.filter((member) => {
+  const search = memberSearch.trim().toLowerCase();
+
+  if (!search) return true;
+
+  const fullName = member.fullName.toLowerCase();
+  const nickname = member.nickname?.toLowerCase() ?? "";
+
+  return fullName.includes(search) || nickname.includes(search);
+});
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.newChat} onPress={() => void openDirectChatPicker()}>
-        <Ionicons name="create-outline" size={19} color="#fff" />
-        <Text style={styles.newChatText}>New direct message</Text>
-      </TouchableOpacity>
+    <View style={styles.topActions}>
+  <TouchableOpacity
+    style={[styles.newChat, styles.actionButton]}
+    onPress={() => void openDirectChatPicker()}
+  >
+    <Ionicons name="create-outline" size={18} color="#fff" />
+    <Text style={styles.newChatText}>Direct</Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={[styles.newChat, styles.actionButton]}
+    onPress={() => void openGroupPicker()}
+  >
+    <Ionicons name="people-outline" size={18} color="#fff" />
+    <Text style={styles.newChatText}>Make Group</Text>
+  </TouchableOpacity>
+</View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <FlatList
         data={rooms}
@@ -200,8 +330,8 @@ const ChatListScreen = ({ navigation }: { navigation: any }) => {
             <View style={styles.roomBody}>
               <View style={styles.row}>
                 <Text numberOfLines={1} style={styles.roomName}>
-                  {item.name}
-                </Text>
+  {item.name}
+</Text>
                 <Text style={styles.time}>
                   {formatTime(item.lastMessage?.createdAt)}
                 </Text>
@@ -256,8 +386,16 @@ const ChatListScreen = ({ navigation }: { navigation: any }) => {
               <Ionicons name="close" size={26} color="#4B1D6B" />
             </TouchableOpacity>
           </View>
+
+          <TextInput
+  style={styles.searchInput}
+  placeholder="Search player..."
+  placeholderTextColor="#9a8da0"
+  value={memberSearch}
+  onChangeText={setMemberSearch}
+/>
           <FlatList
-            data={members}
+           data={filteredMembers}
             keyExtractor={(item) => String(item.userId)}
             ListEmptyComponent={
               loadingMembers ? (
@@ -305,6 +443,103 @@ const ChatListScreen = ({ navigation }: { navigation: any }) => {
           />
         </View>
       </Modal>
+
+
+      <Modal
+  visible={showGroupModal}
+  animationType="slide"
+  presentationStyle="pageSheet"
+  onRequestClose={() => setShowGroupModal(false)}
+>
+  <View style={styles.memberModal}>
+    <View style={styles.memberHeader}>
+      <Text style={styles.memberTitle}>Make Group</Text>
+      <TouchableOpacity onPress={() => setShowGroupModal(false)}>
+        <Ionicons name="close" size={26} color="#4B1D6B" />
+      </TouchableOpacity>
+    </View>
+
+    <TextInput
+      style={styles.searchInput}
+      placeholder="Group name"
+      placeholderTextColor="#9a8da0"
+      value={groupName}
+      onChangeText={setGroupName}
+    />
+
+    <TextInput
+      style={styles.searchInput}
+      placeholder="Search players..."
+      placeholderTextColor="#9a8da0"
+      value={memberSearch}
+      onChangeText={setMemberSearch}
+    />
+
+    <Text style={styles.selectedText}>
+      Selected: {selectedMemberIds.length}
+    </Text>
+
+    <FlatList
+      data={filteredMembers}
+      keyExtractor={(item) => String(item.userId)}
+      ListEmptyComponent={
+        loadingMembers ? (
+          <ActivityIndicator style={{ marginTop: 30 }} color="#4B1D6B" />
+        ) : (
+          <View style={styles.memberEmpty}>
+            <Text style={styles.memberEmptyText}>
+              {memberError || "No approved members found."}
+            </Text>
+          </View>
+        )
+      }
+      renderItem={({ item }) => {
+        const selected = selectedMemberIds.includes(item.userId);
+
+        return (
+          <TouchableOpacity
+            style={styles.member}
+            onPress={() => toggleSelectedMember(item.userId)}
+          >
+            <View style={styles.memberAvatar}>
+              <Text style={styles.memberInitial}>
+                {item.fullName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.memberName}>{item.fullName}</Text>
+              {item.nickname ? (
+                <Text style={styles.memberNickname}>{item.nickname}</Text>
+              ) : null}
+            </View>
+
+            <Ionicons
+              name={selected ? "checkmark-circle" : "ellipse-outline"}
+              size={24}
+              color={selected ? "#4B1D6B" : "#8b7a92"}
+            />
+          </TouchableOpacity>
+        );
+      }}
+    />
+
+    <TouchableOpacity
+      style={[
+        styles.createGroupButton,
+        creatingGroup ? styles.disabledButton : null,
+      ]}
+      disabled={creatingGroup}
+      onPress={() => void handleCreateGroup()}
+    >
+      {creatingGroup ? (
+        <ActivityIndicator color="#fff" />
+      ) : (
+        <Text style={styles.createGroupText}>Create Group</Text>
+      )}
+    </TouchableOpacity>
+  </View>
+</Modal>
     </View>
   );
 };
@@ -418,4 +653,47 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   retryText: { color: "#fff", fontWeight: "700" },
+  searchInput: {
+  marginHorizontal: 18,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: "#ddd2e4",
+  borderRadius: 10,
+  paddingHorizontal: 12,
+  paddingVertical: 10,
+  fontSize: 15,
+  color: "#2d1737",
+  backgroundColor: "#fff",
+},
+topActions: {
+  flexDirection: "row",
+  gap: 10,
+  margin: 12,
+  marginBottom: 4,
+},
+actionButton: {
+  flex: 1,
+  margin: 0,
+},
+selectedText: {
+  marginHorizontal: 18,
+  marginBottom: 8,
+  color: "#4B1D6B",
+  fontWeight: "700",
+},
+createGroupButton: {
+  margin: 18,
+  borderRadius: 10,
+  paddingVertical: 14,
+  alignItems: "center",
+  backgroundColor: "#4B1D6B",
+},
+createGroupText: {
+  color: "#fff",
+  fontWeight: "800",
+  fontSize: 15,
+},
+disabledButton: {
+  opacity: 0.6,
+},
 });

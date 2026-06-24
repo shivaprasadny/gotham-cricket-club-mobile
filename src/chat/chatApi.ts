@@ -73,3 +73,90 @@ export const getChatMembers = async (): Promise<ChatMember[]> => {
   const response = await api.get<ChatMember[]>("/members");
   return response.data;
 };
+export const createGroupChat = async (
+  name: string,
+  memberIds: number[]
+): Promise<ChatRoom> => {
+  const response = await api.post<ChatRoom>("/chat/rooms/groups", {
+    name,
+    memberIds,
+  });
+
+  return response.data;
+};
+
+export const getChatRoomMembers = async (
+  roomId: number
+): Promise<ChatMember[]> => {
+  const response = await api.get<ChatMember[]>(
+    `/chat/rooms/${roomId}/members`
+  );
+
+  return response.data;
+};
+export const addChatRoomMember = async (
+  roomId: number,
+  userId: number
+): Promise<ChatMember> => {
+  const response = await api.post<ChatMember>(
+    `/chat/rooms/${roomId}/members`,
+    {
+      userId,
+    }
+  );
+
+  return response.data;
+};
+
+export const removeChatRoomMember = async (
+  roomId: number,
+  userId: number
+): Promise<void> => {
+  await api.delete(`/chat/rooms/${roomId}/members/${userId}`);
+};
+export const makeChatRoomAdmin = async (
+  roomId: number,
+  userId: number
+): Promise<ChatMember> => {
+  const response = await api.put<ChatMember>(
+    `/chat/rooms/${roomId}/members/${userId}/admin`
+  );
+
+  return response.data;
+};
+
+export const removeChatRoomAdmin = async (
+  roomId: number,
+  userId: number
+): Promise<ChatMember> => {
+  const response = await api.delete<ChatMember>(
+    `/chat/rooms/${roomId}/members/${userId}/admin`
+  );
+
+  return response.data;
+};
+export const renameChatRoom = async (
+  roomId: number,
+  name: string
+): Promise<ChatRoom> => {
+  const response = await api.put<ChatRoom>(`/chat/rooms/${roomId}/name`, {
+    name,
+  });
+
+  return response.data;
+};
+
+export const leaveChatRoom = async (roomId: number): Promise<void> => {
+  await api.post(`/chat/rooms/${roomId}/leave`);
+};
+export const enterChatRoomPresence = async (
+  roomId: number
+): Promise<void> => {
+  await api.post(`/chat/rooms/${roomId}/presence/enter`);
+};
+
+export const leaveChatRoomPresence = async (
+  roomId: number
+): Promise<void> => {
+  await api.post(`/chat/rooms/${roomId}/presence/leave`);
+};

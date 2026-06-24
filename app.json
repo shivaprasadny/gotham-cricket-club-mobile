@@ -30,6 +30,7 @@
    "android": {
   "usesCleartextTraffic": true,
   "googleServicesFile": "./google-services.json",
+  "softwareKeyboardLayoutMode": "resize",
   "adaptiveIcon": {
     "foregroundImage": "./assets/logo.png",
     "backgroundColor": "#ffffff"
