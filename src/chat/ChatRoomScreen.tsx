@@ -674,6 +674,13 @@ navigation.goBack();
   </View>
 }
               renderItem={({ item }) => {
+                if (item.type === "SYSTEM") {
+  return (
+    <View style={styles.systemMessageWrap}>
+      <Text style={styles.systemMessageText}>{item.content}</Text>
+    </View>
+  );
+}
                 const mine = item.senderId === user?.id;
 
                 return (
@@ -1240,5 +1247,23 @@ cancelText: {
 saveText: {
   color: "#4B1D6B",
   fontWeight: "800",
+},
+
+systemMessageWrap: {
+  alignItems: "center",
+  marginVertical: 8,
+  paddingHorizontal: 24,
+},
+
+systemMessageText: {
+  color: "#7c6b83",
+  fontSize: 12,
+  fontWeight: "700",
+  textAlign: "center",
+  backgroundColor: "#eee6f1",
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 14,
+  overflow: "hidden",
 },
 });

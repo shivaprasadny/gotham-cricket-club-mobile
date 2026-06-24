@@ -1,11 +1,14 @@
 export type ChatRoomType = "CLUB" | "MATCH" | "EVENT" | "DIRECT" | "GROUP";
 
+export type ChatMessageType = "CHAT" | "SYSTEM";
+
 export type ChatMessage = {
   id: number;
   roomId: number;
   senderId: number;
   senderName: string;
   content: string;
+  type: ChatMessageType;
   createdAt: string;
 };
 

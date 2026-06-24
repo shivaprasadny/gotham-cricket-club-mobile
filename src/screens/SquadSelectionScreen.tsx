@@ -569,20 +569,20 @@ const SquadSelectionScreen = ({ route, navigation }: any) => {
           multiline
           style={styles.messageInput}
         />
-        <TouchableOpacity
-          disabled={announcing || playingXi.length !== 11}
-          style={[
-            styles.announceButton,
-            (announcing || playingXi.length !== 11) && styles.disabled,
-          ]}
-          onPress={() => void announceSquad()}
-        >
+       <TouchableOpacity
+  disabled={announcing || playingXi.length === 0}
+  style={[
+    styles.announceButton,
+    (announcing || playingXi.length === 0) && styles.disabled,
+  ]}
+  onPress={() => void announceSquad()}
+>
           {announcing ? (
             <ActivityIndicator color="#2b0540" />
           ) : (
             <Ionicons name="megaphone-outline" size={19} color="#2b0540" />
           )}
-          <Text style={styles.announceText}>Confirm and Announce Squad</Text>
+          <Text style={styles.announceText}>Confirm and Announce Selected Squad</Text>
         </TouchableOpacity>
       </ScrollView>
 
