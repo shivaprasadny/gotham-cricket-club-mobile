@@ -1,8 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { logger } from "../utils/logger";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
 import {
   registerForPushNotificationsAsync,
+  removeTokenFromBackend,
   savePushTokenToBackend,
 } from "../services/pushNotificationService";
 import { setSessionExpiredHandler } from "../api/axiosConfig";
@@ -51,14 +53,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     void initializeAuth();
   }, []);
 
-  useEffect(() => {
-    setSessionExpiredHandler(() => {
-      setToken(null);
-      setUser(null);
-    });
+ useEffect(() => {
+  setSessionExpiredHandler(async () => {
+    // ✅ Clear push token so device stops receiving notifications after logout
+    try {
+      const pushToken = await registerForPushNotificationsAsync().catch(() => null);
+      if (pushToken) {
+        await removeTokenFromBackend(pushToken).catch(() => {});
+      }
+    } catch {
+      // Non-fatal
+    }
 
-    return () => setSessionExpiredHandler(null);
-  }, []);
+    // ✅ Clear all local storage
+    await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("user");
+
+    // ✅ Clear state — app will redirect to login automatically
+    // because your navigation already checks user === null
+    setToken(null);
+    setUser(null);
+  });
+
+  return () => setSessionExpiredHandler(null);
+}, []);
 
   /**
    * Startup initializer
@@ -91,7 +109,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(null);
       return false;
     } catch (error) {
-      console.error("Failed to load auth from storage:", error);
+      logger.error("Failed to load auth from storage:", error);
       setToken(null);
       setUser(null);
       return false;
@@ -109,24 +127,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await AsyncStorage.setItem("token", newToken);
     await AsyncStorage.setItem("user", JSON.stringify(newUser));
   } catch (error) {
-    console.error("Error saving auth data:", error);
+    logger.error("Error saving auth data:", error);
     return;
   }
 
   // Push token should not break login
   try {
-    console.log("LOGIN SUCCESS - START PUSH REGISTER");
-
     const pushToken = await registerForPushNotificationsAsync();
-
-    console.log("PUSH TOKEN FROM LOGIN:", pushToken);
-
     if (pushToken) {
       await savePushTokenToBackend(pushToken);
-      console.log("PUSH TOKEN SAVED TO BACKEND");
     }
-  } catch (error: any) {
-    console.log("PUSH TOKEN SAVE ERROR:", error?.response?.data || error);
+  } catch {
+    // Non-fatal — login still succeeds without push token
   }
 };
 
@@ -191,7 +203,7 @@ if (pushToken) {
 
 return { success: true };
     } catch (error) {
-      console.error("BIOMETRIC ERROR:", error);
+      logger.error("BIOMETRIC ERROR:", error);
       return {
         success: false,
         message: "Something went wrong during biometric login",
@@ -204,13 +216,19 @@ return { success: true };
    */
   const logout = async () => {
     try {
+      // Remove push token from backend so this device stops receiving notifications
+      const pushToken = await registerForPushNotificationsAsync().catch(() => null);
+      if (pushToken) {
+        await removeTokenFromBackend(pushToken).catch(() => {});
+      }
+
       setToken(null);
       setUser(null);
 
       await AsyncStorage.removeItem("token");
       await AsyncStorage.removeItem("user");
     } catch (error) {
-      console.error("Error clearing auth data:", error);
+      logger.error("Error clearing auth data:", error);
     }
   };
 

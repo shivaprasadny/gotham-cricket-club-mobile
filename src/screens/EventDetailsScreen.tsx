@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   Alert,
   FlatList,
@@ -44,14 +45,16 @@ const EventDetailsScreen = ({ route, navigation }: Props) => {
 
 
 
- const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  const canAssignPayment =
+    user?.role === "ADMIN" || event.createdBy === user?.email;
 
 const loadResponses = async () => {
   try {
     const data = await getEventAvailability(event.id);
     setResponses(Array.isArray(data) ? data : []);
   } catch (error) {
-    console.log("EVENT RESPONSES ERROR:", error);
+    logger.log("EVENT RESPONSES ERROR:", error);
   } finally {
     setRefreshing(false);
   }
@@ -152,7 +155,36 @@ const onRefresh = async () => {
           </Text>
           <Text style={styles.text}>Location: {event.location}</Text>
 
-        
+          {(canAssignPayment || canManage) ? (
+            <View style={styles.actionRow}>
+              {canAssignPayment ? (
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.payBtn]}
+                  onPress={() =>
+                    navigation.navigate("CreateFee", {
+                      prefill: {
+                        feeType: "EVENT_FEE",
+                        title: event.title,
+                        goingMembers: responses
+                          .filter((r) => r.status === "GOING")
+                          .map((r) => ({ userId: r.userId, fullName: r.fullName })),
+                      },
+                    })
+                  }
+                >
+                  <Text style={styles.actionBtnText}>Assign Payment</Text>
+                </TouchableOpacity>
+              ) : null}
+              {canManage ? (
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.deleteBtn]}
+                  onPress={handleDelete}
+                >
+                  <Text style={styles.actionBtnText}>Delete Event</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
 
           <Text style={styles.sectionTitle}>Your Response</Text>
 
@@ -302,6 +334,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
+  },
+  payBtn: {
+    backgroundColor: "#2b0540",
   },
   editBtn: {
     backgroundColor: "#2b0540",

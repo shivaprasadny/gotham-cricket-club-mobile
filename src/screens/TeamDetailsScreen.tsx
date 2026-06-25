@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -102,7 +103,7 @@ const canManageTeamInfo = isAdmin;
       setMembers(Array.isArray(teamMembers) ? teamMembers : []);
       setClubMembers(Array.isArray(availableMembers) ? availableMembers : []);
     } catch (error: any) {
-      console.log("TEAM DETAILS ERROR:", error?.response?.data || error);
+      logger.log("TEAM DETAILS ERROR:", error?.response?.data || error);
       Alert.alert(
         "Error",
         error?.response?.data?.message ||
@@ -134,7 +135,7 @@ const canManageTeamInfo = isAdmin;
 
       await loadData();
     } catch (error: any) {
-      console.log("ADD TEAM MEMBER ERROR:", error?.response?.data || error);
+      logger.log("ADD TEAM MEMBER ERROR:", error?.response?.data || error);
       Alert.alert(
         "Error",
         error?.response?.data?.message ||
@@ -152,7 +153,7 @@ const canManageTeamInfo = isAdmin;
 
       await loadData();
     } catch (error: any) {
-      console.log("REMOVE TEAM MEMBER ERROR:", error?.response?.data || error);
+      logger.log("REMOVE TEAM MEMBER ERROR:", error?.response?.data || error);
       Alert.alert(
         "Error",
         error?.response?.data?.message ||

@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -19,6 +21,7 @@ import {
   deleteChatForMe,
   getChatMembers,
   getChatRooms,
+  setChatFavorite,
   setChatMuted,
 } from "./chatApi";
 import { chatStompClient } from "./stompClient";
@@ -68,6 +71,10 @@ const [creatingGroup, setCreatingGroup] = useState(false);
 const [status, setStatus] = useState<ChatConnectionStatus>(
   chatStompClient.getStatus()
 );
+const [chatSearch, setChatSearch] = useState("");
+const [activeFilter, setActiveFilter] = useState<
+  "ALL" | "UNREAD" | "FAVORITES" | "DIRECT" | "GROUP" | "MATCH" | "EVENT" | "ANONYMOUS"
+>("ALL");
 
 const roomListSubscribedRef = useRef(false);
 
@@ -109,7 +116,7 @@ const roomListSubscribedRef = useRef(false);
     });
   } catch (error) {
     roomListSubscribedRef.current = false;
-    console.log("CHAT LIST SUBSCRIPTION ERROR:", error);
+    logger.log("CHAT LIST SUBSCRIPTION ERROR:", error);
   }
 
   return () => {
@@ -258,6 +265,64 @@ const handleCreateGroup = async () => {
     }
   };
 
+  const toggleFavorite = async (room: ChatRoom) => {
+    const nextFav = !room.favorite;
+    setRooms((current) =>
+      current.map((item) =>
+        item.id === room.id ? { ...item, favorite: nextFav } : item
+      )
+    );
+    try {
+      await setChatFavorite(room.id, nextFav);
+    } catch (favError: any) {
+      setRooms((current) =>
+        current.map((item) =>
+          item.id === room.id ? { ...item, favorite: room.favorite } : item
+        )
+      );
+      Alert.alert(
+        "Could not update favorite",
+        favError?.response?.data?.message || "Please try again."
+      );
+    }
+  };
+
+  // useMemo MUST be before any conditional returns (Rules of Hooks).
+  const displayRooms = useMemo(() => {
+    // Sort: fav+unread (3) > fav+read (2) > unread (1) > read (0); newest first within group
+    const sorted = [...rooms].sort((a, b) => {
+      const ap = (a.favorite ? 2 : 0) + (a.unreadCount > 0 ? 1 : 0);
+      const bp = (b.favorite ? 2 : 0) + (b.unreadCount > 0 ? 1 : 0);
+      if (ap !== bp) return bp - ap;
+      const at = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+      const bt = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+      return bt - at;
+    });
+
+    // Type filter
+    let filtered = sorted;
+    switch (activeFilter) {
+      case "UNREAD":    filtered = sorted.filter((r) => r.unreadCount > 0); break;
+      case "FAVORITES": filtered = sorted.filter((r) => r.favorite); break;
+      case "DIRECT":    filtered = sorted.filter((r) => r.type === "DIRECT"); break;
+      case "GROUP":     filtered = sorted.filter((r) => r.type === "GROUP"); break;
+      case "ANONYMOUS": filtered = sorted.filter((r) => r.type === "ANONYMOUS"); break;
+      case "MATCH":     filtered = sorted.filter((r) => r.type === "MATCH"); break;
+      case "EVENT":     filtered = sorted.filter((r) => r.type === "EVENT"); break;
+    }
+
+    // Text search
+    const q = chatSearch.trim().toLowerCase();
+    if (!q) return filtered;
+    return filtered.filter((r) => {
+      const name = r.name.toLowerCase();
+      const preview = r.lastMessage
+        ? `${r.lastMessage.senderName} ${r.lastMessage.content}`.toLowerCase()
+        : "";
+      return name.includes(q) || preview.includes(q);
+    });
+  }, [rooms, activeFilter, chatSearch]);
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -265,19 +330,17 @@ const handleCreateGroup = async () => {
       </View>
     );
   }
- const filteredMembers = members.filter((member) => {
-  const search = memberSearch.trim().toLowerCase();
 
-  if (!search) return true;
-
-  const fullName = member.fullName.toLowerCase();
-  const nickname = member.nickname?.toLowerCase() ?? "";
-
-  return fullName.includes(search) || nickname.includes(search);
-});
+  const filteredMembers = members.filter((member) => {
+    const search = memberSearch.trim().toLowerCase();
+    if (!search) return true;
+    const fullName = member.fullName.toLowerCase();
+    const nickname = member.nickname?.toLowerCase() ?? "";
+    return fullName.includes(search) || nickname.includes(search);
+  });
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
     <View style={styles.topActions}>
   <TouchableOpacity
     style={[styles.newChat, styles.actionButton]}
@@ -295,9 +358,39 @@ const handleCreateGroup = async () => {
     <Text style={styles.newChatText}>Make Group</Text>
   </TouchableOpacity>
 </View>
+      <TextInput
+        style={[styles.searchInput, { marginTop: 8 }]}
+        placeholder="Search chats..."
+        placeholderTextColor="#9a8da0"
+        value={chatSearch}
+        onChangeText={setChatSearch}
+        clearButtonMode="while-editing"
+      />
       {error ? <Text style={styles.error}>{error}</Text> : null}
+
+      {/* Filter chips */}
+      <View style={styles.filterRow}>
+        {(["ALL", "UNREAD", "FAVORITES", "DIRECT", "GROUP", "MATCH", "EVENT", "ANONYMOUS"] as const).map(
+          (f) => (
+            <TouchableOpacity
+              key={f}
+              style={[styles.chip, activeFilter === f && styles.chipActive]}
+              onPress={() => setActiveFilter(f)}
+            >
+              <Text style={[styles.chipText, activeFilter === f && styles.chipTextActive]}>
+                {f === "ALL" ? "All"
+                  : f === "UNREAD" ? "Unread"
+                  : f === "FAVORITES" ? "★ Fav"
+                  : f === "ANONYMOUS" ? "🕵️ Anon"
+                  : f.charAt(0) + f.slice(1).toLowerCase() + "s"}
+              </Text>
+            </TouchableOpacity>
+          )
+        )}
+      </View>
+
       <FlatList
-        data={rooms}
+        data={displayRooms}
         keyExtractor={(item) => String(item.id)}
         refreshControl={
           <RefreshControl
@@ -351,6 +444,17 @@ const handleCreateGroup = async () => {
                 ) : null}
               </View>
             </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityLabel={`${item.favorite ? "Unfavorite" : "Favorite"} ${item.name}`}
+              style={styles.roomAction}
+              onPress={() => void toggleFavorite(item)}
+            >
+              <Ionicons
+                name={item.favorite ? "star" : "star-outline"}
+                size={20}
+                color={item.favorite ? "#da9306" : "#7b6b82"}
+              />
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityLabel={`${item.muted ? "Unmute" : "Mute"} ${item.name}`}
@@ -540,7 +644,7 @@ const handleCreateGroup = async () => {
     </TouchableOpacity>
   </View>
 </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -695,5 +799,32 @@ createGroupText: {
 },
 disabledButton: {
   opacity: 0.6,
+},
+filterRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 6,
+  paddingHorizontal: 12,
+  paddingBottom: 8,
+},
+chip: {
+  borderWidth: 1,
+  borderColor: "#c4b3d0",
+  borderRadius: 20,
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  backgroundColor: "#fff",
+},
+chipActive: {
+  backgroundColor: "#4B1D6B",
+  borderColor: "#4B1D6B",
+},
+chipText: {
+  color: "#4B1D6B",
+  fontSize: 12,
+  fontWeight: "700",
+},
+chipTextActive: {
+  color: "#fff",
 },
 });

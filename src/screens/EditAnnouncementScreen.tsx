@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { logger } from "../utils/logger";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -87,7 +88,7 @@ const EditAnnouncementScreen = ({ route, navigation }: Props) => {
         ]
       );
     } catch (error: any) {
-      console.log("UPDATE ANNOUNCEMENT ERROR:", error?.response?.data || error);
+      logger.log("UPDATE ANNOUNCEMENT ERROR:", error?.response?.data || error);
 
       Alert.alert(
         "Error",
@@ -129,7 +130,7 @@ const EditAnnouncementScreen = ({ route, navigation }: Props) => {
                 ]
               );
             } catch (error: any) {
-              console.log(
+              logger.log(
                 "DELETE ANNOUNCEMENT ERROR:",
                 error?.response?.data || error
               );

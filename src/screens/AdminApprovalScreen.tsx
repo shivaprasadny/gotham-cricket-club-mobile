@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   Alert,
   FlatList,
@@ -8,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
   approveMember,
   getPendingMembers,
@@ -45,7 +47,7 @@ const AdminApprovalScreen = () => {
       });
       setSelectedRoles(defaultRoles);
     } catch (error: any) {
-      console.log("PENDING USERS ERROR:", error?.response?.data || error?.message);
+      logger.log("PENDING USERS ERROR:", error?.response?.data || error?.message);
       Alert.alert(
         "Error",
         error?.response?.data?.message || "Failed to load pending users"
@@ -90,7 +92,7 @@ const AdminApprovalScreen = () => {
 
     loadUsers();
   } catch (error: any) {
-    console.log("APPROVE ERROR:", error?.response?.data || error?.message);
+    logger.log("APPROVE ERROR:", error?.response?.data || error?.message);
     Alert.alert(
       "Error",
       error?.response?.data?.message || "Failed to approve user"
@@ -109,7 +111,7 @@ const AdminApprovalScreen = () => {
 
       loadUsers();
     } catch (error: any) {
-      console.log("REJECT ERROR:", error?.response?.data || error?.message);
+      logger.log("REJECT ERROR:", error?.response?.data || error?.message);
       Alert.alert(
         "Error",
         error?.response?.data?.message || "Failed to reject user"
@@ -177,6 +179,7 @@ const AdminApprovalScreen = () => {
   );
 
   return (
+    <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
     <FlatList
       data={users}
       keyExtractor={(item) => item.id.toString()}
@@ -187,6 +190,7 @@ const AdminApprovalScreen = () => {
       }
       ListEmptyComponent={<Text style={styles.emptyText}>No pending users</Text>}
     />
+    </SafeAreaView>
   );
 };
 

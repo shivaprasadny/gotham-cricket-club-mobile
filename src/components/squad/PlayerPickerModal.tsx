@@ -30,6 +30,16 @@ type Props = {
   onSelect: (player: PickerPlayer) => void;
 };
 
+const statusColor = (status?: string) => {
+  switch (status) {
+    case "AVAILABLE":    return "#22c55e";
+    case "MAYBE":        return "#f59e0b";
+    case "NOT_AVAILABLE": return "#ef4444";
+    case "INJURED":      return "#f97316";
+    default:             return "#9ca3af";
+  }
+};
+
 const PlayerPickerModal = ({
   visible,
   title,
@@ -68,12 +78,16 @@ const PlayerPickerModal = ({
           String(player.jerseyNumber || "").includes(text)
       )
       .sort((a, b) => {
-        if (a.availabilityStatus === "AVAILABLE" && b.availabilityStatus !== "AVAILABLE") {
-          return -1;
-        }
-        if (b.availabilityStatus === "AVAILABLE" && a.availabilityStatus !== "AVAILABLE") {
-          return 1;
-        }
+        const order: Record<string, number> = {
+          AVAILABLE: 0,
+          MAYBE: 1,
+          NO_RESPONSE: 2,
+          NOT_AVAILABLE: 3,
+          INJURED: 4,
+        };
+        const aRank = order[a.availabilityStatus ?? "NO_RESPONSE"] ?? 2;
+        const bRank = order[b.availabilityStatus ?? "NO_RESPONSE"] ?? 2;
+        if (aRank !== bRank) return aRank - bRank;
         return a.fullName.localeCompare(b.fullName);
       });
   }, [filter, players, replacingUserId, search, selectedUserIds]);
@@ -142,7 +156,7 @@ const PlayerPickerModal = ({
                   {item.nickname ? ` · ${item.nickname}` : ""}
                 </Text>
               </View>
-              <Text style={styles.status}>
+              <Text style={[styles.status, { color: statusColor(item.availabilityStatus) }]}>
                 {formatEnumLabel(item.availabilityStatus, "No Response")}
               </Text>
             </TouchableOpacity>
@@ -207,6 +221,6 @@ const styles = StyleSheet.create({
   avatarText: { color: "#4B1D6B", fontWeight: "900" },
   name: { color: "#281332", fontWeight: "800" },
   meta: { color: "#76697c", fontSize: 11, marginTop: 2 },
-  status: { color: "#39734a", fontSize: 9, fontWeight: "800" },
+  status: { fontSize: 10, fontWeight: "800" },
   empty: { textAlign: "center", color: "#75677b", marginTop: 35 },
 });

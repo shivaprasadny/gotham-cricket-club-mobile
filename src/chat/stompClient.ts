@@ -1,4 +1,5 @@
 import { Client, IMessage, StompSubscription } from "@stomp/stompjs";
+import { logger } from "../utils/logger";
 import {
   ChatConnectionStatus,
   ChatMessage,
@@ -76,12 +77,12 @@ class ChatStompClient {
       },
       onStompError: (frame) => {
         if (this.client !== client) return;
-        console.log("CHAT STOMP ERROR:", frame.headers.message, frame.body);
+        logger.log("CHAT STOMP ERROR:", frame.headers.message, frame.body);
         this.setStatus("ERROR");
       },
       onWebSocketError: (event) => {
         if (this.client !== client) return;
-        console.log("CHAT WEBSOCKET ERROR:", event);
+        logger.log("CHAT WEBSOCKET ERROR:", event);
         this.setStatus("ERROR");
       },
       // STOMP debug logs every frame and heartbeat. Keep it silent during

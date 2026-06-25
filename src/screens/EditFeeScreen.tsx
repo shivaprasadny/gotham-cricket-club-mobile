@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   Alert,
   Keyboard,
@@ -193,8 +194,8 @@ const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
       setTeams(Array.isArray(teamData) ? teamData : []);
       setMatches(Array.isArray(matchData) ? matchData : []);
     } catch (error: any) {
-      console.log("CREATE FEE INITIAL LOAD ERROR:", error?.response?.data || error);
-      console.log("CREATE FEE INITIAL LOAD STATUS:", error?.response?.status);
+      logger.log("CREATE FEE INITIAL LOAD ERROR:", error?.response?.data || error);
+      logger.log("CREATE FEE INITIAL LOAD STATUS:", error?.response?.status);
 
       Alert.alert(
         "Error",
@@ -238,7 +239,7 @@ const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
         if (!text) return true;
 
         const label = getMatchLabel(match).toLowerCase();
-        const venue = ((match as any).venue || "").toLowerCase();
+        const venue = ((match as { venue?: string }).venue || "").toLowerCase();
         const dateText = match.matchDate
           ? new Date(match.matchDate).toLocaleString().toLowerCase()
           : "";
@@ -447,7 +448,7 @@ const formatDate = (date: Date | null) => {
         setSelectedSplits([]);
       }
     } catch (error: any) {
-      console.log("LOAD SOURCE MEMBERS ERROR:", error?.response?.data || error);
+      logger.log("LOAD SOURCE MEMBERS ERROR:", error?.response?.data || error);
 
       Alert.alert(
         "Error",
@@ -1245,9 +1246,9 @@ if (loading) {
                       </Text>
                     ) : null}
 
-                    {(match as any).venue ? (
+                    {(match as { venue?: string }).venue ? (
                       <Text style={styles.modalSubText}>
-                        {(match as any).venue}
+                        {(match as { venue?: string }).venue}
                       </Text>
                     ) : null}
                   </TouchableOpacity>

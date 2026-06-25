@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef } from "react";
 import * as Notifications from "expo-notifications";
 
+import ErrorBoundary from "./src/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import AppNavigator from "./src/navigation/AppNavigator";
 import { navigationRef } from "./src/navigation/navigationRef";
@@ -98,8 +99,10 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

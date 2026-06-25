@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
@@ -45,7 +47,7 @@ const EventsScreen = ({ navigation }: Props) => {
       const data = await getEvents();
       setEvents(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      console.log("EVENTS LOAD ERROR:", error?.response?.data || error);
+      logger.log("EVENTS LOAD ERROR:", error?.response?.data || error);
       Alert.alert(
         "Error",
         error?.response?.data?.message || "Failed to load events"
@@ -176,6 +178,7 @@ const EventsScreen = ({ navigation }: Props) => {
 });
 
   return (
+    <SafeAreaView edges={["bottom"]} style={{ flex: 1, backgroundColor: "#2b0540" }}>
     <FlatList
       data={filteredEvents}
       keyExtractor={(item) => item.id.toString()}
@@ -266,6 +269,7 @@ const EventsScreen = ({ navigation }: Props) => {
   </View>
 }
     />
+    </SafeAreaView>
   );
 };
 

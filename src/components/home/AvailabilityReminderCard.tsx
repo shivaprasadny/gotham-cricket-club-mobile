@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { logger } from "../../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -24,7 +25,7 @@ type Props = {
 const STATUS_OPTIONS: {
   label: string;
   value: AvailabilityStatus;
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
 }[] = [
   { label: "Available", value: "AVAILABLE", icon: "checkmark-circle" },
   { label: "Maybe", value: "MAYBE", icon: "help-circle" },
@@ -66,7 +67,7 @@ const AvailabilityReminderCard = ({
       setExpandedMatchId(null);
       onUpdated();
     } catch (error: any) {
-      console.log("HOME QUICK AVAILABILITY ERROR:", error);
+      logger.log("HOME QUICK AVAILABILITY ERROR:", error);
 
       Alert.alert(
         "Error",
@@ -197,7 +198,7 @@ const getLeagueLabel = (match: any) => {
                           }
                         >
                           <Ionicons
-                            name={option.icon as any}
+                            name={option.icon}
                             size={18}
                             color="#da9306"
                           />

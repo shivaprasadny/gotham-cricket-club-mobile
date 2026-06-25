@@ -229,6 +229,14 @@ const ProfileScreen = ({ navigation }: Props) => {
         />
       </View>
 
+      {/* ================= NOTIFICATION SETTINGS ================= */}
+      <TouchableOpacity
+        style={styles.settingsBtn}
+        onPress={() => navigation.navigate("NotificationSettings")}
+      >
+        <Text style={styles.settingsText}>Notification Settings</Text>
+      </TouchableOpacity>
+
       {/* ================= LOGOUT BUTTON ================= */}
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Logout</Text>
@@ -399,6 +407,29 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#111827",
     fontSize: 15,
+  },
+
+  // Notification settings button
+  settingsBtn: {
+    marginHorizontal: 20,
+    marginTop: 12,
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+
+  settingsText: {
+    textAlign: "center",
+    color: "#2b0540",
+    fontWeight: "700",
+    fontSize: 16,
   },
 
   // Logout button

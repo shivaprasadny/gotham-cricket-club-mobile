@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import { logger } from "../utils/logger";
 import * as Device from "expo-device";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Alert, Platform } from "react-native";
@@ -15,8 +16,6 @@ Notifications.setNotificationHandler({
 
 export const registerForPushNotificationsAsync = async (): Promise<string | null> => {
   try {
-    console.log("REGISTER PUSH FUNCTION CALLED");
-
     if (
       Platform.OS === "android" &&
       Constants.executionEnvironment === ExecutionEnvironment.StoreClient
@@ -63,8 +62,6 @@ if (Platform.OS === "android") {
       Constants.easConfig?.projectId ||
       Constants.expoConfig?.extra?.eas?.projectId;
 
-    console.log("PROJECT ID:", projectId);
-
     if (!projectId) {
       Alert.alert("Push Error", "Missing EAS projectId.");
       return null;
@@ -76,13 +73,9 @@ if (Platform.OS === "android") {
 
     const token = tokenResponse.data;
 
-  // Debug log for development only
-console.log("EXPO PUSH TOKEN:", token);
-
-// Return token to save in backend
-return token;
+    return token;
   } catch (error: any) {
-    console.log("PUSH TOKEN ERROR:", error);
+    logger.log("PUSH TOKEN ERROR:", error);
     Alert.alert("Push Token Error", String(error?.message || error));
     return null;
   }
@@ -91,4 +84,8 @@ return token;
 export const savePushTokenToBackend = async (token: string) => {
   const response = await api.post("/notifications/token", { token });
   return response.data;
+};
+
+export const removeTokenFromBackend = async (token: string) => {
+  await api.delete("/notifications/token", { data: { token } });
 };

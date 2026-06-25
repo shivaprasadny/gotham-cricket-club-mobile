@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { logger } from "../utils/logger";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -102,7 +103,7 @@ const CreateLeagueScreen = ({ navigation }: Props) => {
         ]
       );
     } catch (error: any) {
-      console.log("CREATE LEAGUE ERROR:", error?.response?.data || error);
+      logger.log("CREATE LEAGUE ERROR:", error?.response?.data || error);
 
       Alert.alert(
         "Error",

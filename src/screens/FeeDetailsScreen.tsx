@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -80,7 +81,7 @@ const FeeDetailsScreen = ({ route }: Props) => {
       const data = await getFeeAssignments(feeId);
       setAssignments(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      console.log("FEE DETAILS LOAD ERROR:", error?.response?.data || error);
+      logger.log("FEE DETAILS LOAD ERROR:", error?.response?.data || error);
       Alert.alert(
         "Error",
         error?.response?.data?.message || "Failed to load fee details"

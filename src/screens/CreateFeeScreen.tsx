@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   Alert,
   Keyboard,
@@ -16,7 +17,7 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 
-import { createFee, createSplitFee } from "../services/feeService";
+import { createSplitFee } from "../services/feeService";
 import { getTeamMembers, getTeams } from "../services/teamService";
 import { getMatches } from "../services/matchService";
 import { getSquadByMatch } from "../services/squadService";
@@ -26,8 +27,15 @@ import {
   DateTimePickerAndroid
 } from "@react-native-community/datetimepicker";
 
+type Prefill = {
+  feeType?: FeeType;
+  title?: string;
+  goingMembers?: Array<{ userId: number; fullName: string }>;
+};
+
 type Props = {
   navigation: any;
+  route?: { params?: { prefill?: Prefill } };
 };
 
 type FeeType =
@@ -88,10 +96,14 @@ type SelectedSplit = {
   amount: string;
 };
 
-const CreateFeeScreen = ({ navigation }: Props) => {
-  const [title, setTitle] = useState("");
-  const [feeType, setFeeType] = useState<FeeType>("MATCH_FEE");
-  const [sourceType, setSourceType] = useState<SourceType>("ALL_CLUB");
+const CreateFeeScreen = ({ navigation, route }: Props) => {
+  const prefill = route?.params?.prefill;
+
+  const [title, setTitle] = useState(prefill?.title ?? "");
+  const [feeType, setFeeType] = useState<FeeType>(prefill?.feeType ?? "MATCH_FEE");
+  const [sourceType, setSourceType] = useState<SourceType>(
+    prefill?.goingMembers?.length ? "CUSTOM_SELECTION" : "ALL_CLUB"
+  );
   const [billingMode, setBillingMode] =
     useState<BillingMode>("FIXED_PER_PERSON");
 
@@ -131,13 +143,21 @@ const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
   }, []);
 
   // Reset selected source data when source type changes
- useEffect(() => {
-  setSelectedTeamId(null);
-  setSelectedMatchId(null);
-  setSelectedSplits([]);
-  setShowSelectedCount(10);
-  setSelectedMemberSearch("");
-}, [sourceType]);
+  useEffect(() => {
+    setSelectedTeamId(null);
+    setSelectedMatchId(null);
+    setSelectedSplits([]);
+    setShowSelectedCount(10);
+    setSelectedMemberSearch("");
+  }, [sourceType]);
+
+  // Pre-populate going members when navigated from Event Details (runs after reset above)
+  useEffect(() => {
+    if (!prefill?.goingMembers?.length) return;
+    setSelectedSplits(
+      prefill.goingMembers.map((m) => ({ userId: m.userId, fullName: m.fullName, amount: "" }))
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-fill equal split amounts
   useEffect(() => {
@@ -177,8 +197,8 @@ const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
       setTeams(Array.isArray(teamData) ? teamData : []);
       setMatches(Array.isArray(matchData) ? matchData : []);
     } catch (error: any) {
-      console.log("CREATE FEE INITIAL LOAD ERROR:", error?.response?.data || error);
-      console.log("CREATE FEE INITIAL LOAD STATUS:", error?.response?.status);
+      logger.log("CREATE FEE INITIAL LOAD ERROR:", error?.response?.data || error);
+      logger.log("CREATE FEE INITIAL LOAD STATUS:", error?.response?.status);
 
       Alert.alert(
         "Error",
@@ -222,7 +242,7 @@ const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
         if (!text) return true;
 
         const label = getMatchLabel(match).toLowerCase();
-        const venue = ((match as any).venue || "").toLowerCase();
+        const venue = ((match as { venue?: string }).venue || "").toLowerCase();
         const dateText = match.matchDate
           ? new Date(match.matchDate).toLocaleString().toLowerCase()
           : "";
@@ -423,7 +443,7 @@ const [selectedMemberSearch, setSelectedMemberSearch] = useState("");
         setSelectedSplits([]);
       }
     } catch (error: any) {
-      console.log("LOAD SOURCE MEMBERS ERROR:", error?.response?.data || error);
+      logger.log("LOAD SOURCE MEMBERS ERROR:", error?.response?.data || error);
 
       Alert.alert(
         "Error",
@@ -1145,9 +1165,9 @@ return;
                       </Text>
                     ) : null}
 
-                    {(match as any).venue ? (
+                    {(match as { venue?: string }).venue ? (
                       <Text style={styles.modalSubText}>
-                        {(match as any).venue}
+                        {(match as { venue?: string }).venue}
                       </Text>
                     ) : null}
                   </TouchableOpacity>

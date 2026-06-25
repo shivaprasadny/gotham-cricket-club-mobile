@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   getMyFeeSummary,
@@ -108,7 +110,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
       setFees(Array.isArray(feeData) ? feeData : []);
       setSummary(summaryData || null);
     } catch (error: any) {
-      console.log("MY FEES LOAD ERROR:", error?.response?.data || error);
+      logger.log("MY FEES LOAD ERROR:", error?.response?.data || error);
       Alert.alert(
         "Error",
         error?.response?.data?.message || "Failed to load fees"
@@ -351,7 +353,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
   }
 
   return (
-    <>
+    <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
       <FlatList
         data={filteredFees}
         keyExtractor={(item) => item.assignmentId.toString()}
@@ -517,7 +519,7 @@ const MyFeesScreen = ({ navigation }: Props) => {
           </View>
         </View>
       </Modal>
-    </>
+    </SafeAreaView>
   );
 };
 

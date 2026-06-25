@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -61,9 +63,9 @@ const MembersScreen = ({ navigation }: Props) => {
       user?.role === "ADMIN" ? await getAdminMembers() : await getAllMembers();
     setMembers(Array.isArray(data) ? data : []);
   } catch (error: any) {
-    console.log("LOAD MEMBERS FULL ERROR:", error);
-    console.log("LOAD MEMBERS STATUS:", error?.response?.status);
-    console.log("LOAD MEMBERS DATA:", error?.response?.data);
+    logger.log("LOAD MEMBERS FULL ERROR:", error);
+    logger.log("LOAD MEMBERS STATUS:", error?.response?.status);
+    logger.log("LOAD MEMBERS DATA:", error?.response?.data);
 
     Alert.alert(
       "Error",
@@ -295,7 +297,7 @@ const handleActivateMember = (memberId: number, fullName: string) => {
   }
 
   return (
-    <>
+    <SafeAreaView edges={["bottom"]} style={{ flex: 1 }}>
       <FlatList
         data={filteredMembers}
         keyExtractor={(item, index) => String(item.userId ?? item.id ?? index)}
@@ -472,7 +474,7 @@ const handleActivateMember = (memberId: number, fullName: string) => {
           </Pressable>
         </Pressable>
       </Modal>
-    </>
+    </SafeAreaView>
   );
 };
 

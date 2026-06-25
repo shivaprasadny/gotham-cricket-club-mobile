@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -171,7 +172,7 @@ setMatchDate(
         setOpponentMode("EXTERNAL");
       }
     } catch (error: any) {
-      console.log("EDIT MATCH LOAD ERROR:", error?.response?.data || error);
+      logger.log("EDIT MATCH LOAD ERROR:", error?.response?.data || error);
 
       Alert.alert(
         "Error",
@@ -358,7 +359,7 @@ matchFeeDueDate: matchFeeDueDate
         [{ text: "OK", onPress: () => navigation.goBack() }]
       );
     } catch (error: any) {
-      console.log("UPDATE MATCH ERROR:", error?.response?.data || error);
+      logger.log("UPDATE MATCH ERROR:", error?.response?.data || error);
 
       Alert.alert(
         "Error",

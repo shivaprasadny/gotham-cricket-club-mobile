@@ -51,6 +51,7 @@ import { navigationRef } from "./navigationRef";
 import ChatListScreen from "../chat/ChatListScreen";
 import ChatRoomScreen from "../chat/ChatRoomScreen";
 import MatchSquadHubScreen from "../screens/MatchSquadHubScreen";
+import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
 
 
 
@@ -183,6 +184,11 @@ const AppNavigator = ({ onNavigationReady }: Props) => {
           <Stack.Screen
             name="Notifications"
             component={NotificationsScreen}
+          />
+          <Stack.Screen
+            name="NotificationSettings"
+            component={NotificationSettingsScreen}
+            options={{ title: "Notification Settings" }}
           />
         </Stack.Navigator>
       )}

@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   RefreshControl,
   ScrollView,
@@ -298,7 +299,7 @@ const HomeScreen = ({ navigation }: Props) => {
       setFees(Array.isArray(feesData) ? feesData : []);
         hasLoadedHomeRef.current = true;
       } catch (error) {
-        console.log("HOME LOAD ERROR:", error);
+        logger.log("HOME LOAD ERROR:", error);
       } finally {
         setLoadingHome(false);
         setRefreshing(false);

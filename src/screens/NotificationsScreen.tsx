@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   Alert,
   FlatList,
@@ -9,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 
@@ -38,7 +40,7 @@ const NotificationsScreen = ({ navigation }: Props) => {
       const data = await getNotifications();
       setNotifications(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.log("LOAD NOTIFICATIONS ERROR:", error);
+      logger.log("LOAD NOTIFICATIONS ERROR:", error);
       Alert.alert("Error", "Failed to load notifications");
     } finally {
       setRefreshing(false);
@@ -74,7 +76,7 @@ const NotificationsScreen = ({ navigation }: Props) => {
               setNotifications([]);
               Alert.alert("Success", "Notifications cleared");
             } catch (error) {
-              console.log("CLEAR NOTIFICATIONS ERROR:", error);
+              logger.log("CLEAR NOTIFICATIONS ERROR:", error);
               Alert.alert("Error", "Failed to clear notifications");
             }
           },
@@ -96,7 +98,7 @@ const NotificationsScreen = ({ navigation }: Props) => {
         }))
       );
     } catch (error) {
-      console.log("MARK ALL READ ERROR:", error);
+      logger.log("MARK ALL READ ERROR:", error);
       Alert.alert("Error", "Failed to mark all as read");
     }
   };
@@ -178,7 +180,7 @@ const getNotificationIconColor = (type?: string) => {
         );
       }
     } catch (error) {
-      console.log("MARK READ ERROR:", error);
+      logger.log("MARK READ ERROR:", error);
     }
 
     await openNotificationDestination(navigation, item);
@@ -223,7 +225,7 @@ const getNotificationIconColor = (type?: string) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
       {/* Header actions */}
       <View style={styles.headerRow}>
         <Text style={styles.screenTitle}>Notifications</Text>
@@ -265,7 +267,7 @@ const getNotificationIconColor = (type?: string) => {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 };
 

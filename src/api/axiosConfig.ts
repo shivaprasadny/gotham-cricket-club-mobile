@@ -1,4 +1,5 @@
 import axios from "axios";
+import { logger } from "../utils/logger";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
 
@@ -53,7 +54,7 @@ api.interceptors.request.use(
 
       return config;
     } catch (error) {
-      console.log("REQUEST INTERCEPTOR ERROR:", error);
+      logger.log("REQUEST INTERCEPTOR ERROR:", error);
       return config;
     }
   },
@@ -120,11 +121,11 @@ api.interceptors.response.use(
 
       // A missing scorecard is normal before the first draft is created.
       if (!isExpectedMissingScorecard) {
-        console.log("API ERROR STATUS:", status);
-        console.log("API ERROR DATA:", error?.response?.data);
+        logger.log("API ERROR STATUS:", status);
+        logger.log("API ERROR DATA:", error?.response?.data);
       }
     } catch (cleanupError) {
-      console.log("RESPONSE INTERCEPTOR CLEANUP ERROR:", cleanupError);
+      logger.log("RESPONSE INTERCEPTOR CLEANUP ERROR:", cleanupError);
     }
 
     return Promise.reject(error);

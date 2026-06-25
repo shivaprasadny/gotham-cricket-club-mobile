@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -57,7 +58,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
       const data = await getAnnouncements();
       setAnnouncements(Array.isArray(data) ? data : []);
     } catch (error: any) {
-      console.log("ANNOUNCEMENTS LOAD ERROR:", error?.response?.data || error);
+      logger.log("ANNOUNCEMENTS LOAD ERROR:", error?.response?.data || error);
 
       Alert.alert(
         "Error",
@@ -107,7 +108,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
 
               await loadAnnouncements();
             } catch (error: any) {
-              console.log(
+              logger.log(
                 "DELETE ANNOUNCEMENT ERROR:",
                 error?.response?.data || error
               );
@@ -150,7 +151,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
 
       await loadAnnouncements();
     } catch (error: any) {
-      console.log("PIN ANNOUNCEMENT ERROR:", error?.response?.data || error);
+      logger.log("PIN ANNOUNCEMENT ERROR:", error?.response?.data || error);
 
       Alert.alert(
         "Error",
@@ -175,7 +176,7 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
 
       await loadAnnouncements();
     } catch (error: any) {
-      console.log("UNPIN ANNOUNCEMENT ERROR:", error?.response?.data || error);
+      logger.log("UNPIN ANNOUNCEMENT ERROR:", error?.response?.data || error);
 
       Alert.alert(
         "Error",

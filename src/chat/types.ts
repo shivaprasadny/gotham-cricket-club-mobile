@@ -1,4 +1,4 @@
-export type ChatRoomType = "CLUB" | "MATCH" | "EVENT" | "DIRECT" | "GROUP";
+export type ChatRoomType = "CLUB" | "MATCH" | "EVENT" | "DIRECT" | "GROUP" | "ANONYMOUS";
 
 export type ChatMessageType = "CHAT" | "SYSTEM";
 
@@ -20,6 +20,7 @@ export type ChatRoom = {
   unreadCount: number;
   lastMessage: ChatMessage | null;
   muted: boolean;
+  favorite: boolean;
 };
 
 export type ChatMessagePage = {

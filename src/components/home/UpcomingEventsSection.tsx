@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { logger } from "../../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -149,7 +150,7 @@ if (status === "NOT_GOING") {
 // DO NOT refresh HomeScreen
 // onUpdated?.();
     } catch (error: any) {
-      console.log("HOME EVENT RESPONSE ERROR:", error);
+      logger.log("HOME EVENT RESPONSE ERROR:", error);
 
       Alert.alert(
         "Error",

@@ -64,6 +64,13 @@ export const setChatMuted = async (
   await api.put(`/chat/rooms/${roomId}/mute`, { muted });
 };
 
+export const setChatFavorite = async (
+  roomId: number,
+  favorite: boolean
+): Promise<void> => {
+  await api.put(`/chat/rooms/${roomId}/favorite`, { favorite });
+};
+
 export const createDirectChat = async (userId: number): Promise<ChatRoom> => {
   const response = await api.post<ChatRoom>("/chat/rooms/direct", { userId });
   return response.data;
@@ -159,4 +166,11 @@ export const leaveChatRoomPresence = async (
   roomId: number
 ): Promise<void> => {
   await api.post(`/chat/rooms/${roomId}/presence/leave`);
+};
+
+export const deleteChatMessage = async (
+  roomId: number,
+  messageId: number
+): Promise<void> => {
+  await api.delete(`/chat/rooms/${roomId}/messages/${messageId}`);
 };

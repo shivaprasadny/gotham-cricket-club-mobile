@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -131,7 +132,7 @@ const [pickerMode, setPickerMode] = useState<"date" | "time">("date");
       setTeams(Array.isArray(teamData) ? teamData : []);
       setLeagues(Array.isArray(leagueData) ? leagueData : []);
     } catch (error) {
-      console.log("CREATE MATCH LOAD ERROR:", error);
+      logger.log("CREATE MATCH LOAD ERROR:", error);
       Alert.alert("Error", "Failed to load teams or leagues");
     }
   };
@@ -262,7 +263,7 @@ const formatLocalDateTime = (date: Date) => {
         [{ text: "OK", onPress: () => navigation.goBack() }]
       );
     } catch (error: any) {
-      console.log("CREATE MATCH ERROR:", error?.response?.data || error);
+      logger.log("CREATE MATCH ERROR:", error?.response?.data || error);
       Alert.alert(
         "Error",
         error?.response?.data?.message ||

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { getMemberById } from "../services/memberService";
 import { createDirectChat } from "../chat/chatApi";
@@ -108,7 +109,8 @@ const MemberProfileScreen = ({ route, navigation }: Props) => {
   };
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <SafeAreaView style={styles.screen} edges={["bottom"]}>
+      <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -158,7 +160,8 @@ const MemberProfileScreen = ({ route, navigation }: Props) => {
       >
         <Text style={styles.statsButtonText}>View Cricket Statistics</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 

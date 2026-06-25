@@ -8,6 +8,7 @@
 // - Direct chats do not show member management
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { logger } from "../utils/logger";
 import {
   ActivityIndicator,
   Alert,
@@ -29,8 +30,10 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useAuth } from "../context/AuthContext";
 import {
   addChatRoomMember,
+  deleteChatMessage,
   getChatMembers,
   getChatMessages,
+  getChatRooms,
   getChatRoomMembers,
   makeChatRoomAdmin,
   markChatRoomRead,
@@ -38,10 +41,9 @@ import {
   removeChatRoomMember,
   sendChatMessage,
   leaveChatRoom,
-renameChatRoom,
-getChatRooms,
-enterChatRoomPresence,
-leaveChatRoomPresence,
+  renameChatRoom,
+  enterChatRoomPresence,
+  leaveChatRoomPresence,
 } from "./chatApi";
 import { chatStompClient } from "./stompClient";
 import {
@@ -74,6 +76,12 @@ const ChatRoomScreen = ({ route }: any) => {
 
 
   // =========================
+  // MESSAGE SEARCH STATE
+  // =========================
+  const [searchActive, setSearchActive] = useState(false);
+  const [messageSearch, setMessageSearch] = useState("");
+
+  // =========================
   // MEMBER MANAGEMENT STATE
   // =========================
   const [showMembers, setShowMembers] = useState(false);
@@ -95,8 +103,13 @@ const [renameValue, setRenameValue] = useState(roomName);
   const subscribedRef = useRef(false);
   const lastSentDraftRef = useRef("");
 
+  const isAnonymousRoom = room.type === "ANONYMOUS";
+
   const canOpenMembers =
-    room.type === "GROUP" || room.type === "MATCH" || room.type === "EVENT";
+    room.type === "GROUP" ||
+    room.type === "MATCH" ||
+    room.type === "EVENT" ||
+    (isAnonymousRoom && user?.role === "ADMIN");
 
   const currentUserMembership = roomMembers.find(
     (member) => member.userId === user?.id
@@ -148,10 +161,10 @@ const [renameValue, setRenameValue] = useState(roomName);
 
       if (nextPage === 0) {
         void markChatRoomRead(room.id, newest?.id).catch((readError) => {
-          console.log(
+          logger.log(
             "MARK CHAT READ ERROR:",
-            (readError as any)?.response?.status,
-            (readError as any)?.response?.data
+            (readError as { response?: { status?: number; data?: unknown } })?.response?.status,
+            (readError as { response?: { status?: number; data?: unknown } })?.response?.data
           );
         });
       }
@@ -174,7 +187,7 @@ const refreshRoomName = async () => {
       });
     }
   } catch (error) {
-    console.log("ROOM NAME REFRESH ERROR:", error);
+    logger.log("ROOM NAME REFRESH ERROR:", error);
   }
 };
 
@@ -200,7 +213,7 @@ const refreshRoomName = async () => {
   useEffect(() => {
     void loadPage(0)
       .catch((loadError: any) => {
-        console.log(
+        logger.log(
           "LOAD CHAT HISTORY ERROR:",
           loadError?.response?.status,
           loadError?.response?.data || loadError
@@ -264,7 +277,7 @@ void refreshRoomName();
       });
     } catch (subscriptionError) {
       subscribedRef.current = false;
-      console.log("CHAT SUBSCRIPTION ERROR:", subscriptionError);
+      logger.log("CHAT SUBSCRIPTION ERROR:", subscriptionError);
     }
 
     return () => {
@@ -274,16 +287,7 @@ void refreshRoomName();
     };
   }, [room.id, status, user?.id]);
 
-  // Fallback polling for V1 stability.
-  useEffect(() => {
-    const interval = setInterval(() => {
-      void refreshLatest().catch((refreshError) => {
-        console.log("CHAT REFRESH ERROR:", refreshError);
-      });
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [refreshLatest]);
+ 
 
  useEffect(() => {
   let active = true;
@@ -291,9 +295,8 @@ void refreshRoomName();
   const enter = async () => {
     try {
       await enterChatRoomPresence(room.id);
-      console.log("ENTERED CHAT ROOM PRESENCE:", room.id);
     } catch (error) {
-      console.log("ENTER ROOM PRESENCE ERROR:", error);
+      logger.log("ENTER ROOM PRESENCE ERROR:", error);
     }
   };
 
@@ -303,7 +306,7 @@ void refreshRoomName();
     active = false;
 
     leaveChatRoomPresence(room.id).catch((error) => {
-      console.log("LEAVE ROOM PRESENCE ERROR:", error);
+      logger.log("LEAVE ROOM PRESENCE ERROR:", error);
     });
   };
 }, [room.id]);
@@ -641,14 +644,53 @@ navigation.goBack();
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        {canOpenMembers ? (
+        <View style={styles.topBar}>
+          {canOpenMembers ? (
+            <TouchableOpacity
+              style={styles.topBarBtn}
+              onPress={() => void openMembersModal()}
+            >
+              <Ionicons name="information-circle-outline" size={18} color="#4B1D6B" />
+              <Text style={styles.topBarBtnText}>Info</Text>
+            </TouchableOpacity>
+          ) : <View style={{ flex: 1 }} />}
+
           <TouchableOpacity
-            style={styles.membersButton}
-            onPress={() => void openMembersModal()}
+            style={styles.topBarBtn}
+            onPress={() => {
+              setSearchActive((v) => !v);
+              setMessageSearch("");
+            }}
           >
-            <Ionicons name="people-outline" size={18} color="#4B1D6B" />
-            <Text style={styles.membersButtonText}>Members</Text>
+            <Ionicons
+              name={searchActive ? "close-outline" : "search-outline"}
+              size={18}
+              color="#4B1D6B"
+            />
+            <Text style={styles.topBarBtnText}>
+              {searchActive ? "Close" : "Search"}
+            </Text>
           </TouchableOpacity>
+        </View>
+
+        {searchActive ? (
+          <TextInput
+            style={styles.messageSearchInput}
+            placeholder="Search messages…"
+            placeholderTextColor="#9a8da0"
+            value={messageSearch}
+            onChangeText={setMessageSearch}
+            autoFocus
+            clearButtonMode="while-editing"
+          />
+        ) : null}
+
+        {isAnonymousRoom ? (
+          <View style={styles.anonBanner}>
+            <Text style={styles.anonBannerText}>
+              Messages here are anonymous. Be respectful.
+            </Text>
+          </View>
         ) : null}
 
         <View style={styles.chatBody}>
@@ -656,10 +698,24 @@ navigation.goBack();
             <View style={styles.center}>
               <ActivityIndicator color="#4B1D6B" />
             </View>
+          ) : messages.length === 0 && !searchActive ? (
+            <View style={styles.emptyOuter}>
+              <Text style={styles.empty}>Start the conversation.</Text>
+            </View>
           ) : (
             <FlatList
-              inverted
-              data={messages}
+              inverted={!searchActive}
+              data={
+                searchActive && messageSearch.trim()
+                  ? messages.filter((m) => {
+                      const q = messageSearch.trim().toLowerCase();
+                      return (
+                        m.content.toLowerCase().includes(q) ||
+                        m.senderName.toLowerCase().includes(q)
+                      );
+                    })
+                  : messages
+              }
               keyExtractor={(item) => String(item.id)}
               contentContainerStyle={styles.messages}
               keyboardShouldPersistTaps="handled"
@@ -669,8 +725,8 @@ navigation.goBack();
                 loadingMore ? <ActivityIndicator color="#4B1D6B" /> : null
               }
             ListEmptyComponent={
-  <View style={styles.emptyWrap}>
-    <Text style={styles.empty}>Start the conversation.</Text>
+  <View style={styles.emptyOuter}>
+    <Text style={styles.empty}>No messages found.</Text>
   </View>
 }
               renderItem={({ item }) => {
@@ -684,7 +740,37 @@ navigation.goBack();
                 const mine = item.senderId === user?.id;
 
                 return (
-                  <View
+                  <TouchableOpacity
+                    activeOpacity={mine ? 0.7 : 1}
+                    onLongPress={() => {
+  if (!mine) return;
+  Alert.alert(
+    "Delete message",
+    "Remove this message?",
+    [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            // ✅ Call backend to permanently delete
+            await deleteChatMessage(room.id, item.id);
+            // Remove from local state after backend confirms
+            setMessages((cur) =>
+              cur.filter((m) => m.id !== item.id)
+            );
+          } catch (deleteError: any) {
+            Alert.alert(
+              "Could not delete",
+              deleteError?.response?.data?.message || "Please try again."
+            );
+          }
+        },
+      },
+    ]
+  );
+}}
                     style={[
                       styles.messageRow,
                       mine ? styles.messageRowMine : styles.messageRowOther,
@@ -708,7 +794,7 @@ navigation.goBack();
                         })}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               }}
             />
@@ -763,25 +849,20 @@ navigation.goBack();
 
         
             <View style={styles.memberHeader}>
-              <View>
-                <Text style={styles.memberTitle}>Chat Members</Text>
-                   <Text style={styles.memberSubtitle}>
-  {roomMembers.length} members • {
-    roomMembers.filter(m => m.roomAdmin).length
-  } admins
-</Text>
-
-
-
-<Text style={styles.memberSubtitle}>
-  Admins:{" "}
-  {roomMembers
-    .filter((m) => m.roomAdmin)
-    .map((m) => m.fullName)
-    .join(", ") || "None"}
-</Text>
-
-
+              <View style={{ flex: 1 }}>
+                <Text style={styles.memberTitle} numberOfLines={2}>{roomName}</Text>
+                <View style={styles.memberHeaderRow}>
+                  <View style={styles.typeBadge}>
+                    <Text style={styles.typeBadgeText}>{room.type}</Text>
+                  </View>
+                  <Text style={styles.memberSubtitle}>
+                    {roomMembers.length} members • {roomMembers.filter(m => m.roomAdmin).length} admins
+                  </Text>
+                </View>
+                <Text style={styles.memberSubtitle}>
+                  Admins:{" "}
+                  {roomMembers.filter((m) => m.roomAdmin).map((m) => m.fullName).join(", ") || "None"}
+                </Text>
               </View>
 
               <TouchableOpacity onPress={() => setShowMembers(false)}>
@@ -794,9 +875,9 @@ navigation.goBack();
             ) : (
               <ScrollView keyboardShouldPersistTaps="handled">
                 <Text style={styles.sectionTitle}>Current Members</Text>
-                {room.type === "GROUP" ? (
+                {(room.type === "GROUP" || room.type === "MATCH" || room.type === "EVENT") && !isAnonymousRoom ? (
   <View style={styles.groupActions}>
-    {currentUserIsRoomAdmin ? (
+    {room.type === "GROUP" && currentUserIsRoomAdmin ? (
       <TouchableOpacity
         style={styles.groupActionButton}
         onPress={handleRenameGroup}
@@ -811,13 +892,8 @@ navigation.goBack();
       onPress={handleLeaveGroup}
     >
       <Ionicons name="exit-outline" size={18} color="#a33b3b" />
-      <Text
-        style={[
-          styles.groupActionText,
-          { color: "#a33b3b" },
-        ]}
-      >
-        Leave Group
+      <Text style={[styles.groupActionText, { color: "#a33b3b" }]}>
+        Leave
       </Text>
     </TouchableOpacity>
   </View>
@@ -881,7 +957,7 @@ navigation.goBack();
                   </>
                 ) : (
                   <Text style={styles.noMembersText}>
-                    Only group admins can add or remove members.
+                    Only room admins can add or remove members.
                   </Text>
                 )}
               </ScrollView>
@@ -1188,6 +1264,12 @@ const styles = StyleSheet.create({
   emptyWrap: {
   transform: [{ scaleY: -1 }],
 },
+  emptyOuter: {
+    flex: 1,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    paddingBottom: 28,
+  },
 groupActions: {
   flexDirection: "row",
   gap: 10,
@@ -1265,5 +1347,68 @@ systemMessageText: {
   paddingVertical: 6,
   borderRadius: 14,
   overflow: "hidden",
+},
+memberHeaderRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+  marginTop: 4,
+  marginBottom: 2,
+},
+typeBadge: {
+  backgroundColor: "#eadff0",
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+  borderRadius: 8,
+},
+typeBadgeText: {
+  color: "#4B1D6B",
+  fontSize: 11,
+  fontWeight: "700",
+},
+topBar: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#fff",
+  borderBottomWidth: StyleSheet.hairlineWidth,
+  borderBottomColor: "#e4dbe8",
+},
+topBarBtn: {
+  flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  paddingVertical: 9,
+},
+topBarBtnText: {
+  color: "#4B1D6B",
+  fontWeight: "800",
+  fontSize: 13,
+},
+messageSearchInput: {
+  marginHorizontal: 12,
+  marginVertical: 8,
+  borderWidth: 1,
+  borderColor: "#d8cedd",
+  borderRadius: 10,
+  paddingHorizontal: 14,
+  paddingVertical: 9,
+  fontSize: 15,
+  color: "#24112e",
+  backgroundColor: "#fff",
+},
+anonBanner: {
+  backgroundColor: "#eadff0",
+  paddingHorizontal: 16,
+  paddingVertical: 7,
+  borderBottomWidth: StyleSheet.hairlineWidth,
+  borderBottomColor: "#d5c9e0",
+},
+anonBannerText: {
+  color: "#4B1D6B",
+  fontSize: 12,
+  fontWeight: "600",
+  textAlign: "center",
 },
 });

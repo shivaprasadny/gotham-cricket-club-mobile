@@ -1,4 +1,5 @@
 import { getEventById } from "./eventService";
+import { logger } from "../utils/logger";
 import { getChatRooms } from "../chat/chatApi";
 
 export type NotificationNavigationData = {
@@ -48,7 +49,7 @@ export const openNotificationDestination = async (
           return;
         }
       } catch (error) {
-        console.log("OPEN CHAT NOTIFICATION ERROR:", error);
+        logger.log("OPEN CHAT NOTIFICATION ERROR:", error);
       }
     }
     navigation.navigate("ChatList");
@@ -62,7 +63,7 @@ export const openNotificationDestination = async (
         navigation.navigate("EventDetails", { event });
         return;
       } catch (error) {
-        console.log("OPEN EVENT NOTIFICATION ERROR:", error);
+        logger.log("OPEN EVENT NOTIFICATION ERROR:", error);
       }
     }
 
