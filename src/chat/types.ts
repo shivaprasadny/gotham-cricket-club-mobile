@@ -2,14 +2,25 @@ export type ChatRoomType = "CLUB" | "MATCH" | "EVENT" | "DIRECT" | "GROUP" | "AN
 
 export type ChatMessageType = "CHAT" | "SYSTEM";
 
+export type ReactionSummary = {
+  emoji: string;
+  count: number;
+  reactorNames: string[] | null; // null for anonymous rooms
+};
+
 export type ChatMessage = {
   id: number;
   roomId: number;
-  senderId: number;
+  senderId: number | null; // null for anonymous rooms
   senderName: string;
   content: string;
   type: ChatMessageType;
   createdAt: string;
+  reactions?: ReactionSummary[];
+  // Reply fields — undefined/null when this is a top-level message
+  replyToMessageId?: number | null;
+  replyPreview?: string | null;
+  replySenderName?: string | null;
 };
 
 export type ChatRoom = {
@@ -21,6 +32,7 @@ export type ChatRoom = {
   lastMessage: ChatMessage | null;
   muted: boolean;
   favorite: boolean;
+  frozen?: boolean;
 };
 
 export type ChatMessagePage = {
@@ -49,4 +61,20 @@ export type ChatMember = {
   fullName: string;
   nickname?: string | null;
   roomAdmin?: boolean;
+};
+
+// Member profile returned by GET /api/members/{userId}
+export type MemberProfile = {
+  userId: number;
+  fullName?: string;
+  email?: string;       // null when showEmail is false
+  role?: string;
+  nickname?: string;
+  countryCode?: string; // null when showPhone is false
+  phone?: string;       // null when showPhone is false
+  showWhatsApp?: boolean;
+  battingStyle?: string;
+  bowlingStyle?: string;
+  playerType?: string;
+  jerseyNumber?: number;
 };

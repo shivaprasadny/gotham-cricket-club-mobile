@@ -6,11 +6,15 @@ export type UpdateMyProfileRequest = {
   gender?: string;
   dateOfBirth?: string;
   nickname?: string;
-  phone?: string;
+  countryCode?: string | null;
+  phone?: string | null;
   battingStyle?: string;
   bowlingStyle?: string;
   playerType?: string;
   jerseyNumber?: number | null;
+  showEmail?: boolean;
+  showPhone?: boolean;
+  showWhatsApp?: boolean;
 };
 
 export const getMyProfile = async () => {

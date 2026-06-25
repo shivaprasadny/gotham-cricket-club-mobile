@@ -1,6 +1,6 @@
 import axios from "axios";
 import { logger } from "../utils/logger";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { Alert } from "react-native";
 
 /**
@@ -45,7 +45,7 @@ api.interceptors.request.use(
   async (config) => {
     try {
       // Get saved JWT token from phone storage
-      const token = await AsyncStorage.getItem("token");
+      const token = await SecureStore.getItemAsync("token");
 
       // If token exists, attach it to Authorization header
       if (token) {
@@ -80,7 +80,7 @@ api.interceptors.response.use(
       // 403 means the user is logged in but is not allowed to perform an action,
       // so it must not log the user out.
       if (status === 401 && !isSessionExpiredAlertShown) {
-        const storedToken = await AsyncStorage.getItem("token");
+        const storedToken = await SecureStore.getItemAsync("token");
 
         // Login and other public endpoints may also return 401. Only expire a
         // session when the app actually had a saved authenticated session.
@@ -91,8 +91,8 @@ api.interceptors.response.use(
         isSessionExpiredAlertShown = true;
 
         // Clear saved login session from phone
-        await AsyncStorage.removeItem("token");
-        await AsyncStorage.removeItem("user");
+        await SecureStore.deleteItemAsync("token").catch(() => {});
+        await SecureStore.deleteItemAsync("user").catch(() => {});
 
         // Remove default Authorization header if it exists
         delete api.defaults.headers.common.Authorization;

@@ -2,14 +2,21 @@ import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import * as LocalAuthentication from "expo-local-authentication";
+import * as SecureStore from "expo-secure-store";
 import { getMyProfile } from "../services/profileService";
+import { loginUser } from "../services/authService";
 import { useAuth } from "../context/AuthContext";
 import { formatEnumLabel } from "../utils/formatEnumLabel";
 
@@ -49,6 +56,14 @@ const ProfileScreen = ({ navigation }: Props) => {
   // =========================
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Biometric toggle state
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [showBioModal, setShowBioModal] = useState(false);
+  const [bioPassword, setBioPassword] = useState("");
+  const [bioEnabling, setBioEnabling] = useState(false);
+  const [showBioPassword, setShowBioPassword] = useState(false);
 
   // Auth logout from context
   const { logout } = useAuth();
@@ -106,13 +121,74 @@ const ProfileScreen = ({ navigation }: Props) => {
     }
   };
 
-  // Reload every time profile screen opens again
+  // Reload profile + biometric status every time this screen opens
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
       void loadProfile();
+
+      const checkBiometric = async () => {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        setBiometricAvailable(hasHardware && isEnrolled);
+        const saved = await SecureStore.getItemAsync("bio_email").catch(() => null);
+        setBiometricEnabled(!!saved);
+      };
+      void checkBiometric();
     }, [])
   );
+
+  // =========================
+  // BIOMETRIC TOGGLE HANDLERS
+  // =========================
+  const handleBiometricToggle = (value: boolean) => {
+    if (value) {
+      // Turning ON — ask for password to save credentials
+      setBioPassword("");
+      setShowBioPassword(false);
+      setShowBioModal(true);
+    } else {
+      // Turning OFF — confirm then clear SecureStore
+      Alert.alert(
+        "Disable Biometric Login",
+        "You will need to enter your password next time you log in.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Disable",
+            style: "destructive",
+            onPress: async () => {
+              await SecureStore.deleteItemAsync("bio_email").catch(() => {});
+              await SecureStore.deleteItemAsync("bio_password").catch(() => {});
+              setBiometricEnabled(false);
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  const handleEnableBiometric = async () => {
+    if (!bioPassword.trim()) {
+      Alert.alert("Error", "Please enter your password");
+      return;
+    }
+    if (!profile?.email) return;
+    setBioEnabling(true);
+    try {
+      await loginUser(profile.email, bioPassword.trim());
+      await SecureStore.setItemAsync("bio_email", profile.email);
+      await SecureStore.setItemAsync("bio_password", bioPassword.trim());
+      setBiometricEnabled(true);
+      setShowBioModal(false);
+      Alert.alert("Biometric Login Enabled", "You can now use fingerprint or Face ID to log in.");
+    } catch {
+      Alert.alert("Wrong Password", "The password you entered is incorrect.");
+    } finally {
+      setBioEnabling(false);
+      setBioPassword("");
+    }
+  };
 
   // =========================
   // LOGOUT HANDLER
@@ -237,10 +313,80 @@ const ProfileScreen = ({ navigation }: Props) => {
         <Text style={styles.settingsText}>Notification Settings</Text>
       </TouchableOpacity>
 
+      {/* ================= BIOMETRIC TOGGLE ================= */}
+      <View style={styles.bioRow}>
+        <View style={styles.bioRowLeft}>
+          <Text style={styles.bioRowTitle}>
+            {Platform.OS === "ios" ? "Face ID / Touch ID Login" : "Fingerprint Login"}
+          </Text>
+          <Text style={styles.bioRowSub}>
+            {!biometricAvailable
+              ? Platform.OS === "ios"
+                ? "Set up Face ID or Touch ID in iPhone Settings first"
+                : "Set up fingerprint in Android Settings → Security first"
+              : biometricEnabled
+              ? "Tap your finger or face to log in"
+              : "Enable for faster login"}
+          </Text>
+        </View>
+        <Switch
+          value={biometricEnabled}
+          onValueChange={handleBiometricToggle}
+          disabled={!biometricAvailable}
+          trackColor={{ false: "#ccc", true: "#7c3aed" }}
+          thumbColor={biometricEnabled ? "#4B1D6B" : "#f4f3f4"}
+        />
+      </View>
+
       {/* ================= LOGOUT BUTTON ================= */}
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
+
+      {/* ================= ENABLE BIOMETRIC MODAL ================= */}
+      <Modal
+        visible={showBioModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBioModal(false)}
+      >
+        <View style={styles.bioOverlay}>
+          <View style={styles.bioBox}>
+            <Text style={styles.bioBoxTitle}>Enable Biometric Login</Text>
+            <Text style={styles.bioBoxSub}>
+              Enter your password to confirm. It will be stored securely on this device.
+            </Text>
+            <View style={styles.bioPasswordRow}>
+              <TextInput
+                style={styles.bioInput}
+                placeholder="Your password"
+                placeholderTextColor="#aaa"
+                secureTextEntry={!showBioPassword}
+                value={bioPassword}
+                onChangeText={setBioPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity onPress={() => setShowBioPassword((v) => !v)}>
+                <Text style={styles.bioShowText}>{showBioPassword ? "Hide" : "Show"}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.bioActions}>
+              <TouchableOpacity onPress={() => setShowBioModal(false)}>
+                <Text style={styles.bioCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => void handleEnableBiometric()}
+                disabled={bioEnabling}
+                style={[styles.bioConfirmBtn, bioEnabling && { opacity: 0.6 }]}
+              >
+                <Text style={styles.bioConfirmText}>
+                  {bioEnabling ? "Verifying…" : "Enable"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -453,5 +599,106 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
     fontSize: 16,
+  },
+
+  // Biometric toggle row
+  bioRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginTop: 14,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  bioRowLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  bioRowTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2b0540",
+  },
+  bioRowSub: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 2,
+  },
+
+  // Enable-biometric modal
+  bioOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  bioBox: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+  },
+  bioBoxTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#2b0540",
+    marginBottom: 6,
+  },
+  bioBoxSub: {
+    fontSize: 13,
+    color: "#666",
+    marginBottom: 18,
+    lineHeight: 19,
+  },
+  bioPasswordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginBottom: 20,
+  },
+  bioInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#222",
+  },
+  bioShowText: {
+    color: "#4B1D6B",
+    fontWeight: "600",
+    fontSize: 13,
+    paddingLeft: 8,
+  },
+  bioActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 20,
+  },
+  bioCancelText: {
+    fontSize: 15,
+    color: "#888",
+    fontWeight: "600",
+  },
+  bioConfirmBtn: {
+    backgroundColor: "#4B1D6B",
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  bioConfirmText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
   },
 });

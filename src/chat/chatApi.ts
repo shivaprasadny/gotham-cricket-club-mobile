@@ -44,11 +44,12 @@ export const markChatRoomRead = async (
 
 export const sendChatMessage = async (
   roomId: number,
-  content: string
+  content: string,
+  replyToMessageId?: number | null
 ): Promise<ChatMessage> => {
   const response = await api.post<ChatMessage>(
     `/chat/rooms/${roomId}/messages`,
-    { content }
+    { content, replyToMessageId: replyToMessageId ?? null }
   );
   return response.data;
 };
@@ -173,4 +174,31 @@ export const deleteChatMessage = async (
   messageId: number
 ): Promise<void> => {
   await api.delete(`/chat/rooms/${roomId}/messages/${messageId}`);
+};
+
+export const toggleReaction = async (
+  roomId: number,
+  messageId: number,
+  emoji: string
+): Promise<ChatMessage> => {
+  const response = await api.post<ChatMessage>(
+    `/chat/rooms/${roomId}/messages/${messageId}/reactions`,
+    { emoji }
+  );
+  return response.data;
+};
+
+export const setRoomFrozen = async (
+  roomId: number,
+  frozen: boolean
+): Promise<void> => {
+  await api.put(`/chat/rooms/${roomId}/frozen`, { frozen });
+};
+
+export const reportMessage = async (
+  roomId: number,
+  messageId: number,
+  reason?: string
+): Promise<void> => {
+  await api.post(`/chat/rooms/${roomId}/messages/${messageId}/report`, { reason });
 };

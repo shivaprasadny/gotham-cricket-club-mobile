@@ -49,6 +49,9 @@ const EventDetailsScreen = ({ route, navigation }: Props) => {
   const canAssignPayment =
     user?.role === "ADMIN" || event.createdBy === user?.email;
 
+  // Lock RSVP for past events
+  const isPastEvent = event.eventDate ? new Date(event.eventDate) < new Date() : false;
+
 const loadResponses = async () => {
   try {
     const data = await getEventAvailability(event.id);
@@ -188,47 +191,57 @@ const onRefresh = async () => {
 
           <Text style={styles.sectionTitle}>Your Response</Text>
 
-          <View style={styles.row}>
-            {["GOING", "NOT_GOING", "MAYBE"].map((item) => (
+          {isPastEvent ? (
+            <View style={styles.pastEventBanner}>
+              <Text style={styles.pastEventText}>
+                Availability is closed because this event has already passed.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.row}>
+                {["GOING", "NOT_GOING", "MAYBE"].map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={[
+                      styles.statusBtn,
+                      status === item && styles.statusBtnSelected,
+                    ]}
+                    onPress={() =>
+                      setStatus(item as "GOING" | "NOT_GOING" | "MAYBE")
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        status === item && styles.statusTextSelected,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.input}
+                placeholder="Optional message"
+                placeholderTextColor="#7a7a7a"
+                value={message}
+                onChangeText={setMessage}
+              />
+
               <TouchableOpacity
-                key={item}
-                style={[
-                  styles.statusBtn,
-                  status === item && styles.statusBtnSelected,
-                ]}
-                onPress={() =>
-                  setStatus(item as "GOING" | "NOT_GOING" | "MAYBE")
-                }
+                style={styles.submitBtn}
+                onPress={handleSubmit}
+                disabled={submitting}
               >
-                <Text
-                  style={[
-                    styles.statusText,
-                    status === item && styles.statusTextSelected,
-                  ]}
-                >
-                  {item}
+                <Text style={styles.submitBtnText}>
+                  {submitting ? "Submitting..." : "Submit Response"}
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-
-          <TextInput
-            style={styles.input}
-            placeholder="Optional message"
-            placeholderTextColor="#7a7a7a"
-            value={message}
-            onChangeText={setMessage}
-          />
-
-          <TouchableOpacity
-            style={styles.submitBtn}
-            onPress={handleSubmit}
-            disabled={submitting}
-          >
-            <Text style={styles.submitBtnText}>
-              {submitting ? "Submitting..." : "Submit Response"}
-            </Text>
-          </TouchableOpacity>
+            </>
+          )}
 
          <Text style={styles.sectionTitle}>All Responses</Text>
         </View>
@@ -361,6 +374,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 4,
     color: "#111827",
+  },
+  pastEventBanner: {
+    backgroundColor: "#fff3e0",
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#e53935",
+  },
+  pastEventText: {
+    color: "#b71c1c",
+    fontSize: 14,
+    fontWeight: "600",
   },
   responseText: {
     color: "#374151",

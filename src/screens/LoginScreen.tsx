@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
@@ -13,6 +13,9 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import * as LocalAuthentication from "expo-local-authentication";
+import * as SecureStore from "expo-secure-store";
 import { useAuth } from "../context/AuthContext";
 import { loginUser } from "../services/authService";
 
@@ -35,63 +38,161 @@ const LoginScreen = ({ navigation }: Props) => {
   // Loading states
   const [submitting, setSubmitting] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  // 1 = fingerprint, 2 = face ID
+  const [biometricType, setBiometricType] = useState(1);
+
+  // Wrong-password lockout
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(0); // unix ms timestamp
+  const [lockCountdown, setLockCountdown] = useState("");
+
+  // =========================
+  // LOCKOUT COUNTDOWN
+  // =========================
+  useEffect(() => {
+    if (!lockedUntil) return;
+    const interval = setInterval(() => {
+      const remaining = lockedUntil - Date.now();
+      if (remaining <= 0) {
+        setLockedUntil(0);
+        setFailedAttempts(0);
+        setLockCountdown("");
+        clearInterval(interval);
+      } else {
+        const totalSec = Math.ceil(remaining / 1000);
+        const mins = Math.floor(totalSec / 60);
+        const secs = totalSec % 60;
+        setLockCountdown(`${mins}:${String(secs).padStart(2, "0")}`);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
+
+  // =========================
+  // AUTO BIOMETRIC ON MOUNT
+  // =========================
+  useEffect(() => {
+    const checkAndAutoPrompt = async () => {
+      try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        if (!hasHardware || !isEnrolled) return;
+
+        const savedEmail = await SecureStore.getItemAsync("bio_email");
+        if (!savedEmail) return;
+
+        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+        setBiometricType(types[0] ?? 1);
+        setBiometricAvailable(true);
+
+        // Short delay so the screen finishes rendering before the system prompt appears
+        setTimeout(() => void triggerBiometric(), 600);
+      } catch {
+        // Non-fatal — fall back to password login
+      }
+    };
+
+    void checkAndAutoPrompt();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-prompt on mount — shows alert if something goes wrong so it's not silent
+  const triggerBiometric = async () => {
+    setBiometricLoading(true);
+    try {
+      const result = await biometricLogin();
+      if (result.success) {
+        navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+      } else if (result.message) {
+        Alert.alert("Biometric Login", result.message);
+      }
+    } catch {
+      Alert.alert("Biometric Login", "Could not start biometric. Please log in with password.");
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
 
   // =========================
   // NORMAL LOGIN
   // =========================
 
   const handleLogin = async () => {
-  if (!email.trim()) {
-    Alert.alert("Error", "Please enter email");
-    return;
-  }
+    // Block if currently locked out
+    if (lockedUntil && Date.now() < lockedUntil) return;
 
-  if (!password.trim()) {
-    Alert.alert("Error", "Please enter password");
-    return;
-  }
-
-  try {
-    setSubmitting(true);
-
-    // Call backend login API
-    const response = await loginUser(email.trim(), password.trim());
-
-    // Save token and user in AuthContext
-    await login(response.token, {
-      id: response.id,
-      fullName: response.fullName,
-      email: response.email,
-      role: response.role,
-      status: response.status,
-    });
-  } catch (error: any) {
-    const message = error?.response?.data?.message;
-
-    // No backend / internet issue
-    if (!error?.response) {
-      Alert.alert("No Internet", "Check connection or server is not running");
+    if (!email.trim()) {
+      Alert.alert("Error", "Please enter email");
       return;
     }
 
-    // Email not verified yet
-    if (message === "Please verify your email first") {
-      Alert.alert("Verify Email", "Please verify your email first.");
-      navigation.navigate("VerifyEmail", { email: email.trim() });
+    if (!password.trim()) {
+      Alert.alert("Error", "Please enter password");
       return;
     }
 
-    // Waiting admin approval
-    if (message === "Waiting for admin approval") {
-      Alert.alert("Pending Approval", "Your account is waiting for admin approval.");
-      return;
-    }
+    try {
+      setSubmitting(true);
 
-    Alert.alert("Login Failed", message || "Invalid email or password");
-  } finally {
-    setSubmitting(false);
-  }
-};
+      const response = await loginUser(email.trim(), password.trim());
+
+      // Reset lockout on success
+      setFailedAttempts(0);
+      setLockedUntil(0);
+
+      await login(response.token, {
+        id: response.id,
+        fullName: response.fullName,
+        email: response.email,
+        role: response.role,
+        status: response.status,
+      });
+
+      // Store credentials encrypted for biometric re-auth on future sessions
+      await SecureStore.setItemAsync("bio_email", email.trim()).catch(() => {});
+      await SecureStore.setItemAsync("bio_password", password.trim()).catch(() => {});
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+
+      // No backend / internet issue
+      if (!error?.response) {
+        Alert.alert("No Internet", "Check connection or server is not running");
+        return;
+      }
+
+      // Email not verified yet
+      if (message === "Please verify your email first") {
+        Alert.alert("Verify Email", "Please verify your email first.");
+        navigation.navigate("VerifyEmail", { email: email.trim() });
+        return;
+      }
+
+      // Waiting admin approval
+      if (message === "Waiting for admin approval") {
+        Alert.alert("Pending Approval", "Your account is waiting for admin approval.");
+        return;
+      }
+
+      // Track failed attempts and apply lockout after 5
+      const next = failedAttempts + 1;
+      setFailedAttempts(next);
+      if (next >= 5) {
+        const until = Date.now() + 15 * 60 * 1000;
+        setLockedUntil(until);
+        Alert.alert(
+          "Too Many Attempts",
+          "Too many failed login attempts. Please try again in 15 minutes."
+        );
+      } else {
+        Alert.alert(
+          "Login Failed",
+          `${message || "Invalid email or password"} (${next}/5 attempts)`
+        );
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // =========================
   // BIOMETRIC LOGIN
@@ -177,25 +278,43 @@ const LoginScreen = ({ navigation }: Props) => {
 
             {/* Email/password login button */}
             <TouchableOpacity
-              style={styles.primaryButton}
+              style={[styles.primaryButton, (submitting || lockedUntil > 0) && { opacity: 0.5 }]}
               onPress={handleLogin}
-              disabled={submitting}
+              disabled={submitting || lockedUntil > 0}
             >
               <Text style={styles.primaryButtonText}>
                 {submitting ? "Signing In..." : "Login"}
               </Text>
             </TouchableOpacity>
 
-            {/* Biometric login button */}
-            {/* <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleBiometricLogin}
-              disabled={biometricLoading}
-            >
-              <Text style={styles.secondaryButtonText}>
-                {biometricLoading ? "Checking..." : "Login with Biometrics"}
+            {/* Lockout countdown message */}
+            {lockedUntil > 0 && (
+              <Text style={styles.lockText}>
+                Too many failed attempts. Try again in {lockCountdown}.
               </Text>
-            </TouchableOpacity> */}
+            )}
+
+            {/* Biometric login — shown only when hardware enrolled + credentials saved */}
+            {biometricAvailable && (
+              <TouchableOpacity
+                style={[styles.biometricButton, (biometricLoading || submitting) && { opacity: 0.5 }]}
+                onPress={handleBiometricLogin}
+                disabled={biometricLoading || submitting}
+              >
+                <Ionicons
+                  name={biometricType === 2 ? "scan-outline" : "finger-print-outline"}
+                  size={26}
+                  color="#F4B400"
+                />
+                <Text style={styles.biometricText}>
+                  {biometricLoading
+                    ? "Verifying..."
+                    : biometricType === 2
+                    ? "Sign in with Face ID"
+                    : "Sign in with Fingerprint"}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* Forgot password link */}
             <TouchableOpacity
@@ -351,5 +470,33 @@ const styles = StyleSheet.create({
     color: "#2b0540",
     textAlign: "center",
     fontWeight: "600",
+  },
+
+  // Fingerprint / Face ID button
+  biometricButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: "#F4B400",
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 10,
+    backgroundColor: "transparent",
+  },
+
+  biometricText: {
+    color: "#F4B400",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+
+  lockText: {
+    color: "#e53935",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 8,
   },
 });

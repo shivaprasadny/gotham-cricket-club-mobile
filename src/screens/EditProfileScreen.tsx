@@ -6,6 +6,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { getMyProfile, updateMyProfile } from "../services/profileService";
+import CountryCodePicker from "../components/CountryCodePicker";
 
 type Props = {
   navigation: any;
@@ -23,8 +25,14 @@ const EditProfileScreen = ({ navigation }: Props) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [nickname, setNickname] = useState("");
+  const [countryCode, setCountryCode] = useState("+1");
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("");
+
+  // Contact privacy toggles
+  const [showEmail, setShowEmail] = useState(true);
+  const [showPhone, setShowPhone] = useState(true);
+  const [showWhatsApp, setShowWhatsApp] = useState(true);
   const [dateOfBirth, setDateOfBirth] = useState("");
 
   // Cricket profile fields
@@ -92,8 +100,12 @@ const EditProfileScreen = ({ navigation }: Props) => {
       setFirstName(data.firstName || "");
       setLastName(data.lastName || "");
       setNickname(data.nickname || "");
+      setCountryCode(data.countryCode || "+1");
       setPhone(data.phone || "");
       setGender(data.gender || "");
+      setShowEmail(data.showEmail !== false);
+      setShowPhone(data.showPhone !== false);
+      setShowWhatsApp(data.showWhatsApp !== false);
       setDateOfBirth(data.dateOfBirth || "");
 
       setBattingStyle(data.battingStyle || "");
@@ -167,13 +179,17 @@ const EditProfileScreen = ({ navigation }: Props) => {
         firstName,
         lastName,
         nickname,
-        phone,
+        countryCode: phone.trim() ? countryCode : null,
+        phone: phone.trim() || null,
         gender,
         dateOfBirth,
         battingStyle,
         bowlingStyle,
         playerType,
         jerseyNumber: jerseyNumber ? Number(jerseyNumber) : null,
+        showEmail,
+        showPhone,
+        showWhatsApp,
       });
 
       Alert.alert("Success", "Profile updated");
@@ -203,8 +219,20 @@ const EditProfileScreen = ({ navigation }: Props) => {
           <Label text="😎 Nickname" />
           <TextInput style={styles.input} value={nickname} onChangeText={setNickname} />
 
-          <Label text="📱 Phone" />
-          <TextInput style={styles.input} value={phone} onChangeText={setPhone} />
+          <Label text="📱 Phone (optional)" />
+          <View style={styles.phoneRow}>
+            <View style={styles.countryCodeBox}>
+              <CountryCodePicker value={countryCode} onChange={setCountryCode} />
+            </View>
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="Phone number"
+              placeholderTextColor="#7a7a7a"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+            />
+          </View>
 
           <Label text="🎂 Date of Birth" />
           <TouchableOpacity style={styles.input} onPress={openDobPicker}>
@@ -244,6 +272,20 @@ const EditProfileScreen = ({ navigation }: Props) => {
             onChangeText={setJerseyNumber}
             keyboardType="numeric"
           />
+
+          <Label text="🔒 Contact Privacy" />
+          <View style={styles.privacyRow}>
+            <Text style={styles.privacyLabel}>Show email to teammates</Text>
+            <Switch value={showEmail} onValueChange={setShowEmail} thumbColor="#da9306" trackColor={{ true: "#4a1a6a", false: "#555" }} />
+          </View>
+          <View style={styles.privacyRow}>
+            <Text style={styles.privacyLabel}>Show phone to teammates</Text>
+            <Switch value={showPhone} onValueChange={setShowPhone} thumbColor="#da9306" trackColor={{ true: "#4a1a6a", false: "#555" }} />
+          </View>
+          <View style={styles.privacyRow}>
+            <Text style={styles.privacyLabel}>Allow WhatsApp contact</Text>
+            <Switch value={showWhatsApp} onValueChange={setShowWhatsApp} thumbColor="#da9306" trackColor={{ true: "#4a1a6a", false: "#555" }} />
+          </View>
 
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
             <Text style={styles.saveText}>
@@ -435,5 +477,45 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
+  },
+  phoneRow: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    marginBottom: 14,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+  countryCodeBox: {
+    width: 130,
+    borderRightWidth: 1,
+    borderRightColor: "#ddd",
+    justifyContent: "center",
+  },
+  countryCodePicker: {
+    color: "#111",
+    height: 50,
+  },
+  phoneInput: {
+    flex: 1,
+    color: "#111",
+    paddingHorizontal: 14,
+    fontSize: 15,
+  },
+  privacyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#f7f3fb",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 10,
+  },
+  privacyLabel: {
+    color: "#ccc",
+    fontSize: 14,
+    flex: 1,
   },
 });

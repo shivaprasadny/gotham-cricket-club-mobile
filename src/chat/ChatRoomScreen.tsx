@@ -15,6 +15,7 @@ import {
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -30,6 +31,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useAuth } from "../context/AuthContext";
 import {
   addChatRoomMember,
+  createDirectChat,
   deleteChatMessage,
   getChatMembers,
   getChatMessages,
@@ -39,11 +41,14 @@ import {
   markChatRoomRead,
   removeChatRoomAdmin,
   removeChatRoomMember,
+  reportMessage,
   sendChatMessage,
   leaveChatRoom,
   renameChatRoom,
   enterChatRoomPresence,
   leaveChatRoomPresence,
+  toggleReaction,
+  setRoomFrozen,
 } from "./chatApi";
 import { chatStompClient } from "./stompClient";
 import {
@@ -53,6 +58,8 @@ import {
   ChatRoom,
 } from "./types";
 import { useNavigation } from "@react-navigation/native";
+import { getMemberById } from "../services/memberService";
+import { MemberProfile } from "./types";
 
 const ChatRoomScreen = ({ route }: any) => {
   const typedRoute = route as { params: { room: ChatRoom } };
@@ -102,6 +109,101 @@ const [renameValue, setRenameValue] = useState(roomName);
 
   const subscribedRef = useRef(false);
   const lastSentDraftRef = useRef("");
+
+  // Frozen state — initialised from room prop, updated live via WebSocket
+  const [isFrozen, setIsFrozen] = useState(room.frozen ?? false);
+  // Which message's emoji picker is open (null = none)
+  const [reactionPickerMsgId, setReactionPickerMsgId] = useState<number | null>(null);
+  // WhatsApp-style reaction viewer
+  const [reactionViewerMsg, setReactionViewerMsg] = useState<ChatMessage | null>(null);
+  const [reactionViewerTab, setReactionViewerTab] = useState("all");
+
+  // Reply state
+  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
+
+  // Message action bottom sheet (group chat tap / anonymous long press)
+  const [msgActionItem, setMsgActionItem] = useState<ChatMessage | null>(null);
+
+  useEffect(() => {
+    if (room.type !== "DIRECT") return;
+    getChatRoomMembers(room.id)
+      .then((members) => {
+        const partner = members.find((m) => m.userId !== user?.id);
+        if (partner) return getMemberById(partner.userId);
+      })
+      .then((p) => {
+        if (!p) return;
+        const partner = p as MemberProfile;
+
+        const partnerPhone = `${partner.countryCode ?? ""}${partner.phone ?? ""}`.trim();
+        const partnerWhatsApp = partner.showWhatsApp !== false;
+
+        const goToProfile = () =>
+          navigation.navigate("MemberProfile", { userId: partner.userId });
+
+        const handleWA = async () => {
+          const digits = partnerPhone.replace(/\D/g, "");
+          try {
+            await Linking.openURL(`https://wa.me/${digits}`);
+          } catch {
+            Alert.alert("Cannot open WhatsApp", "Make sure WhatsApp is installed and try again.");
+          }
+        };
+
+        navigation.setOptions({
+          // Tappable avatar + name replaces the plain text title
+          headerTitle: () => (
+            <TouchableOpacity
+              onPress={goToProfile}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+            >
+              <View style={{
+                width: 34, height: 34, borderRadius: 17,
+                backgroundColor: "#da9306",
+                alignItems: "center", justifyContent: "center",
+              }}>
+                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
+                  {(partner.fullName ?? roomName).charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View>
+                <Text style={{ color: "#2b0540", fontWeight: "700", fontSize: 15 }} numberOfLines={1}>
+                  {partner.fullName ?? roomName}
+                </Text>
+                {partner.nickname ? (
+                  <Text style={{ color: "#7a5c9a", fontSize: 11 }}>"{partner.nickname}"</Text>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          ),
+          // Call / SMS / WhatsApp icons in the header right
+          headerRight: partnerPhone ? () => (
+            <View style={{ flexDirection: "row", gap: 2, marginRight: 4 }}>
+              <TouchableOpacity
+                style={{ padding: 6 }}
+                onPress={() => void Linking.openURL(`tel:${partnerPhone}`)}
+              >
+                <Ionicons name="call-outline" size={22} color="#4B1D6B" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ padding: 6 }}
+                onPress={() => void Linking.openURL(`sms:${partnerPhone}`)}
+              >
+                <Ionicons name="chatbubble-outline" size={22} color="#4B1D6B" />
+              </TouchableOpacity>
+              {partnerWhatsApp ? (
+                <TouchableOpacity style={{ padding: 6 }} onPress={() => void handleWA()}>
+                  <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : undefined,
+        });
+      })
+      .catch(() => {});
+  }, [room.id, user?.id]);
+
+  const EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "👏"];
 
   const isAnonymousRoom = room.type === "ANONYMOUS";
 
@@ -262,18 +364,25 @@ const refreshRoomName = async () => {
       });
 
       roomSubscription = chatStompClient.subscribeToRoom(room.id, (message) => {
-        setMessages((current) =>
-          current.some((item) => item.id === message.id)
-            ? current
-            : [message, ...current]
-        );
+        // Freeze/unfreeze sentinel — update UI state, don't add to message list
+        if (message.content === "__ROOM_FROZEN__") { setIsFrozen(true); return; }
+        if (message.content === "__ROOM_UNFROZEN__") { setIsFrozen(false); return; }
+
+        setMessages((current) => {
+          const exists = current.some((item) => item.id === message.id);
+          if (exists) {
+            // Reaction update — replace in place to refresh reaction bubbles
+            return current.map((item) => item.id === message.id ? message : item);
+          }
+          return [message, ...current];
+        });
 
         if (message.senderId === user?.id) {
           lastSentDraftRef.current = "";
         }
 
-       void markChatRoomRead(room.id, message.id);
-void refreshRoomName();
+        void markChatRoomRead(room.id, message.id);
+        void refreshRoomName();
       });
     } catch (subscriptionError) {
       subscribedRef.current = false;
@@ -287,7 +396,11 @@ void refreshRoomName();
     };
   }, [room.id, status, user?.id]);
 
- 
+  // Polling fallback — catches messages and reaction updates the WebSocket missed
+  useEffect(() => {
+    const interval = setInterval(() => void refreshLatest().catch(() => {}), 3000);
+    return () => clearInterval(interval);
+  }, [refreshLatest]);
 
  useEffect(() => {
   let active = true;
@@ -480,9 +593,11 @@ void refreshRoomName();
 
     setSending(true);
     setDraft("");
+    const replyId = replyingTo?.id ?? null;
+    setReplyingTo(null);
 
     try {
-      const saved = await sendChatMessage(room.id, content);
+      const saved = await sendChatMessage(room.id, content, replyId);
 
       setMessages((current) =>
         current.some((message) => message.id === saved.id)
@@ -655,6 +770,46 @@ navigation.goBack();
             </TouchableOpacity>
           ) : <View style={{ flex: 1 }} />}
 
+          {/* Freeze / unfreeze button — ADMIN only, anonymous rooms only */}
+          {isAnonymousRoom && user?.role === "ADMIN" ? (
+            <TouchableOpacity
+              style={styles.topBarBtn}
+              onPress={() => {
+                const next = !isFrozen;
+                Alert.alert(
+                  next ? "Freeze Chat" : "Unfreeze Chat",
+                  next
+                    ? "Members won't be able to send messages while the chat is frozen."
+                    : "Members will be able to send messages again.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: next ? "Freeze" : "Unfreeze",
+                      style: next ? "destructive" : "default",
+                      onPress: async () => {
+                        try {
+                          await setRoomFrozen(room.id, next);
+                          setIsFrozen(next);
+                        } catch (e: any) {
+                          Alert.alert("Error", e?.response?.data?.message || "Please try again.");
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+            >
+              <Ionicons
+                name={isFrozen ? "lock-open-outline" : "lock-closed-outline"}
+                size={18}
+                color={isFrozen ? "#4caf50" : "#e53935"}
+              />
+              <Text style={[styles.topBarBtnText, { color: isFrozen ? "#4caf50" : "#e53935" }]}>
+                {isFrozen ? "Unfreeze" : "Freeze"}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
           <TouchableOpacity
             style={styles.topBarBtn}
             onPress={() => {
@@ -673,6 +828,7 @@ navigation.goBack();
           </TouchableOpacity>
         </View>
 
+
         {searchActive ? (
           <TextInput
             style={styles.messageSearchInput}
@@ -689,6 +845,17 @@ navigation.goBack();
           <View style={styles.anonBanner}>
             <Text style={styles.anonBannerText}>
               Messages here are anonymous. Be respectful.
+            </Text>
+          </View>
+        ) : null}
+
+        {isFrozen ? (
+          <View style={styles.frozenBanner}>
+            <Ionicons name="lock-closed" size={14} color="#fff" />
+            <Text style={styles.frozenBannerText}>
+              {user?.role === "ADMIN"
+                ? "Chat is frozen — only you can send messages."
+                : "Chat is frozen by admin. No new messages allowed."}
             </Text>
           </View>
         ) : null}
@@ -737,40 +904,26 @@ navigation.goBack();
     </View>
   );
 }
-                const mine = item.senderId === user?.id;
+                const mine = !isAnonymousRoom && item.senderId === user?.id;
+                const isGroupOrMatch = room.type === "GROUP" || room.type === "MATCH" || room.type === "EVENT";
 
                 return (
                   <TouchableOpacity
-                    activeOpacity={mine ? 0.7 : 1}
+                    activeOpacity={0.8}
                     onLongPress={() => {
-  if (!mine) return;
-  Alert.alert(
-    "Delete message",
-    "Remove this message?",
-    [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            // ✅ Call backend to permanently delete
-            await deleteChatMessage(room.id, item.id);
-            // Remove from local state after backend confirms
-            setMessages((cur) =>
-              cur.filter((m) => m.id !== item.id)
-            );
-          } catch (deleteError: any) {
-            Alert.alert(
-              "Could not delete",
-              deleteError?.response?.data?.message || "Please try again."
-            );
-          }
-        },
-      },
-    ]
-  );
-}}
+                      setReactionPickerMsgId(null);
+                      setMsgActionItem(item);
+                    }}
+                    onPress={() => {
+                      if (reactionPickerMsgId !== null) {
+                        setReactionPickerMsgId(null);
+                        return;
+                      }
+                      // Group/match/event: tap other's message → action sheet
+                      if (isGroupOrMatch && !isAnonymousRoom && !mine) {
+                        setMsgActionItem(item);
+                      }
+                    }}
                     style={[
                       styles.messageRow,
                       mine ? styles.messageRowMine : styles.messageRowOther,
@@ -781,6 +934,18 @@ navigation.goBack();
                     >
                       {!mine ? (
                         <Text style={styles.sender}>{item.senderName}</Text>
+                      ) : null}
+
+                      {/* Reply quote */}
+                      {item.replyToMessageId ? (
+                        <View style={[styles.replyQuote, mine && styles.replyQuoteMine]}>
+                          <Text style={styles.replyQuoteSender} numberOfLines={1}>
+                            {item.replySenderName ?? "Unknown"}
+                          </Text>
+                          <Text style={styles.replyQuoteText} numberOfLines={2}>
+                            {item.replyPreview ?? ""}
+                          </Text>
+                        </View>
                       ) : null}
 
                       <Text style={[styles.content, mine && styles.mineText]}>
@@ -794,12 +959,115 @@ navigation.goBack();
                         })}
                       </Text>
                     </View>
+
+                    {/* Emoji picker — appears below bubble on long press */}
+                    {reactionPickerMsgId === item.id ? (
+                      <View style={[styles.emojiPicker, mine ? { alignSelf: "flex-end" } : { alignSelf: "flex-start" }]}>
+                        {EMOJIS.map((emoji) => (
+                          <TouchableOpacity
+                            key={emoji}
+                            style={styles.emojiBtn}
+                            onPress={async () => {
+                              setReactionPickerMsgId(null);
+                              try {
+                                const updated = await toggleReaction(room.id, item.id, emoji);
+                                // Immediately update bubble without waiting for WebSocket round-trip
+                                setMessages((cur) =>
+                                  cur.map((m) => m.id === updated.id ? updated : m)
+                                );
+                              } catch (e: any) {
+                                Alert.alert("Reaction", e?.response?.data?.message || "Could not save reaction.");
+                              }
+                            }}
+                          >
+                            <Text style={styles.emojiBtnText}>{emoji}</Text>
+                          </TouchableOpacity>
+                        ))}
+                        {/* Delete option for own messages */}
+                        {mine ? (
+                          <TouchableOpacity
+                            style={styles.emojiBtn}
+                            onPress={() => {
+                              setReactionPickerMsgId(null);
+                              Alert.alert("Delete message", "Remove this message?", [
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                  text: "Delete",
+                                  style: "destructive",
+                                  onPress: async () => {
+                                    try {
+                                      await deleteChatMessage(room.id, item.id);
+                                      setMessages((cur) => cur.filter((m) => m.id !== item.id));
+                                    } catch (deleteError: any) {
+                                      Alert.alert("Could not delete", deleteError?.response?.data?.message || "Please try again.");
+                                    }
+                                  },
+                                },
+                              ]);
+                            }}
+                          >
+                            <Text style={styles.emojiBtnText}>🗑️</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    ) : null}
+
+                    {/* Reaction bubbles */}
+                    {item.reactions && item.reactions.length > 0 ? (
+                      <View style={styles.reactionRow}>
+                        {item.reactions.map((r) => {
+                          const iMine = r.reactorNames === null
+                            ? false
+                            : r.reactorNames.includes(user?.fullName ?? "");
+                          return (
+                            <TouchableOpacity
+                              key={r.emoji}
+                              style={[styles.reactionBubble, iMine && styles.reactionBubbleMine]}
+                              onPress={async () => {
+                                try {
+                                  const updated = await toggleReaction(room.id, item.id, r.emoji);
+                                  setMessages((cur) =>
+                                    cur.map((m) => m.id === updated.id ? updated : m)
+                                  );
+                                } catch (e: any) {
+                                  Alert.alert("Reaction", e?.response?.data?.message || "Could not save reaction.");
+                                }
+                              }}
+                              onLongPress={() => {
+                                setReactionViewerTab("all");
+                                setReactionViewerMsg(item);
+                              }}
+                            >
+                              <Text style={styles.reactionEmoji}>{r.emoji}</Text>
+                              <Text style={styles.reactionCount}>{r.count}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    ) : null}
                   </TouchableOpacity>
                 );
               }}
             />
           )}
         </View>
+
+        {/* Reply preview bar — shown when user is replying to a message */}
+        {replyingTo ? (
+          <View style={styles.replyBar}>
+            <View style={styles.replyBarContent}>
+              <Text style={styles.replyBarSender} numberOfLines={1}>
+                Replying to {replyingTo.replySenderName ?? replyingTo.senderName}
+              </Text>
+              <Text style={styles.replyBarText} numberOfLines={1}>
+                {replyingTo.content}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.replyBarClose} onPress={() => setReplyingTo(null)}>
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View
           style={[
@@ -815,20 +1083,21 @@ navigation.goBack();
           <TextInput
             value={draft}
             onChangeText={setDraft}
-            placeholder="Message"
+            placeholder={isFrozen && user?.role !== "ADMIN" ? "Chat is frozen…" : "Message"}
             multiline
             maxLength={2000}
-            style={styles.input}
+            style={[styles.input, isFrozen && user?.role !== "ADMIN" && { color: "#aaa" }]}
             textAlignVertical="center"
+            editable={!(isFrozen && user?.role !== "ADMIN")}
           />
 
           <TouchableOpacity
             accessibilityLabel="Send message"
-            disabled={!draft.trim() || sending}
+            disabled={!draft.trim() || sending || (isFrozen && user?.role !== "ADMIN")}
             onPress={() => void send()}
             style={[
               styles.send,
-              (!draft.trim() || sending) && styles.sendDisabled,
+              (!draft.trim() || sending || (isFrozen && user?.role !== "ADMIN")) && styles.sendDisabled,
             ]}
           >
             {sending ? (
@@ -994,7 +1263,234 @@ navigation.goBack();
     </View>
   </View>
 </Modal>
+        {/* Reaction viewer — WhatsApp-style bottom sheet */}
+        <Modal
+          visible={reactionViewerMsg !== null}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setReactionViewerMsg(null)}
+        >
+          <View style={styles.rxOverlay}>
+            <View style={styles.rxSheet}>
+              {/* Header */}
+              <View style={styles.rxHeader}>
+                <Text style={styles.rxHeaderTitle}>Reactions</Text>
+                <TouchableOpacity onPress={() => setReactionViewerMsg(null)}>
+                  <Ionicons name="close" size={22} color="#333" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Emoji tabs */}
+              <View style={styles.rxTabs}>
+                <TouchableOpacity
+                  style={[styles.rxTab, reactionViewerTab === "all" && styles.rxTabActive]}
+                  onPress={() => setReactionViewerTab("all")}
+                >
+                  <Text style={[styles.rxTabText, reactionViewerTab === "all" && styles.rxTabTextActive]}>
+                    {"All "}
+                    {(reactionViewerMsg?.reactions ?? []).reduce((s, r) => s + r.count, 0)}
+                  </Text>
+                </TouchableOpacity>
+                {(reactionViewerMsg?.reactions ?? []).map((r) => (
+                  <TouchableOpacity
+                    key={r.emoji}
+                    style={[styles.rxTab, reactionViewerTab === r.emoji && styles.rxTabActive]}
+                    onPress={() => setReactionViewerTab(r.emoji)}
+                  >
+                    <Text style={[styles.rxTabText, reactionViewerTab === r.emoji && styles.rxTabTextActive]}>
+                      {r.emoji} {r.count}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Reactor list */}
+              {(() => {
+                const allReactions = reactionViewerMsg?.reactions ?? [];
+                const selected = reactionViewerTab === "all"
+                  ? allReactions
+                  : allReactions.filter((r) => r.emoji === reactionViewerTab);
+                const isAnonymous = selected.some((r) => r.reactorNames === null);
+
+                if (isAnonymous) {
+                  return (
+                    <View style={styles.rxAnon}>
+                      <Ionicons name="lock-closed" size={30} color="#ccc" />
+                      <Text style={styles.rxAnonText}>Reactions are private in anonymous chat</Text>
+                      {selected.map((r) => (
+                        <Text key={r.emoji} style={styles.rxAnonCount}>
+                          {r.emoji}{"  "}{r.count}
+                        </Text>
+                      ))}
+                    </View>
+                  );
+                }
+
+                type RxRow = { emoji: string; name: string };
+                const rows: RxRow[] = [];
+                selected.forEach((r) =>
+                  (r.reactorNames ?? []).forEach((name) =>
+                    rows.push({ emoji: r.emoji, name })
+                  )
+                );
+
+                return (
+                  <FlatList
+                    data={rows}
+                    keyExtractor={(_, i) => String(i)}
+                    contentContainerStyle={styles.rxList}
+                    renderItem={({ item: row }) => (
+                      <View style={styles.rxRow}>
+                        <View style={styles.rxAvatar}>
+                          <Text style={styles.rxAvatarText}>
+                            {row.name.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <Text style={styles.rxName}>{row.name}</Text>
+                        {reactionViewerTab === "all" && (
+                          <Text style={styles.rxRowEmoji}>{row.emoji}</Text>
+                        )}
+                      </View>
+                    )}
+                  />
+                );
+              })()}
+            </View>
+          </View>
+        </Modal>
+
       </KeyboardAvoidingView>
+
+      {/* Message action bottom sheet */}
+      {msgActionItem !== null ? (
+        <Modal visible transparent animationType="slide" onRequestClose={() => setMsgActionItem(null)}>
+          <TouchableOpacity
+            style={styles.actionSheetOverlay}
+            activeOpacity={1}
+            onPress={() => setMsgActionItem(null)}
+          />
+          <View style={styles.actionSheet}>
+            <View style={styles.actionSheetHandle} />
+
+            {/* Reply — available in all room types */}
+            <TouchableOpacity
+              style={styles.actionSheetItem}
+              onPress={() => {
+                setReplyingTo(msgActionItem);
+                setMsgActionItem(null);
+              }}
+            >
+              <Ionicons name="return-down-back-outline" size={22} color="#4B1D6B" />
+              <Text style={styles.actionSheetItemText}>Reply</Text>
+            </TouchableOpacity>
+
+            {/* Emoji reactions — shown via picker shortcut */}
+            <TouchableOpacity
+              style={styles.actionSheetItem}
+              onPress={() => {
+                setReactionPickerMsgId(msgActionItem.id);
+                setMsgActionItem(null);
+              }}
+            >
+              <Ionicons name="happy-outline" size={22} color="#4B1D6B" />
+              <Text style={styles.actionSheetItemText}>React</Text>
+            </TouchableOpacity>
+
+            {/* Message Privately — group/match/event non-anonymous only, other member */}
+            {!isAnonymousRoom &&
+              (room.type === "GROUP" || room.type === "MATCH" || room.type === "EVENT") &&
+              msgActionItem.senderId !== user?.id ? (
+              <TouchableOpacity
+                style={styles.actionSheetItem}
+                onPress={async () => {
+                  setMsgActionItem(null);
+                  try {
+                    const directRoom = await createDirectChat(msgActionItem.senderId!);
+                    navigation.navigate("ChatRoom", { room: directRoom });
+                  } catch (e: any) {
+                    Alert.alert("Could not open chat", e?.response?.data?.message || "Please try again.");
+                  }
+                }}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={22} color="#4B1D6B" />
+                <Text style={styles.actionSheetItemText}>Message Privately</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {/* View Profile — non-anonymous only, other member */}
+            {!isAnonymousRoom && msgActionItem.senderId !== user?.id ? (
+              <TouchableOpacity
+                style={styles.actionSheetItem}
+                onPress={() => {
+                  setMsgActionItem(null);
+                  navigation.navigate("MemberProfile", { userId: msgActionItem.senderId });
+                }}
+              >
+                <Ionicons name="person-outline" size={22} color="#4B1D6B" />
+                <Text style={styles.actionSheetItemText}>View Profile</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {/* Report — anonymous rooms only */}
+            {isAnonymousRoom ? (
+              <TouchableOpacity
+                style={styles.actionSheetItem}
+                onPress={() => {
+                  const id = msgActionItem.id;
+                  setMsgActionItem(null);
+                  Alert.alert("Report Message", "Report this message for admin review?", [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Report",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          await reportMessage(room.id, id);
+                          Alert.alert("Reported", "This message has been reported for admin review.");
+                        } catch (e: any) {
+                          Alert.alert("Could not report", e?.response?.data?.message || "Please try again.");
+                        }
+                      },
+                    },
+                  ]);
+                }}
+              >
+                <Ionicons name="flag-outline" size={22} color="#e53935" />
+                <Text style={[styles.actionSheetItemText, styles.actionSheetItemDanger]}>Report</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {/* Delete — own messages only */}
+            {msgActionItem.senderId === user?.id && !isAnonymousRoom ? (
+              <TouchableOpacity
+                style={styles.actionSheetItem}
+                onPress={() => {
+                  const id = msgActionItem.id;
+                  setMsgActionItem(null);
+                  Alert.alert("Delete message", "Remove this message?", [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          await deleteChatMessage(room.id, id);
+                          setMessages((cur) => cur.filter((m) => m.id !== id));
+                        } catch (deleteError: any) {
+                          Alert.alert("Could not delete", deleteError?.response?.data?.message || "Please try again.");
+                        }
+                      },
+                    },
+                  ]);
+                }}
+              >
+                <Ionicons name="trash-outline" size={22} color="#e53935" />
+                <Text style={[styles.actionSheetItemText, styles.actionSheetItemDanger]}>Delete</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </Modal>
+      ) : null}
     </SafeAreaView>
   );
 };
@@ -1410,5 +1906,325 @@ anonBannerText: {
   fontSize: 12,
   fontWeight: "600",
   textAlign: "center",
+},
+
+frozenBanner: {
+  backgroundColor: "#b71c1c",
+  paddingHorizontal: 16,
+  paddingVertical: 7,
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+},
+
+frozenBannerText: {
+  color: "#fff",
+  fontSize: 12,
+  fontWeight: "700",
+  textAlign: "center",
+  flexShrink: 1,
+},
+
+reactionRow: {
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 4,
+  marginTop: 4,
+  marginHorizontal: 4,
+},
+
+reactionBubble: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#f0ebf8",
+  borderRadius: 12,
+  paddingHorizontal: 8,
+  paddingVertical: 3,
+  gap: 3,
+  borderWidth: 1,
+  borderColor: "#d5c9e0",
+},
+
+reactionBubbleMine: {
+  backgroundColor: "#e8d5f5",
+  borderColor: "#9b59b6",
+},
+
+reactionEmoji: {
+  fontSize: 14,
+},
+
+reactionCount: {
+  fontSize: 12,
+  color: "#4B1D6B",
+  fontWeight: "600",
+},
+
+emojiPicker: {
+  flexDirection: "row",
+  backgroundColor: "#fff",
+  borderRadius: 24,
+  paddingHorizontal: 8,
+  paddingVertical: 6,
+  gap: 4,
+  elevation: 6,
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.15,
+  shadowRadius: 6,
+  borderWidth: 1,
+  borderColor: "#e8e0f0",
+  marginTop: 4,
+  alignSelf: "flex-start",
+},
+
+emojiBtn: {
+  padding: 4,
+},
+
+emojiBtnText: {
+  fontSize: 22,
+},
+
+// Reaction viewer modal
+rxOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.45)",
+  justifyContent: "flex-end",
+},
+rxSheet: {
+  backgroundColor: "#fff",
+  borderTopLeftRadius: 18,
+  borderTopRightRadius: 18,
+  maxHeight: "60%",
+  paddingBottom: 24,
+},
+rxHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingHorizontal: 18,
+  paddingVertical: 14,
+  borderBottomWidth: StyleSheet.hairlineWidth,
+  borderBottomColor: "#e0e0e0",
+},
+rxHeaderTitle: {
+  fontSize: 16,
+  fontWeight: "700",
+  color: "#222",
+},
+rxTabs: {
+  flexDirection: "row",
+  paddingHorizontal: 14,
+  paddingVertical: 8,
+  gap: 8,
+  borderBottomWidth: StyleSheet.hairlineWidth,
+  borderBottomColor: "#e0e0e0",
+},
+rxTab: {
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 20,
+  backgroundColor: "#f3f3f3",
+},
+rxTabActive: {
+  backgroundColor: "#4B1D6B",
+},
+rxTabText: {
+  fontSize: 14,
+  color: "#555",
+  fontWeight: "600",
+},
+rxTabTextActive: {
+  color: "#fff",
+},
+rxList: {
+  paddingHorizontal: 18,
+  paddingTop: 6,
+},
+rxRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingVertical: 10,
+  gap: 12,
+},
+rxAvatar: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: "#4B1D6B",
+  alignItems: "center",
+  justifyContent: "center",
+},
+rxAvatarText: {
+  color: "#fff",
+  fontWeight: "700",
+  fontSize: 16,
+},
+rxName: {
+  flex: 1,
+  fontSize: 15,
+  color: "#222",
+},
+rxRowEmoji: {
+  fontSize: 20,
+},
+rxAnon: {
+  alignItems: "center",
+  paddingVertical: 32,
+  gap: 10,
+},
+rxAnonText: {
+  color: "#999",
+  fontSize: 14,
+  textAlign: "center",
+  paddingHorizontal: 24,
+},
+rxAnonCount: {
+  fontSize: 18,
+  color: "#555",
+},
+// Reply quote shown inside a message bubble
+replyQuote: {
+  backgroundColor: "rgba(0,0,0,0.12)",
+  borderLeftWidth: 3,
+  borderLeftColor: "#da9306",
+  borderRadius: 6,
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  marginBottom: 6,
+},
+replyQuoteMine: {
+  backgroundColor: "rgba(255,255,255,0.18)",
+},
+replyQuoteSender: {
+  color: "#da9306",
+  fontSize: 11,
+  fontWeight: "700",
+  marginBottom: 1,
+},
+replyQuoteText: {
+  color: "#e0d6f0",
+  fontSize: 12,
+},
+// Reply preview bar above the composer
+replyBar: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#f3f0f8",
+  borderTopWidth: 1,
+  borderTopColor: "#ddd",
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  gap: 8,
+},
+replyBarContent: {
+  flex: 1,
+},
+replyBarSender: {
+  color: "#4B1D6B",
+  fontWeight: "700",
+  fontSize: 12,
+},
+replyBarText: {
+  color: "#555",
+  fontSize: 12,
+},
+replyBarClose: {
+  padding: 4,
+},
+// Message action bottom sheet
+actionSheet: {
+  position: "absolute",
+  bottom: 0,
+  left: 0,
+  right: 0,
+  backgroundColor: "#fff",
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  paddingBottom: 30,
+  paddingTop: 12,
+  elevation: 20,
+  shadowColor: "#000",
+  shadowOpacity: 0.2,
+  shadowRadius: 12,
+},
+actionSheetOverlay: {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.4)",
+},
+actionSheetHandle: {
+  width: 36,
+  height: 4,
+  backgroundColor: "#ddd",
+  borderRadius: 2,
+  alignSelf: "center",
+  marginBottom: 16,
+},
+actionSheetItem: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: 20,
+  paddingVertical: 14,
+  gap: 14,
+},
+actionSheetItemText: {
+  fontSize: 16,
+  color: "#111",
+},
+actionSheetItemDanger: {
+  color: "#e53935",
+},
+// Direct chat header strip
+directHeader: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  backgroundColor: "#f3f0f8",
+  borderBottomWidth: StyleSheet.hairlineWidth,
+  borderBottomColor: "#d1c4e9",
+  gap: 8,
+},
+directHeaderLeft: {
+  flex: 1,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 10,
+},
+directHeaderAvatar: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: "#da9306",
+  alignItems: "center",
+  justifyContent: "center",
+},
+directHeaderAvatarText: {
+  color: "#fff",
+  fontWeight: "800",
+  fontSize: 16,
+},
+directHeaderName: {
+  color: "#2b0540",
+  fontWeight: "700",
+  fontSize: 15,
+},
+directHeaderNickname: {
+  color: "#7a5c9a",
+  fontSize: 12,
+},
+directHeaderIcons: {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 2,
+},
+directHeaderIconBtn: {
+  padding: 8,
 },
 });

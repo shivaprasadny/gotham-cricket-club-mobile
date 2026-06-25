@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,10 +23,12 @@ type Props = {
 type MemberProfile = {
   userId: number;
   fullName?: string;
-  email?: string;
+  email?: string;       // null when showEmail is false (backend omits it)
   role?: string;
   nickname?: string;
-  phone?: string;
+  countryCode?: string; // null when showPhone is false
+  phone?: string;       // null when showPhone is false
+  showWhatsApp?: boolean;
   battingStyle?: string;
   bowlingStyle?: string;
   playerType?: string;
@@ -92,6 +95,25 @@ const MemberProfileScreen = ({ route, navigation }: Props) => {
     );
   }
 
+  const fullPhone = profile
+    ? `${profile.countryCode ?? ""}${profile.phone ?? ""}`.trim()
+    : "";
+
+  // Treat undefined/null showWhatsApp as true (default visible)
+  const whatsAppVisible = profile ? profile.showWhatsApp !== false : false;
+
+  const openWhatsApp = async () => {
+    const digits = fullPhone.replace(/\D/g, "");
+    // Use wa.me link — works even when canOpenURL returns false on iOS
+    // due to missing LSApplicationQueriesSchemes in older builds.
+    const url = `https://wa.me/${digits}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert("Cannot open WhatsApp", "Make sure WhatsApp is installed and try again.");
+    }
+  };
+
   const openDirectMessage = async () => {
     if (openingChat) return;
     setOpeningChat(true);
@@ -140,11 +162,76 @@ const MemberProfileScreen = ({ route, navigation }: Props) => {
         ) : null}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Contact</Text>
-        <InfoRow label="Email" value={profile.email} />
-        <InfoRow label="Phone" value={profile.phone} />
-      </View>
+      {/* Contact section — rows hidden when backend omits data (privacy off) */}
+      {(profile.email || profile.phone) ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Contact</Text>
+
+          {profile.email ? (
+            <TouchableOpacity
+              style={styles.contactRow}
+              onPress={() => void Linking.openURL(`mailto:${profile.email}`)}
+            >
+              <View style={[styles.contactIcon, { backgroundColor: "#f0e6fa" }]}>
+                <Ionicons name="mail-outline" size={20} color="#2b0540" />
+              </View>
+              <View style={styles.contactRowText}>
+                <Text style={styles.contactRowLabel}>Email</Text>
+                <Text style={styles.contactRowValue}>{profile.email}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#bbb" />
+            </TouchableOpacity>
+          ) : null}
+
+          {profile.phone ? (
+            <TouchableOpacity
+              style={styles.contactRow}
+              onPress={() => void Linking.openURL(`tel:${fullPhone}`)}
+            >
+              <View style={[styles.contactIcon, { backgroundColor: "#e6f0fa" }]}>
+                <Ionicons name="call-outline" size={20} color="#1565c0" />
+              </View>
+              <View style={styles.contactRowText}>
+                <Text style={styles.contactRowLabel}>Phone</Text>
+                <Text style={styles.contactRowValue}>{fullPhone}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#bbb" />
+            </TouchableOpacity>
+          ) : null}
+
+          {profile.phone ? (
+            <TouchableOpacity
+              style={styles.contactRow}
+              onPress={() => void Linking.openURL(`sms:${fullPhone}`)}
+            >
+              <View style={[styles.contactIcon, { backgroundColor: "#e6faf0" }]}>
+                <Ionicons name="chatbubble-outline" size={20} color="#2e7d32" />
+              </View>
+              <View style={styles.contactRowText}>
+                <Text style={styles.contactRowLabel}>SMS</Text>
+                <Text style={styles.contactRowValue}>{fullPhone}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#bbb" />
+            </TouchableOpacity>
+          ) : null}
+
+          {profile.phone && whatsAppVisible ? (
+            <TouchableOpacity
+              style={[styles.contactRow, { borderBottomWidth: 0 }]}
+              onPress={() => void openWhatsApp()}
+            >
+              <View style={[styles.contactIcon, { backgroundColor: "#e6fae6" }]}>
+                <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+              </View>
+              <View style={styles.contactRowText}>
+                <Text style={styles.contactRowLabel}>WhatsApp</Text>
+                <Text style={styles.contactRowValue}>Chat on WhatsApp</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#bbb" />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Cricket Profile</Text>
@@ -277,5 +364,36 @@ const styles = StyleSheet.create({
   statsButtonText: {
     color: "#2b0540",
     fontWeight: "900",
+  },
+  contactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#e5e7eb",
+    gap: 12,
+  },
+  contactIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  contactRowText: {
+    flex: 1,
+  },
+  contactRowLabel: {
+    color: "#6b7280",
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  contactRowValue: {
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

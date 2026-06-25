@@ -6,9 +6,9 @@
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "notification": {
-  "icon": "./assets/icon.png",
-  "color": "#da9306"
-},
+      "icon": "./assets/icon.png",
+      "color": "#da9306"
+    },
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -18,43 +18,56 @@
     },
     "ios": {
       "buildNumber": "5",
-  "supportsTablet": true,
-  "bundleIdentifier": "com.shivaprasadnyc.gothamcricketmobile",
-  "infoPlist": {
-    "ITSAppUsesNonExemptEncryption": false,
-    "NSAppTransportSecurity": {
-      "NSAllowsArbitraryLoads": true
-    }
-  }
-},
-   "android": {
-  "usesCleartextTraffic": true,
-  "googleServicesFile": "./google-services.json",
-  "softwareKeyboardLayoutMode": "resize",
-  "adaptiveIcon": {
-    "foregroundImage": "./assets/logo.png",
-    "backgroundColor": "#ffffff"
-  },
-  "edgeToEdgeEnabled": true,
-  "predictiveBackGestureEnabled": false,
-  "package": "com.shivaprasadnyc.gothamcricketmobile"
-},
+      "supportsTablet": true,
+      "bundleIdentifier": "com.shivaprasadnyc.gothamcricketmobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSFaceIDUsageDescription": "Allow Gotham Cricket to use Face ID for secure login",
+        "LSApplicationQueriesSchemes": ["whatsapp", "tel", "sms", "mailto"],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
+    "android": {
+      "usesCleartextTraffic": true,
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.shivaprasadnyc.gothamcricketmobile",
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
+      ]
+    },
     "web": {
       "favicon": "./assets/logo.png"
     },
     "plugins": [
-  "@react-native-community/datetimepicker",
-  "expo-notifications",
-  [
-    "expo-build-properties",
-    {
-      "android": {
-        "usesCleartextTraffic": true,
-         "softwareKeyboardLayoutMode": "resize"
-      }
-    }
-  ]
-],
+      "@react-native-community/datetimepicker",
+      "expo-notifications",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true,
+            "softwareKeyboardLayoutMode": "resize"
+          }
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Gotham Cricket to use Face ID for secure login"
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "cc31b874-cd6f-4142-93e6-519164925364"

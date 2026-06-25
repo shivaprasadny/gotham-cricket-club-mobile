@@ -37,6 +37,8 @@ const ForgotPasswordScreen = ({ navigation }: Props) => {
   // =========================
   const [sendingCode, setSendingCode] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // =========================
   // SEND RESET CODE
@@ -194,33 +196,43 @@ const handleResetPassword = async () => {
               autoCorrect={false}
             />
 
-            {/* New password input */}
-            <TextInput
-              style={styles.input}
-              placeholder="New Password"
-              placeholderTextColor="#7a7a7a"
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="newPassword"
-              autoComplete="new-password"
-            />
+            {/* New password with show/hide toggle */}
+            <View style={styles.passwordRow}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="New Password"
+                placeholderTextColor="#7a7a7a"
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry={!showNewPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="newPassword"
+                autoComplete="new-password"
+              />
+              <TouchableOpacity onPress={() => setShowNewPassword((v) => !v)}>
+                <Text style={styles.showText}>{showNewPassword ? "Hide" : "Show"}</Text>
+              </TouchableOpacity>
+            </View>
 
-            {/* Confirm password input */}
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm Password"
-              placeholderTextColor="#7a7a7a"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="newPassword"
-              autoComplete="new-password"
-            />
+            {/* Confirm password with show/hide toggle */}
+            <View style={styles.passwordRow}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Confirm Password"
+                placeholderTextColor="#7a7a7a"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="newPassword"
+                autoComplete="new-password"
+              />
+              <TouchableOpacity onPress={() => setShowConfirmPassword((v) => !v)}>
+                <Text style={styles.showText}>{showConfirmPassword ? "Hide" : "Show"}</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Reset password button */}
             <TouchableOpacity
@@ -313,6 +325,30 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#111",
     backgroundColor: "#fafafa",
+  },
+
+  passwordRow: {
+    borderWidth: 1,
+    borderColor: "#d9d2e1",
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: "#fafafa",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+  },
+
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#111",
+  },
+
+  showText: {
+    color: "#2b0540",
+    fontWeight: "700",
+    paddingLeft: 8,
   },
 
   // Primary reset button

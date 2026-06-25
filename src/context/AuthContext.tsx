@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { logger } from "../utils/logger";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
@@ -8,6 +8,7 @@ import {
   savePushTokenToBackend,
 } from "../services/pushNotificationService";
 import { setSessionExpiredHandler } from "../api/axiosConfig";
+import { loginUser } from "../services/authService";
 
 type UserType = {
   id: number;
@@ -66,8 +67,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     // ✅ Clear all local storage
-    await AsyncStorage.removeItem("token");
-    await AsyncStorage.removeItem("user");
+    await SecureStore.deleteItemAsync("token").catch(() => {});
+    await SecureStore.deleteItemAsync("user").catch(() => {});
 
     // ✅ Clear state — app will redirect to login automatically
     // because your navigation already checks user === null
@@ -95,8 +96,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
    */
   const loadUserFromStorage = async (): Promise<boolean> => {
     try {
-      const storedToken = await AsyncStorage.getItem("token");
-      const storedUser = await AsyncStorage.getItem("user");
+      const storedToken = await SecureStore.getItemAsync("token");
+      const storedUser = await SecureStore.getItemAsync("user");
 
       if (storedToken && storedUser) {
         setToken(storedToken);
@@ -124,8 +125,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setToken(newToken);
     setUser(newUser);
 
-    await AsyncStorage.setItem("token", newToken);
-    await AsyncStorage.setItem("user", JSON.stringify(newUser));
+    await SecureStore.setItemAsync("token", newToken);
+    await SecureStore.setItemAsync("user", JSON.stringify(newUser));
   } catch (error) {
     logger.error("Error saving auth data:", error);
     return;
@@ -173,35 +174,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: "Login with Face ID / Fingerprint",
+        promptMessage: "Sign in to Gotham Cricket",
         fallbackLabel: "Use Password",
         disableDeviceFallback: false,
       });
 
       if (!result.success) {
+        return { success: false, message: "Biometric authentication failed" };
+      }
+
+      // Retrieve stored credentials and get a fresh JWT from the server
+      const savedEmail = await SecureStore.getItemAsync("bio_email");
+      const savedPassword = await SecureStore.getItemAsync("bio_password");
+
+      if (!savedEmail || !savedPassword) {
         return {
           success: false,
-          message: "Biometric authentication failed",
+          message: "No saved login found. Please login with password first.",
         };
       }
 
-   const loaded = await loadUserFromStorage();
+      const response = await loginUser(savedEmail, savedPassword);
 
-if (!loaded) {
-  return {
-    success: false,
-    message: "No saved login found. Please login with password first.",
-  };
-}
+      await login(response.token, {
+        id: response.id,
+        fullName: response.fullName,
+        email: response.email,
+        role: response.role,
+        status: response.status,
+      });
 
-// optional: save push token again
-const pushToken = await registerForPushNotificationsAsync();
-
-if (pushToken) {
-  await savePushTokenToBackend(pushToken);
-}
-
-return { success: true };
+      return { success: true };
     } catch (error) {
       logger.error("BIOMETRIC ERROR:", error);
       return {
@@ -225,8 +228,12 @@ return { success: true };
       setToken(null);
       setUser(null);
 
-      await AsyncStorage.removeItem("token");
-      await AsyncStorage.removeItem("user");
+      await SecureStore.deleteItemAsync("token").catch(() => {});
+      await SecureStore.deleteItemAsync("user").catch(() => {});
+
+      // Clear saved biometric credentials — next session requires password
+      await SecureStore.deleteItemAsync("bio_email").catch(() => {});
+      await SecureStore.deleteItemAsync("bio_password").catch(() => {});
     } catch (error) {
       logger.error("Error clearing auth data:", error);
     }

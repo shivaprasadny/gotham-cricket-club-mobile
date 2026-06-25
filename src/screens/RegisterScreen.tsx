@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { registerUser } from "../services/authService";
+import CountryCodePicker from "../components/CountryCodePicker";
 
 type Props = {
   navigation: any;
@@ -36,6 +37,7 @@ const RegisterScreen = ({ navigation }: Props) => {
   const [dobYear, setDobYear] = useState(2000);
 
   const [email, setEmail] = useState("");
+  const [countryCode, setCountryCode] = useState("+1");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -46,6 +48,8 @@ const RegisterScreen = ({ navigation }: Props) => {
   const [jerseyNumber, setJerseyNumber] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // =========================
   // DOB OPTIONS
@@ -113,6 +117,11 @@ const handleRegister = async () => {
   try {
     setSubmitting(true);
 
+    // If phone is entered, country code is required
+    if (phone.trim() && !countryCode) {
+      return Alert.alert("Error", "Select a country code for your phone number");
+    }
+
     // Prepare payload for backend
     const payload = {
       firstName: firstName.trim(),
@@ -121,7 +130,8 @@ const handleRegister = async () => {
       dateOfBirth: dateOfBirth || null,
       gender,
       email: email.trim(),
-      phone: phone.trim(),
+      countryCode: phone.trim() ? countryCode : null,
+      phone: phone.trim() || null,
       password: password.trim(),
       battingStyle: battingStyle.trim(),
       bowlingStyle: bowlingStyle.trim(),
@@ -236,36 +246,52 @@ const handleRegister = async () => {
             autoCorrect={false}
           />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Phone"
-            placeholderTextColor="#7a7a7a"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
+          {/* Country code + phone number row */}
+          <View style={styles.phoneRow}>
+            <View style={styles.countryCodeBox}>
+              <CountryCodePicker value={countryCode} onChange={setCountryCode} />
+            </View>
+            <TextInput
+              style={styles.phoneInput}
+              placeholder="Phone (optional)"
+              placeholderTextColor="#7a7a7a"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+            />
+          </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#7a7a7a"
-            secureTextEntry
-            value={password}
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={setPassword}
-          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Password"
+              placeholderTextColor="#7a7a7a"
+              secureTextEntry={!showPassword}
+              value={password}
+              autoCapitalize="none"
+              autoCorrect={false}
+              onChangeText={setPassword}
+            />
+            <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
+              <Text style={styles.showText}>{showPassword ? "Hide" : "Show"}</Text>
+            </TouchableOpacity>
+          </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            placeholderTextColor="#7a7a7a"
-            secureTextEntry
-            value={confirmPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={setConfirmPassword}
-          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Confirm Password"
+              placeholderTextColor="#7a7a7a"
+              secureTextEntry={!showConfirmPassword}
+              value={confirmPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              onChangeText={setConfirmPassword}
+            />
+            <TouchableOpacity onPress={() => setShowConfirmPassword((v) => !v)}>
+              <Text style={styles.showText}>{showConfirmPassword ? "Hide" : "Show"}</Text>
+            </TouchableOpacity>
+          </View>
 
           <TextInput
             style={styles.input}
@@ -420,14 +446,38 @@ const styles = StyleSheet.create({
   },
 
   input: {
-  borderWidth: 1,
-  borderColor: "#ddd",
-  padding: 12,
-  borderRadius: 10,
-  marginBottom: 10,
-  color: "#111",
-  backgroundColor: "#fff",
-},
+    borderWidth: 1,
+    borderColor: "#ddd",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+    color: "#111",
+    backgroundColor: "#fff",
+  },
+
+  passwordRow: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+  },
+
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#111",
+  },
+
+  showText: {
+    color: "#2b0540",
+    fontWeight: "700",
+    paddingLeft: 8,
+  },
 
   inputText: {
     color: "#111",
@@ -536,5 +586,30 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     alignItems: "center",
+  },
+  phoneRow: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    marginBottom: 14,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+  countryCodeBox: {
+    width: 130,
+    borderRightWidth: 1,
+    borderRightColor: "#ddd",
+    justifyContent: "center",
+  },
+  countryCodePicker: {
+    color: "#111",
+    height: 50,
+  },
+  phoneInput: {
+    flex: 1,
+    color: "#111",
+    paddingHorizontal: 14,
+    fontSize: 15,
   },
 });
