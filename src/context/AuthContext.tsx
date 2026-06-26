@@ -9,6 +9,7 @@ import {
 } from "../services/pushNotificationService";
 import { setSessionExpiredHandler } from "../api/axiosConfig";
 import { loginUser } from "../services/authService";
+import { chatStompClient } from "../chat/stompClient";
 
 type UserType = {
   id: number;
@@ -66,6 +67,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Non-fatal
     }
 
+    void chatStompClient.disconnect();
+
     // ✅ Clear all local storage
     await SecureStore.deleteItemAsync("token").catch(() => {});
     await SecureStore.deleteItemAsync("user").catch(() => {});
@@ -102,6 +105,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (storedToken && storedUser) {
         setToken(storedToken);
         setUser(JSON.parse(storedUser) as UserType);
+        void chatStompClient.connect(storedToken);
+
+        // Re-register push token on every app start so a fresh install or
+        // new build (which gets a new Expo token) always has the token saved.
+        registerForPushNotificationsAsync()
+          .then((pushToken) => {
+            if (pushToken) return savePushTokenToBackend(pushToken);
+          })
+          .catch(() => {});
+
         return true;
       }
 
@@ -131,6 +144,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     logger.error("Error saving auth data:", error);
     return;
   }
+
+  void chatStompClient.connect(newToken);
 
   // Push token should not break login
   try {
@@ -225,15 +240,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await removeTokenFromBackend(pushToken).catch(() => {});
       }
 
+      void chatStompClient.disconnect();
+
       setToken(null);
       setUser(null);
 
       await SecureStore.deleteItemAsync("token").catch(() => {});
       await SecureStore.deleteItemAsync("user").catch(() => {});
 
-      // Clear saved biometric credentials — next session requires password
-      await SecureStore.deleteItemAsync("bio_email").catch(() => {});
-      await SecureStore.deleteItemAsync("bio_password").catch(() => {});
+      // bio_email and bio_password are intentionally kept so the biometric
+      // button appears on the next login. They are only cleared when the user
+      // explicitly disables biometric from Profile settings.
     } catch (error) {
       logger.error("Error clearing auth data:", error);
     }

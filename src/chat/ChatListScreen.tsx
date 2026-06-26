@@ -105,13 +105,13 @@ const roomListSubscribedRef = useRef(false);
     return;
   }
 
-  let subscription: ReturnType<typeof chatStompClient.subscribeToRoomList> | null =
+  let subscription: ReturnType<typeof chatStompClient.subscribeToUserRoomList> | null =
     null;
 
   try {
     roomListSubscribedRef.current = true;
 
-    subscription = chatStompClient.subscribeToRoomList(() => {
+    subscription = chatStompClient.subscribeToUserRoomList(() => {
       void loadRooms();
     });
   } catch (error) {

@@ -25,12 +25,11 @@
         "NSFaceIDUsageDescription": "Allow Gotham Cricket to use Face ID for secure login",
         "LSApplicationQueriesSchemes": ["whatsapp", "tel", "sms", "mailto"],
         "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true
+          "NSAllowsArbitraryLoads": false
         }
       }
     },
     "android": {
-      "usesCleartextTraffic": true,
       "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
@@ -55,7 +54,7 @@
         "expo-build-properties",
         {
           "android": {
-            "usesCleartextTraffic": true,
+            "usesCleartextTraffic": false,
             "softwareKeyboardLayoutMode": "resize"
           }
         }

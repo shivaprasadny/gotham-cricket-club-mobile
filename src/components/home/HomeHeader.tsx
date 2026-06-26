@@ -6,10 +6,11 @@ type Props = {
   user: any;
   navigation: any;
   unreadCount: number;
+  unreadChatCount: number;
   onOpenMenu: () => void;
 };
 
-const HomeHeader = ({ user, navigation, unreadCount, onOpenMenu }: Props) => {
+const HomeHeader = ({ user, navigation, unreadCount, unreadChatCount, onOpenMenu }: Props) => {
   return (
     <View style={styles.topRow}>
       <View style={{ flex: 1 }}>
@@ -24,7 +25,16 @@ const HomeHeader = ({ user, navigation, unreadCount, onOpenMenu }: Props) => {
           accessibilityLabel="Open chats"
           onPress={() => navigation.navigate("ChatList")}
         >
-          <Ionicons name="chatbubbles-outline" size={24} color="#da9306" />
+          <View>
+            <Ionicons name="chatbubbles-outline" size={24} color="#da9306" />
+            {unreadChatCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>
+                  {unreadChatCount > 9 ? "9+" : unreadChatCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { logger } from "../utils/logger";
 import {
   RefreshControl,
@@ -23,6 +23,8 @@ import {
 } from "../services/notificationService";
 import { getEvents } from "../services/eventService";
 import { getMyFees } from "../services/feeService";
+import { getChatRooms } from "../chat/chatApi";
+import { chatStompClient } from "../chat/stompClient";
 
 // Home components
 import HomeHeader from "../components/home/HomeHeader";
@@ -120,6 +122,42 @@ const HomeScreen = ({ navigation }: Props) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
   const [fees, setFees] = useState<MyFeeItem[]>([]);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const chatRoomSubRef = useRef<{ unsubscribe: () => void } | null>(null);
+
+  // Subscribe to /user/queue/chat/rooms — the backend pushes here (per-member)
+  // whenever a new message is sent to any room the user belongs to.
+  useEffect(() => {
+    const refreshCount = async () => {
+      try {
+        const rooms = await getChatRooms();
+        setUnreadChatCount(
+          Array.isArray(rooms)
+            ? rooms.reduce((sum: number, r: any) => sum + (r.unreadCount || 0), 0)
+            : 0
+        );
+      } catch {}
+    };
+
+    const unsub = chatStompClient.addStatusListener((s) => {
+      if (s === "CONNECTED" && !chatRoomSubRef.current) {
+        try {
+          chatRoomSubRef.current = chatStompClient.subscribeToUserRoomList(() => {
+            void refreshCount();
+          });
+        } catch {}
+      } else if (s !== "CONNECTED") {
+        chatRoomSubRef.current?.unsubscribe();
+        chatRoomSubRef.current = null;
+      }
+    });
+
+    return () => {
+      unsub();
+      chatRoomSubRef.current?.unsubscribe();
+      chatRoomSubRef.current = null;
+    };
+  }, []);
 
   // =========================
   // LOCAL HIDE STATE
@@ -178,23 +216,28 @@ const HomeScreen = ({ navigation }: Props) => {
     return `${totalMinutes}m left`;
   };
 
-  // Current week range: Monday to Sunday
+  // Current week range: Monday to Sunday as YYYY-MM-DD strings.
+  // String comparison avoids iOS (JavaScriptCore) vs Android (V8) timezone
+  // parsing differences when calling new Date() on backend date strings.
   const getWeekRange = () => {
     const now = new Date();
-
-    // JS: Sunday = 0, Monday = 1
-    const day = now.getDay();
+    const day = now.getDay(); // 0=Sun, 1=Mon…
     const diffToMonday = day === 0 ? -6 : 1 - day;
 
-    const start = new Date(now);
-    start.setDate(now.getDate() + diffToMonday);
-    start.setHours(0, 0, 0, 0);
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diffToMonday);
 
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
 
-    return { start, end };
+    const toLocalDateStr = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    };
+
+    return { start: toLocalDateStr(monday), end: toLocalDateStr(sunday) };
   };
 
   // =========================
@@ -219,6 +262,7 @@ const HomeScreen = ({ navigation }: Props) => {
         getNotifications(),
         getEvents(),
         getMyFees(),
+        getChatRooms(),
       ];
 
       // Only Admin needs pending member requests
@@ -246,9 +290,12 @@ const HomeScreen = ({ navigation }: Props) => {
       const feesData =
         results[5].status === "fulfilled" ? results[5].value : [];
 
+      const chatRoomsData =
+        results[6].status === "fulfilled" ? results[6].value : [];
+
       const pendingData =
-        isAdmin && results[6] && results[6].status === "fulfilled"
-          ? results[6].value
+        isAdmin && results[7] && results[7].status === "fulfilled"
+          ? results[7].value
           : [];
 
       // Upcoming matches only
@@ -297,6 +344,11 @@ const HomeScreen = ({ navigation }: Props) => {
       setPendingMembers(Array.isArray(pendingData) ? pendingData : []);
       setUpcomingEvents(upcomingEventList);
       setFees(Array.isArray(feesData) ? feesData : []);
+      setUnreadChatCount(
+        Array.isArray(chatRoomsData)
+          ? chatRoomsData.reduce((sum: number, r: any) => sum + (r.unreadCount || 0), 0)
+          : 0
+      );
         hasLoadedHomeRef.current = true;
       } catch (error) {
         logger.log("HOME LOAD ERROR:", error);
@@ -316,6 +368,25 @@ const HomeScreen = ({ navigation }: Props) => {
   useFocusEffect(
     useCallback(() => {
       void loadHomeData(!hasLoadedHomeRef.current);
+
+      // Poll both badge counts every 10s while the screen is focused.
+      // This works regardless of WebSocket/STOMP connectivity.
+      const pollBadges = async () => {
+        try {
+          const [notifs, rooms] = await Promise.all([
+            getNotifications(),
+            getChatRooms(),
+          ]);
+          if (Array.isArray(notifs)) setNotifications(notifs);
+          if (Array.isArray(rooms)) {
+            setUnreadChatCount(
+              rooms.reduce((sum: number, r: any) => sum + (r.unreadCount || 0), 0)
+            );
+          }
+        } catch {}
+      };
+      const interval = setInterval(() => void pollBadges(), 10000);
+      return () => clearInterval(interval);
     }, [loadHomeData])
   );
 
@@ -342,26 +413,27 @@ const HomeScreen = ({ navigation }: Props) => {
     return notifications.filter((item) => !item.isRead).length;
   }, [notifications]);
 
-  // Matches from Monday to Sunday
+  // All matches this week (Mon–Sun), regardless of availability status
   const weeklyMatches = useMemo(() => {
     const { start, end } = getWeekRange();
-
     return upcomingMatches.filter((match) => {
-      const matchDate = new Date(match.matchDate);
-      return matchDate >= start && matchDate <= end;
+      // Compare only the date portion of the ISO string — avoids iOS/Android
+      // timezone differences when constructing Date objects from backend strings
+      const dateKey = (match.matchDate as string).substring(0, 10);
+      return dateKey >= start && dateKey <= end;
     });
   }, [upcomingMatches]);
 
-  // Weekly matches where user said AVAILABLE only
+  // "This Week Matches" — only games where user said AVAILABLE or MAYBE
   const possibleWeeklyMatches = useMemo(() => {
     return weeklyMatches.filter(
       (match) =>
-        match.myAvailability === "AVAILABLE" &&
-        !dismissedMatchIds.includes(match.id)
+        match.myAvailability === "AVAILABLE" ||
+        match.myAvailability === "MAYBE"
     );
-  }, [weeklyMatches, dismissedMatchIds]);
+  }, [weeklyMatches]);
 
-  // Weekly matches where user has not marked availability yet
+  // "Availability Reminder" — games this week with no response yet (not dismissed)
   const weeklyUnmarkedMatches = useMemo(() => {
     return weeklyMatches.filter(
       (match) => !match.myAvailability && !dismissedMatchIds.includes(match.id)
@@ -403,6 +475,7 @@ const HomeScreen = ({ navigation }: Props) => {
           user={user}
           navigation={navigation}
           unreadCount={unreadNotificationCount}
+          unreadChatCount={unreadChatCount}
           onOpenMenu={() => setMenuVisible(true)}
         />
 
@@ -431,9 +504,9 @@ const HomeScreen = ({ navigation }: Props) => {
               onUpdated={() => loadHomeData(false)}
             />
 
-            {/* Weekly matches where user marked Available */}
+            {/* Matches this week where user is AVAILABLE or MAYBE */}
             <WeeklyMatchesSection
-              matches={possibleWeeklyMatches.slice(0, 3)}
+              matches={possibleWeeklyMatches}
               navigation={navigation}
               getOpponentName={getMatchTitle}
               getMatchCountdown={getCountdownText}

@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
 type Props = {
   matches: any[];
@@ -14,10 +13,21 @@ type Props = {
   getMatchCountdown: (matchDate: string) => string;
 };
 
+type AvailabilityStatus = "AVAILABLE" | "NOT_AVAILABLE" | "MAYBE" | "INJURED" | undefined;
+
+const AVAILABILITY_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
+  AVAILABLE:     { label: "Available",     bg: "#16a34a", color: "#fff" },
+  NOT_AVAILABLE: { label: "Not Available", bg: "#dc2626", color: "#fff" },
+  MAYBE:         { label: "Maybe",         bg: "#d97706", color: "#fff" },
+  INJURED:       { label: "Injured",       bg: "#9333ea", color: "#fff" },
+};
+
+const getAvailabilityConfig = (status: AvailabilityStatus) =>
+  status ? AVAILABILITY_CONFIG[status] : { label: "Mark", bg: "#4b5563", color: "#e5e7eb" };
+
 const WeeklyMatchesSection = ({
   matches,
   navigation,
-  getOpponentName,
   getMatchCountdown,
 }: Props) => {
   if (matches.length === 0) {
@@ -26,98 +36,94 @@ const WeeklyMatchesSection = ({
 
   const getMatchTitle = (match: any) => {
     const home = match.homeTeamName || "Gotham";
-    const opponent =
-      match.awayTeamName ||
-      match.externalOpponentName ||
-      "Opponent";
-
+    const opponent = match.awayTeamName || match.externalOpponentName || "Opponent";
     return `${home} vs ${opponent}`;
-  };
-
-  const getLeagueLabel = (match: any) => {
-    return match.leagueName || "League TBA";
-  };
-
-  const getFormatLabel = (match: any) => {
-    return match.matchFormat || "Match";
   };
 
   const formatDate = (dateString: string) => {
     try {
-      return new Date(dateString).toLocaleString();
+      return new Date(dateString).toLocaleString([], {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
     } catch {
       return dateString;
     }
+  };
+
+  const goToAvailability = (e: any, match: any) => {
+    e.stopPropagation();
+    navigation.navigate("Availability", {
+      matchId: match.id,
+      homeTeamName: match.homeTeamName,
+      awayTeamName: match.awayTeamName,
+      externalOpponentName: match.externalOpponentName,
+      venue: match.venue,
+      matchDate: match.matchDate,
+      homeAway: match.homeAway,
+      matchFormat: match.matchFormat,
+      matchFeeAmount: match.matchFeeAmount,
+      matchFeeDueDate: match.matchFeeDueDate,
+      matchFeeDescription: match.matchFeeDescription,
+      status: match.status,
+    });
   };
 
   return (
     <View style={styles.wrapper}>
       <Text style={styles.sectionTitle}>This Week Matches</Text>
 
-      {matches.map((match) => (
-        <TouchableOpacity
-          key={match.id}
-          style={styles.rowCard}
-          activeOpacity={0.85}
-          onPress={() =>
-            navigation.navigate("MatchDetails", {
-              matchId: match.id,
-            })
-          }
-        >
-          <View style={styles.matchInfo}>
-            <Text style={styles.matchTitle} numberOfLines={1}>
-              {getMatchTitle(match)}
-            </Text>
+      {matches.map((match) => {
+        const avail = getAvailabilityConfig(match.myAvailability);
 
-            <Text style={styles.matchMeta} numberOfLines={1}>
-              {match.homeAway === "AWAY" ? "Away" : "Home"} •{" "}
-              {getLeagueLabel(match)} • {getFormatLabel(match)} •{" "}
-              {formatDate(match.matchDate)}
-            </Text>
+        return (
+          <TouchableOpacity
+            key={match.id}
+            style={styles.rowCard}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate("MatchDetails", { matchId: match.id })}
+          >
+            <View style={styles.matchInfo}>
+              <Text style={styles.matchTitle} numberOfLines={1}>
+                {getMatchTitle(match)}
+              </Text>
 
-            <Text style={styles.matchVenue} numberOfLines={1}>
-              📍 {match.venue || "Venue TBA"}
-            </Text>
-          </View>
+              <Text style={styles.matchMeta} numberOfLines={1}>
+                {match.homeAway === "AWAY" ? "Away" : "Home"} •{" "}
+                {match.leagueName || "League TBA"} •{" "}
+                {match.matchFormat || "Match"}
+              </Text>
 
-          <View style={styles.rightBox}>
-            <Text style={styles.countdownText}>
-              {getMatchCountdown(match.matchDate)}
-            </Text>
+              <Text style={styles.matchDate} numberOfLines={1}>
+                {formatDate(match.matchDate)}
+              </Text>
 
-            <TouchableOpacity
-              style={styles.smallButton}
-              activeOpacity={0.85}
-              onPress={(e) => {
-                e.stopPropagation();
+              <Text style={styles.matchVenue} numberOfLines={1}>
+                📍 {match.venue || "Venue TBA"}
+              </Text>
+            </View>
 
-                navigation.navigate("Availability", {
-                  matchId: match.id,
-                  homeTeamName: match.homeTeamName,
-                  awayTeamName: match.awayTeamName,
-                  externalOpponentName: match.externalOpponentName,
-                  venue: match.venue,
-                  matchDate: match.matchDate,
-                  homeAway: match.homeAway,
-                  matchFormat: match.matchFormat,
-                  matchFeeAmount: match.matchFeeAmount,
-                  matchFeeDueDate: match.matchFeeDueDate,
-                  matchFeeDescription: match.matchFeeDescription,
-                  status: match.status,
-                });
-              }}
-            >
-              <Ionicons
-                name="create-outline"
-                size={14}
-                color="#2b0540"
-              />
-              <Text style={styles.smallButtonText}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      ))}
+            <View style={styles.rightBox}>
+              <Text style={styles.countdownText}>
+                {getMatchCountdown(match.matchDate)}
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.availBadge, { backgroundColor: avail.bg }]}
+                activeOpacity={0.8}
+                onPress={(e) => goToAvailability(e, match)}
+              >
+                <Text style={[styles.availText, { color: avail.color }]}>
+                  {avail.label}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 };
@@ -128,7 +134,6 @@ const styles = StyleSheet.create({
   wrapper: {
     marginBottom: 18,
   },
-
   sectionTitle: {
     color: "#fff",
     fontSize: 20,
@@ -136,7 +141,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 6,
   },
-
   rowCard: {
     backgroundColor: "#3a0a57",
     borderRadius: 16,
@@ -147,56 +151,50 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(218,147,6,0.25)",
   },
-
   matchInfo: {
     flex: 1,
     paddingRight: 10,
   },
-
   matchTitle: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "800",
     marginBottom: 4,
   },
-
   matchMeta: {
     color: "#d1d5db",
-    fontSize: 13,
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  matchDate: {
+    color: "#d1d5db",
+    fontSize: 12,
     marginBottom: 3,
   },
-
   matchVenue: {
     color: "#da9306",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "600",
   },
-
   rightBox: {
     alignItems: "flex-end",
     justifyContent: "center",
+    gap: 8,
   },
-
   countdownText: {
     color: "#da9306",
     fontSize: 12,
     fontWeight: "800",
-    marginBottom: 8,
   },
-
-  smallButton: {
-    backgroundColor: "#da9306",
+  availBadge: {
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    flexDirection: "row",
+    minWidth: 72,
     alignItems: "center",
   },
-
-  smallButtonText: {
-    color: "#2b0540",
-    fontSize: 12,
-    fontWeight: "900",
-    marginLeft: 4,
+  availText: {
+    fontSize: 11,
+    fontWeight: "800",
   },
 });

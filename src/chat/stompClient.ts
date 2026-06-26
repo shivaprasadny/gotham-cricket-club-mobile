@@ -131,6 +131,15 @@ class ChatStompClient {
     );
   }
 
+  // Subscribes to the current user's personal queue for room-list updates.
+  // Backend sends here per-member instead of the shared broadcast topic.
+  subscribeToUserRoomList(onUpdate: () => void): StompSubscription {
+    if (!this.client?.connected) {
+      throw new Error("Chat is not connected");
+    }
+    return this.client.subscribe("/user/queue/chat/rooms", () => onUpdate());
+  }
+
   subscribeToErrors(
     onError: (error: ChatSocketError) => void
   ): StompSubscription {
