@@ -53,8 +53,8 @@ import ChatRoomScreen from "../chat/ChatRoomScreen";
 import MatchSquadHubScreen from "../screens/MatchSquadHubScreen";
 import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
 import ScorecardsScreen from "../screens/ScorecardsScreen";
-
-
+import PollsScreen from "../screens/PollsScreen";
+import CreatePollScreen from "../screens/CreatePollScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -195,6 +195,16 @@ const AppNavigator = ({ onNavigationReady }: Props) => {
             name="NotificationSettings"
             component={NotificationSettingsScreen}
             options={{ title: "Notification Settings" }}
+          />
+          <Stack.Screen
+            name="Polls"
+            component={PollsScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="CreatePoll"
+            component={CreatePollScreen}
+            options={{ title: "Create Poll" }}
           />
         </Stack.Navigator>
       )}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef } from "react";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Notifications from "expo-notifications";
 
 import ErrorBoundary from "./src/components/ErrorBoundary";
@@ -99,10 +100,14 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </ErrorBoundary>
+    // GestureHandlerRootView is required by react-native-gesture-handler v2
+    // for GestureDetector (used in ImageCropModal) to work at runtime
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorBoundary>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }

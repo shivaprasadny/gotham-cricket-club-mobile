@@ -147,6 +147,14 @@ const HomeMenuModal = ({
             <Text style={styles.menuText}>Scorecards</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => goTo("Polls")}
+          >
+            <Ionicons name="checkbox-outline" size={20} color="#da9306" />
+            <Text style={styles.menuText}>Polls</Text>
+          </TouchableOpacity>
+
           {/* Logout button */}
           <TouchableOpacity
             style={styles.logoutItem}

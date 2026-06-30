@@ -28,6 +28,7 @@ import {
   DismissalType,
   FieldingEntryRequest,
   MatchOutcome,
+  OfficialResultType,
   SaveInningsRequest,
   SaveScorecardRequest,
   ScorecardResponse,
@@ -283,6 +284,8 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
       winningMarginRuns: null,
       winningMarginWickets: null,
       resultSummary: "",
+      officialResultType: null,
+      officialResultNotes: "",
       playerOfMatchId: null,
       innings: [
         createInnings(1, ourTeamId, ourTeamName),
@@ -793,7 +796,11 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
   };
 
   const saveDraft = async () => {
-    const calculated = applyCalculatedResult(normalizeEmptyBatters(payload));
+    const normalized = normalizeEmptyBatters(payload);
+    const calculated =
+      normalized.officialResultType && normalized.officialResultType !== "AUTO"
+        ? normalized
+        : applyCalculatedResult(normalized);
     const validation = validateScorecard(calculated);
     if (validation) {
       Alert.alert("Check Scorecard", validation);
@@ -1488,10 +1495,26 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
     );
   };
 
+  const OFFICIAL_RESULT_OPTIONS: { value: OfficialResultType; label: string }[] = [
+    { value: "AUTO", label: "Auto Calculate" },
+    { value: "TIE", label: "Tie" },
+    { value: "DRAW", label: "Draw" },
+    { value: "NO_RESULT", label: "No Result" },
+    { value: "ABANDONED", label: "Abandoned" },
+    { value: "DLS_METHOD", label: "DLS Method" },
+    { value: "SUPER_OVER", label: "Super Over" },
+    { value: "WALKOVER", label: "Walkover" },
+    { value: "FORFEIT", label: "Forfeit" },
+    { value: "SPLIT_POINTS", label: "Split Points" },
+    { value: "CUSTOM", label: "Custom" },
+  ];
+
   const renderReview = () => {
-    const calculated = applyCalculatedResult(payload);
-    const first = calculated.innings[0];
-    const second = calculated.innings[1];
+    const isManual =
+      payload.officialResultType != null && payload.officialResultType !== "AUTO";
+    const displayPayload = isManual ? payload : applyCalculatedResult(payload);
+    const first = displayPayload.innings[0];
+    const second = displayPayload.innings[1];
     return (
       <View style={styles.card}>
         <Text style={styles.stepTitle}>Review and Save</Text>
@@ -1506,13 +1529,174 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
               {first.runs}/{first.wickets} ({legalBallsToOvers(first.legalBalls)})
             </Text>
           </View>
-          <View style={styles.reviewTeamRow}>
-            <Text style={styles.reviewTeam}>{second.battingTeamName}</Text>
-            <Text style={styles.reviewTotal}>
-              {second.runs}/{second.wickets} ({legalBallsToOvers(second.legalBalls)})
-            </Text>
-          </View>
-          <Text style={styles.resultText}>{calculated.resultSummary}</Text>
+          {second ? (
+            <View style={styles.reviewTeamRow}>
+              <Text style={styles.reviewTeam}>{second.battingTeamName}</Text>
+              <Text style={styles.reviewTotal}>
+                {second.runs}/{second.wickets} ({legalBallsToOvers(second.legalBalls)})
+              </Text>
+            </View>
+          ) : null}
+          {!isManual ? (
+            <Text style={styles.resultText}>{displayPayload.resultSummary}</Text>
+          ) : null}
+        </View>
+
+        {/* Official Match Result override */}
+        <View style={styles.officialResultSection}>
+          <Text style={styles.sectionLabel}>Official Match Result</Text>
+          <Text style={styles.officialResultHint}>
+            Use Auto Calculate for normal matches. Select another option only
+            for special situations (DLS, Super Over, Walkover, etc.).
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.officialResultScroll}
+          >
+            {OFFICIAL_RESULT_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[
+                  styles.choice,
+                  (payload.officialResultType ?? "AUTO") === opt.value &&
+                    styles.choiceSelected,
+                ]}
+                onPress={() =>
+                  changePayload((c) => ({
+                    ...c,
+                    officialResultType:
+                      opt.value === "AUTO" ? null : opt.value,
+                  }))
+                }
+              >
+                <Text
+                  style={[
+                    styles.choiceText,
+                    (payload.officialResultType ?? "AUTO") === opt.value &&
+                      styles.choiceTextSelected,
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {isManual ? (
+            <View style={styles.officialResultFields}>
+              {/* Winner */}
+              <Text style={styles.fieldLabel}>WINNER (OPTIONAL)</Text>
+              <View style={styles.choiceRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.choice,
+                    payload.winningTeamId === ourTeamId &&
+                    payload.winningTeamId != null &&
+                      styles.choiceSelected,
+                  ]}
+                  onPress={() =>
+                    changePayload((c) => ({
+                      ...c,
+                      winningTeamId: c.winningTeamId === ourTeamId ? null : ourTeamId,
+                      winningTeamName: c.winningTeamId === ourTeamId ? null : null,
+                    }))
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.choiceText,
+                      payload.winningTeamId === ourTeamId &&
+                      payload.winningTeamId != null &&
+                        styles.choiceTextSelected,
+                    ]}
+                  >
+                    {ourTeamName}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.choice,
+                    payload.winningTeamName === opponentName &&
+                    payload.winningTeamId == null &&
+                      styles.choiceSelected,
+                  ]}
+                  onPress={() =>
+                    changePayload((c) => ({
+                      ...c,
+                      winningTeamId: null,
+                      winningTeamName:
+                        c.winningTeamName === opponentName ? null : opponentName,
+                    }))
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.choiceText,
+                      payload.winningTeamName === opponentName &&
+                      payload.winningTeamId == null &&
+                        styles.choiceTextSelected,
+                    ]}
+                  >
+                    {opponentName}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.choice,
+                    payload.winningTeamId == null &&
+                    payload.winningTeamName == null &&
+                      styles.choiceSelected,
+                  ]}
+                  onPress={() =>
+                    changePayload((c) => ({
+                      ...c,
+                      winningTeamId: null,
+                      winningTeamName: null,
+                    }))
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.choiceText,
+                      payload.winningTeamId == null &&
+                      payload.winningTeamName == null &&
+                        styles.choiceTextSelected,
+                    ]}
+                  >
+                    No Winner
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Result Description */}
+              <Text style={styles.fieldLabel}>RESULT DESCRIPTION</Text>
+              <TextInput
+                style={[styles.input, styles.wideField, styles.officialResultInput]}
+                value={payload.resultSummary}
+                onChangeText={(text) =>
+                  changePayload((c) => ({ ...c, resultSummary: text }))
+                }
+                placeholder="e.g. Gotham won via DLS method"
+                placeholderTextColor="#9b8ca1"
+                maxLength={200}
+              />
+
+              {/* Reason / Notes */}
+              <Text style={styles.fieldLabel}>REASON / NOTES (OPTIONAL)</Text>
+              <TextInput
+                style={[styles.input, styles.wideField, styles.officialResultInput, styles.officialResultNotes]}
+                value={payload.officialResultNotes}
+                onChangeText={(text) =>
+                  changePayload((c) => ({ ...c, officialResultNotes: text }))
+                }
+                placeholder="Add context or reason for the official result override"
+                placeholderTextColor="#9b8ca1"
+                multiline
+                maxLength={500}
+              />
+            </View>
+          ) : null}
         </View>
 
         <TouchableOpacity
@@ -1947,6 +2131,17 @@ const styles = StyleSheet.create({
     borderTopColor: "#745486",
     paddingTop: 11,
   },
+  officialResultSection: { marginBottom: 14 },
+  officialResultHint: {
+    color: "#7b6d80",
+    fontSize: 11,
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  officialResultScroll: { marginBottom: 10 },
+  officialResultFields: { marginTop: 4 },
+  officialResultInput: { marginBottom: 10 },
+  officialResultNotes: { minHeight: 72, textAlignVertical: "top" },
   pomPicker: {
     borderWidth: 1,
     borderColor: "#ded4e2",

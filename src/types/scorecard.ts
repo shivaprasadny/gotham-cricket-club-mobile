@@ -1,6 +1,18 @@
 export type TossDecision = "BAT" | "BOWL";
 export type MatchOutcome = "WIN" | "LOSS" | "TIE" | "NO_RESULT" | "ABANDONED";
 export type ScorecardStatus = "DRAFT" | "PUBLISHED";
+export type OfficialResultType =
+  | "AUTO"
+  | "TIE"
+  | "DRAW"
+  | "NO_RESULT"
+  | "ABANDONED"
+  | "DLS_METHOD"
+  | "SUPER_OVER"
+  | "WALKOVER"
+  | "FORFEIT"
+  | "SPLIT_POINTS"
+  | "CUSTOM";
 export type DismissalType =
   | "NOT_OUT"
   | "BOWLED"
@@ -79,6 +91,8 @@ export type SaveScorecardRequest = {
   winningMarginRuns: number | null;
   winningMarginWickets: number | null;
   resultSummary: string;
+  officialResultType: OfficialResultType | null;
+  officialResultNotes: string;
   playerOfMatchId: number | null;
   innings: SaveInningsRequest[];
 };
@@ -156,6 +170,8 @@ export type ScorecardResponse = {
   winningMarginRuns: number | null;
   winningMarginWickets: number | null;
   resultSummary: string;
+  officialResultType: OfficialResultType | null;
+  officialResultNotes: string | null;
   firstInningsTotal: number | null;
   chaseTotal: number | null;
   topScorer: string | null;
@@ -169,6 +185,7 @@ export type ScorecardResponse = {
 };
 
 export type LeaderboardCategory =
+  // Existing
   | "RUNS"
   | "HIGHEST_SCORE"
   | "BAT_AVG"
@@ -182,7 +199,15 @@ export type LeaderboardCategory =
   | "FIELDING_DISMISSALS"
   | "STUMPINGS"
   | "RUN_OUTS"
-  | "CATCH_EFFICIENCY";
+  | "CATCH_EFFICIENCY"
+  // Phase 4A additions
+  | "MOST_FOURS"
+  | "MOST_FIFTIES"
+  | "MOST_HUNDREDS"
+  | "MOST_DUCKS"
+  | "MOST_MATCHES"
+  | "MOST_FIFERS"
+  | "BEST_ALL_ROUNDER";
 
 export type PlayerLeaderboardEntry = {
   rank: number;
@@ -191,6 +216,7 @@ export type PlayerLeaderboardEntry = {
   value: number;
   secondaryValue: number | null;
   matchesPlayed: number | null;
+  profileImageUrl?: string | null;
 };
 
 export type RecentMatchPerformance = {
@@ -245,6 +271,10 @@ export type PlayerStatistics = {
   catchChances: number;
   catchEfficiency: number;
   playerOfMatchAwards: number;
+  // Phase 4A additions
+  ducks: number;
+  fifers: number;
+  allRounderPoints: number;
   recentPerformances: RecentMatchPerformance[];
 };
 

@@ -33,6 +33,8 @@ export type ChatRoom = {
   muted: boolean;
   favorite: boolean;
   frozen?: boolean;
+  otherUserProfileImageUrl?: string | null;
+  otherUserId?: number | null;
 };
 
 export type ChatMessagePage = {
@@ -61,6 +63,7 @@ export type ChatMember = {
   fullName: string;
   nickname?: string | null;
   roomAdmin?: boolean;
+  profileImageUrl?: string | null;
 };
 
 // Member profile returned by GET /api/members/{userId}
@@ -77,4 +80,5 @@ export type MemberProfile = {
   bowlingStyle?: string;
   playerType?: string;
   jerseyNumber?: number;
+  profileImageUrl?: string | null;
 };

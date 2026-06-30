@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Avatar from "../Avatar";
 import {
   PlayerLeaderboardEntry,
   StatisticsFilterOptions,
@@ -46,6 +47,7 @@ export const LeaderboardList = ({
         onPress={() => onPlayerPress(entry.playerId)}
       >
         <Text style={styles.rank}>{entry.rank}</Text>
+        <Avatar name={entry.fullName} userId={entry.playerId} size="medium" imageUrl={entry.profileImageUrl} />
         {/* Matches count inline after name: "Shiva (2)" — number is small and light */}
         <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
           {entry.fullName}

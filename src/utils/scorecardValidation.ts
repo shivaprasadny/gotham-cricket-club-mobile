@@ -1,9 +1,13 @@
 import {
   DismissalType,
+  OfficialResultType,
   SaveInningsRequest,
   SaveScorecardRequest,
   ScorecardResponse,
 } from "../types/scorecard";
+
+const isManualOverride = (t: OfficialResultType | null | undefined) =>
+  t != null && t !== "AUTO";
 
 export const oversToLegalBalls = (value: string): number | null => {
   const trimmed = value.trim();
@@ -149,23 +153,26 @@ export const validateScorecard = (
     const error = validateInnings(innings);
     if (error) return error;
   }
-  if (payload.outcome === "WIN" || payload.outcome === "LOSS") {
-    const marginCount =
-      Number(payload.winningMarginRuns != null) +
-      Number(payload.winningMarginWickets != null);
-    if (marginCount !== 1) return "Win or loss requires one margin: runs or wickets.";
-  }
-  if ((payload.outcome === "NO_RESULT" || payload.outcome === "ABANDONED") &&
-      (payload.winningMarginRuns != null || payload.winningMarginWickets != null)) {
-    return "No result or abandoned matches cannot have a winning margin.";
-  }
-  if (payload.outcome === "TIE" && payload.innings.length === 2 &&
-      payload.innings[0].runs !== payload.innings[1].runs) {
-    return "A tied match must have equal innings scores.";
-  }
-  if (publishing && ["WIN", "LOSS", "TIE"].includes(payload.outcome) &&
-      payload.innings.length !== 2) {
-    return "Publishing this result requires two innings.";
+  const manual = isManualOverride(payload.officialResultType);
+  if (!manual) {
+    if (payload.outcome === "WIN" || payload.outcome === "LOSS") {
+      const marginCount =
+        Number(payload.winningMarginRuns != null) +
+        Number(payload.winningMarginWickets != null);
+      if (marginCount !== 1) return "Win or loss requires one margin: runs or wickets.";
+    }
+    if ((payload.outcome === "NO_RESULT" || payload.outcome === "ABANDONED") &&
+        (payload.winningMarginRuns != null || payload.winningMarginWickets != null)) {
+      return "No result or abandoned matches cannot have a winning margin.";
+    }
+    if (payload.outcome === "TIE" && payload.innings.length === 2 &&
+        payload.innings[0].runs !== payload.innings[1].runs) {
+      return "A tied match must have equal innings scores.";
+    }
+    if (publishing && ["WIN", "LOSS", "TIE"].includes(payload.outcome) &&
+        payload.innings.length !== 2) {
+      return "Publishing this result requires two innings.";
+    }
   }
   return null;
 };
@@ -180,6 +187,8 @@ export const responseToDraft = (scorecard: ScorecardResponse): SaveScorecardRequ
   winningMarginRuns: scorecard.winningMarginRuns,
   winningMarginWickets: scorecard.winningMarginWickets,
   resultSummary: scorecard.resultSummary || "",
+  officialResultType: scorecard.officialResultType ?? null,
+  officialResultNotes: scorecard.officialResultNotes || "",
   playerOfMatchId: scorecard.playerOfMatchId,
   innings: scorecard.innings.map((innings) => ({
     inningsNumber: innings.inningsNumber,

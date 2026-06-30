@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Avatar from "../components/Avatar";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   approveMember,
@@ -25,6 +26,7 @@ type PendingUser = {
   email: string;
   role: string;
   status: string;
+  profileImageUrl?: string | null;
 };
 
 const ROLE_OPTIONS: ApprovalRole[] = ["PLAYER", "CAPTAIN", "ADMIN"];
@@ -151,7 +153,10 @@ const AdminApprovalScreen = () => {
 
   const renderItem = ({ item }: { item: PendingUser }) => (
     <View style={styles.card}>
-      <Text style={styles.name}>{item.fullName}</Text>
+      <View style={styles.cardHeader}>
+        <Avatar name={item.fullName} userId={item.id} size="large" imageUrl={item.profileImageUrl} />
+        <Text style={styles.name}>{item.fullName}</Text>
+      </View>
       <Text style={styles.email}>{item.email}</Text>
       <Text style={styles.status}>
         Status: {formatEnumLabel(item.status)}
@@ -217,6 +222,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 14,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 4,
   },
   name: {
     fontSize: 18,

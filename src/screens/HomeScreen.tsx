@@ -24,11 +24,14 @@ import {
 } from "../services/notificationService";
 import { getEvents } from "../services/eventService";
 import { getMyFees } from "../services/feeService";
+import { getActivePolls } from "../services/pollService";
 import { getChatRooms } from "../chat/chatApi";
 // Fix 1: fetch published scorecard summaries for recent results
 import { getScorecard } from "../services/scorecardService";
 import { ScorecardResponse } from "../types/scorecard";
 import { chatStompClient } from "../chat/stompClient";
+import { PollResponse } from "../types/poll";
+import PollCard from "../components/polls/PollCard";
 
 // Home components
 import HomeHeader from "../components/home/HomeHeader";
@@ -129,6 +132,7 @@ const HomeScreen = ({ navigation }: Props) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
   const [fees, setFees] = useState<MyFeeItem[]>([]);
+  const [activePolls, setActivePolls] = useState<PollResponse[]>([]);
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const chatRoomSubRef = useRef<{ unsubscribe: () => void } | null>(null);
 
@@ -270,6 +274,7 @@ const HomeScreen = ({ navigation }: Props) => {
         getEvents(),
         getMyFees(),
         getChatRooms(),
+        getActivePolls(),
       ];
 
       // Only Admin needs pending member requests
@@ -300,9 +305,12 @@ const HomeScreen = ({ navigation }: Props) => {
       const chatRoomsData =
         results[6].status === "fulfilled" ? results[6].value : [];
 
+      const pollsData =
+        results[7].status === "fulfilled" ? results[7].value : [];
+
       const pendingData =
-        isAdmin && results[7] && results[7].status === "fulfilled"
-          ? results[7].value
+        isAdmin && results[8] && results[8].status === "fulfilled"
+          ? results[8].value
           : [];
 
       // Current week start (Monday 00:00) for match visibility — matches stay on the
@@ -409,6 +417,7 @@ const HomeScreen = ({ navigation }: Props) => {
       setPendingMembers(Array.isArray(pendingData) ? pendingData : []);
       setUpcomingEvents(upcomingEventList);
       setFees(Array.isArray(feesData) ? feesData : []);
+      setActivePolls(Array.isArray(pollsData) ? pollsData : []);
       setUnreadChatCount(
         Array.isArray(chatRoomsData)
           ? chatRoomsData.reduce((sum: number, r: any) => sum + (r.unreadCount || 0), 0)
@@ -583,6 +592,33 @@ const HomeScreen = ({ navigation }: Props) => {
               navigation={navigation}
             />
 
+            {/* Active polls */}
+            {activePolls.length > 0 && (
+              <View style={styles.pollsSection}>
+                <View style={styles.pollsSectionHeader}>
+                  <Text style={styles.pollsSectionTitle}>Active Polls</Text>
+                  <TouchableOpacity onPress={() => navigation.navigate("Polls")}>
+                    <Text style={styles.pollsSeeAll}>See all</Text>
+                  </TouchableOpacity>
+                </View>
+                {activePolls.map((poll) => (
+                  <PollCard
+                    key={poll.pollId}
+                    poll={poll}
+                    compact
+                    onUpdated={(updated) =>
+                      setActivePolls((prev) =>
+                        prev.map((p) => (p.pollId === updated.pollId ? updated : p))
+                      )
+                    }
+                    onDeleted={(id) =>
+                      setActivePolls((prev) => prev.filter((p) => p.pollId !== id))
+                    }
+                  />
+                ))}
+              </View>
+            )}
+
             {/* Upcoming events with quick response and hide button */}
             <UpcomingEventsSection
   events={visibleUpcomingEvents}
@@ -738,4 +774,25 @@ recentResultScore: { color: "#d8c9e8", fontSize: 12, marginTop: 3 },
 recentResultOutcome: { fontSize: 12, fontWeight: "700", marginTop: 2 },
 recentResultRowWin: { borderLeftWidth: 3, borderLeftColor: "#22c55e" },
 recentResultRowLoss: { borderLeftWidth: 3, borderLeftColor: "#ef4444" },
+pollsSection: {
+  marginBottom: 18,
+},
+pollsSectionHeader: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: 10,
+},
+pollsSectionTitle: {
+  color: "#da9306",
+  fontSize: 14,
+  fontWeight: "800",
+  textTransform: "uppercase",
+  letterSpacing: 0.5,
+},
+pollsSeeAll: {
+  color: "#c4b7cc",
+  fontSize: 12,
+  fontWeight: "700",
+},
 });

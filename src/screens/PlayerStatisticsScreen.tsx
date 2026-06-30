@@ -8,6 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
+import Avatar from "../components/Avatar";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   getPlayerStatistics,
@@ -105,6 +106,11 @@ const PlayerStatisticsScreen = ({ route }: any) => {
       }
     >
       <View style={styles.hero}>
+        <Avatar
+          name={stats.fullName}
+          userId={playerId}
+          size="xlarge"
+        />
         <Text style={styles.heroTitle}>{stats.fullName}</Text>
         <Text style={styles.heroText}>{stats.matches} published matches</Text>
       </View>

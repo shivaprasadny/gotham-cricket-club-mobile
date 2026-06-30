@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import Avatar, { TappableAvatar } from "../components/Avatar";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   createDirectChat,
@@ -29,18 +30,6 @@ import { ChatConnectionStatus } from "./types";
 import { ChatMember, ChatRoom } from "./types";
 import { useAuth } from "../context/AuthContext";
 
-const roomIcon = (type: ChatRoom["type"]): keyof typeof Ionicons.glyphMap => {
-  switch (type) {
-    case "MATCH":
-      return "trophy-outline";
-    case "EVENT":
-      return "calendar-outline";
-    case "DIRECT":
-      return "person-outline";
-    default:
-      return "people-outline";
-  }
-};
 
 const formatTime = (value?: string) => {
   if (!value) return "";
@@ -418,7 +407,17 @@ const handleCreateGroup = async () => {
               onPress={() => navigation.navigate("ChatRoom", { room: item })}
             >
             <View style={styles.icon}>
-              <Ionicons name={roomIcon(item.type)} size={23} color="#4B1D6B" />
+              <TappableAvatar
+                name={item.name}
+                size={44}
+                isAnonymous={item.type === "ANONYMOUS"}
+                imageUrl={item.type === "DIRECT" ? item.otherUserProfileImageUrl : undefined}
+                onPress={
+                  item.type === "DIRECT" && item.otherUserId
+                    ? () => navigation.navigate("MemberProfile", { userId: item.otherUserId })
+                    : undefined
+                }
+              />
             </View>
             <View style={styles.roomBody}>
               <View style={styles.row}>
@@ -526,11 +525,7 @@ const handleCreateGroup = async () => {
                 style={styles.member}
                 onPress={() => void startDirectChat(item)}
               >
-                <View style={styles.memberAvatar}>
-                  <Text style={styles.memberInitial}>
-                    {item.fullName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
+                <Avatar name={item.fullName} userId={item.userId} size={42} imageUrl={item.profileImageUrl} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.memberName}>{item.fullName}</Text>
                   {item.nickname ? (
@@ -605,11 +600,7 @@ const handleCreateGroup = async () => {
             style={styles.member}
             onPress={() => toggleSelectedMember(item.userId)}
           >
-            <View style={styles.memberAvatar}>
-              <Text style={styles.memberInitial}>
-                {item.fullName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
+            <Avatar name={item.fullName} userId={item.userId} size={42} imageUrl={item.profileImageUrl} />
 
             <View style={{ flex: 1 }}>
               <Text style={styles.memberName}>{item.fullName}</Text>

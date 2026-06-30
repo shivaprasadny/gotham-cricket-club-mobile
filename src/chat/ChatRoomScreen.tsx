@@ -60,6 +60,7 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { getMemberById } from "../services/memberService";
 import { MemberProfile } from "./types";
+import Avatar from "../components/Avatar";
 
 const ChatRoomScreen = ({ route }: any) => {
   const typedRoute = route as { params: { room: ChatRoom } };
@@ -158,16 +159,12 @@ const [renameValue, setRenameValue] = useState(roomName);
               onPress={goToProfile}
               style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}
             >
-              <View style={{
-                width: 34, height: 34, borderRadius: 17,
-                backgroundColor: "#da9306",
-                alignItems: "center", justifyContent: "center",
-                flexShrink: 0,
-              }}>
-                <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
-                  {(partner.fullName ?? roomName).charAt(0).toUpperCase()}
-                </Text>
-              </View>
+              <Avatar
+                name={partner.fullName ?? roomName}
+                userId={partner.userId}
+                size={34}
+                imageUrl={partner.profileImageUrl}
+              />
               {/* flex:1 + numberOfLines=1 ensures the name truncates before reaching icons */}
               <View style={{ flex: 1 }}>
                 <Text
@@ -723,11 +720,7 @@ navigation.goBack();
 
     return (
       <View style={styles.memberRow}>
-        <View style={styles.memberAvatar}>
-          <Text style={styles.memberInitial}>
-            {item.fullName.charAt(0).toUpperCase()}
-          </Text>
-        </View>
+        <Avatar name={item.fullName} userId={item.userId} size={40} imageUrl={item.profileImageUrl} />
 
         <View style={{ flex: 1 }}>
           <View style={styles.memberNameRow}>
@@ -1206,11 +1199,7 @@ navigation.goBack();
                           style={styles.memberRow}
                           onPress={() => void handleAddMember(member)}
                         >
-                          <View style={styles.memberAvatar}>
-                            <Text style={styles.memberInitial}>
-                              {member.fullName.charAt(0).toUpperCase()}
-                            </Text>
-                          </View>
+                          <Avatar name={member.fullName} userId={member.userId} size={40} imageUrl={member.profileImageUrl} />
 
                           <View style={{ flex: 1 }}>
                             <Text style={styles.memberName}>
@@ -1350,11 +1339,7 @@ navigation.goBack();
                     contentContainerStyle={styles.rxList}
                     renderItem={({ item: row }) => (
                       <View style={styles.rxRow}>
-                        <View style={styles.rxAvatar}>
-                          <Text style={styles.rxAvatarText}>
-                            {row.name.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
+                        <Avatar name={row.name} size={40} />
                         <Text style={styles.rxName}>{row.name}</Text>
                         {reactionViewerTab === "all" && (
                           <Text style={styles.rxRowEmoji}>{row.emoji}</Text>

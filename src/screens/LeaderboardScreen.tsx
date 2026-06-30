@@ -27,26 +27,75 @@ import {
 } from "../components/statistics/StatisticsUI";
 
 const categories: LeaderboardCategory[] = [
+  // Batting
   "RUNS",
   "HIGHEST_SCORE",
   "BAT_AVG",
   "STRIKE_RATE",
+  "MOST_FOURS",
+  "SIXES",
+  "MOST_FIFTIES",
+  "MOST_HUNDREDS",
+  "MOST_DUCKS",
+  "MOST_MATCHES",
+  // Bowling
   "WICKETS",
   "BEST_BOWLING",
   "ECONOMY",
-  "SIXES",
-  "POM",
+  "MOST_FIFERS",
+  // Fielding
   "CATCHES",
   "FIELDING_DISMISSALS",
   "STUMPINGS",
   "RUN_OUTS",
   "CATCH_EFFICIENCY",
+  // All-round
+  "POM",
+  "BEST_ALL_ROUNDER",
 ];
+
+// Human-readable labels for each category
+const categoryLabel: Record<LeaderboardCategory, string> = {
+  RUNS: "Runs",
+  HIGHEST_SCORE: "Highest Score",
+  BAT_AVG: "Bat Average",
+  STRIKE_RATE: "Strike Rate",
+  MOST_FOURS: "Most 4s",
+  SIXES: "Sixes",
+  MOST_FIFTIES: "Most 50s",
+  MOST_HUNDREDS: "Most 100s",
+  MOST_DUCKS: "Most Ducks",
+  MOST_MATCHES: "Most Matches",
+  WICKETS: "Wickets",
+  BEST_BOWLING: "Best Bowling",
+  ECONOMY: "Economy",
+  MOST_FIFERS: "5-fors",
+  CATCHES: "Catches",
+  FIELDING_DISMISSALS: "Fielding",
+  STUMPINGS: "Stumpings",
+  RUN_OUTS: "Run Outs",
+  CATCH_EFFICIENCY: "Catch %",
+  POM: "Player of Match",
+  BEST_ALL_ROUNDER: "All-Rounder",
+};
+
+// Secondary stat label shown below the main value (e.g. economy below wickets)
+const secondaryLabel: Partial<Record<LeaderboardCategory, string>> = {
+  WICKETS: "Econ",
+  BEST_BOWLING: "Runs",
+  MOST_FIFERS: "Wkts",
+  MOST_MATCHES: "Runs",
+  CATCH_EFFICIENCY: "Chances",
+};
+
+const THIS_YEAR = new Date().getFullYear();
 
 const LeaderboardScreen = ({ route, navigation }: any) => {
   const { scope = "CLUB", leagueId } = route.params || {};
   const [category, setCategory] = useState<LeaderboardCategory>("RUNS");
   const [limit, setLimit] = useState(10);
+  // "career" = all time (no year filter), "year" = current calendar year only
+  const [timeScope, setTimeScope] = useState<"career" | "year">("career");
   const [filters, setFilters] = useState<StatisticsFilters>({});
   const [filterOptions, setFilterOptions] =
     useState<StatisticsFilterOptions | null>(null);
@@ -63,15 +112,15 @@ const LeaderboardScreen = ({ route, navigation }: any) => {
   const load = useCallback(async () => {
     try {
       const { leagueId: _ignored, ...leaderFilters } = filters;
+      // Merge the Career/This Year toggle into the year filter
+      const effectiveFilters: StatisticsFilters = {
+        ...leaderFilters,
+        year: timeScope === "year" ? THIS_YEAR : leaderFilters.year,
+      };
       const data =
         scope === "LEAGUE"
-          ? await getLeagueLeaders(
-              leagueId,
-              category,
-              limit,
-              leaderFilters
-            )
-          : await getClubLeaders(category, limit, leaderFilters);
+          ? await getLeagueLeaders(leagueId, category, limit, effectiveFilters)
+          : await getClubLeaders(category, limit, effectiveFilters);
       // Backend returns entries already sorted correctly (wickets DESC, economy ASC tiebreaker)
       setEntries(Array.isArray(data) ? data : []);
     } catch (error: any) {
@@ -83,7 +132,7 @@ const LeaderboardScreen = ({ route, navigation }: any) => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [category, filters, leagueId, limit, scope]);
+  }, [category, filters, leagueId, limit, scope, timeScope]);
 
   useFocusEffect(
     useCallback(() => {
@@ -111,6 +160,21 @@ const LeaderboardScreen = ({ route, navigation }: any) => {
           {scope === "LEAGUE" ? "League" : "Club"} Leaders
         </Text>
         <Text style={styles.heroText}>Published scorecards only</Text>
+
+        {/* Career / This Year toggle */}
+        <View style={styles.timeScopeRow}>
+          {(["career", "year"] as const).map((ts) => (
+            <TouchableOpacity
+              key={ts}
+              style={[styles.timeScopeBtn, timeScope === ts && styles.timeScopeBtnActive]}
+              onPress={() => setTimeScope(ts)}
+            >
+              <Text style={[styles.timeScopeText, timeScope === ts && styles.timeScopeTextActive]}>
+                {ts === "career" ? "Career" : `This Year (${THIS_YEAR})`}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       <StatisticsFilterBar
@@ -140,7 +204,7 @@ const LeaderboardScreen = ({ route, navigation }: any) => {
                 category === item && styles.categoryTextSelected,
               ]}
             >
-              {item.replaceAll("_", " ")}
+              {categoryLabel[item]}
             </Text>
           </TouchableOpacity>
         ))}
@@ -174,7 +238,7 @@ const LeaderboardScreen = ({ route, navigation }: any) => {
       ) : entries.length ? (
         <LeaderboardList
           entries={entries}
-          secondaryLabel={category === "WICKETS" ? "Econ" : undefined}
+          secondaryLabel={secondaryLabel[category]}
           onPlayerPress={(playerId) =>
             navigation.navigate("PlayerStatistics", {
               playerId,
@@ -202,6 +266,17 @@ const styles = StyleSheet.create({
   hero: { backgroundColor: "#2b0540", borderRadius: 20, padding: 20 },
   heroTitle: { color: "#fff", fontSize: 25, fontWeight: "900" },
   heroText: { color: "#f4b400", marginTop: 5 },
+  timeScopeRow: { flexDirection: "row", gap: 8, marginTop: 14 },
+  timeScopeBtn: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 12,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  timeScopeBtnActive: { backgroundColor: "#da9306" },
+  timeScopeText: { color: "rgba(255,255,255,0.7)", fontWeight: "700", fontSize: 13 },
+  timeScopeTextActive: { color: "#2b0540", fontWeight: "900" },
   categories: { marginVertical: 14 },
   category: {
     backgroundColor: "#fff",

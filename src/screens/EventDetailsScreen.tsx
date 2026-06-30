@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { TappableAvatar } from "../components/Avatar";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -31,6 +32,7 @@ type EventAvailabilityItem = {
   fullName: string;
   status: "GOING" | "NOT_GOING" | "MAYBE";
   message?: string;
+  profileImageUrl?: string | null;
 };
 
 const EventDetailsScreen = ({ route, navigation }: Props) => {
@@ -248,7 +250,16 @@ const onRefresh = async () => {
       }
       renderItem={({ item }) => (
   <View style={styles.responseCard}>
-    <Text style={styles.responseName}>{item.fullName}</Text>
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
+      <TappableAvatar
+        name={item.fullName}
+        userId={item.userId}
+        size="medium"
+        imageUrl={item.profileImageUrl}
+        onPress={() => navigation.navigate("MemberProfile", { userId: item.userId })}
+      />
+      <Text style={styles.responseName}>{item.fullName}</Text>
+    </View>
     <Text style={styles.responseText}>
       Status: {formatEnumLabel(item.status)}
     </Text>

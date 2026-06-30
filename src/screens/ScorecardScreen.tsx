@@ -211,6 +211,9 @@ const ScorecardScreen = ({ route, navigation }: Props) => {
         </View>
         <Text style={styles.matchTitle}>{scorecard.matchSummary}</Text>
         <Text style={styles.result}>{scorecard.resultSummary}</Text>
+        {scorecard.officialResultNotes ? (
+          <Text style={styles.officialNotes}>{scorecard.officialResultNotes}</Text>
+        ) : null}
         <View style={styles.heroStats}>
           <View style={styles.heroStat}>
             <Text style={styles.heroStatValue}>{scorecard.firstInningsTotal ?? "-"}</Text>
@@ -407,6 +410,7 @@ const styles = StyleSheet.create({
   published: { color: "#cbbfd1", fontSize: 12 },
   matchTitle: { color: "#fff", fontSize: 22, fontWeight: "900", marginTop: 14 },
   result: { color: "#f4b400", fontSize: 15, fontWeight: "700", marginTop: 6 },
+  officialNotes: { color: "#cbbfd1", fontSize: 12, marginTop: 4, fontStyle: "italic" },
   heroStats: { flexDirection: "row", gap: 8, marginTop: 18 },
   heroStat: { flex: 1, backgroundColor: "#3b1251", borderRadius: 12, padding: 10, alignItems: "center" },
   heroStatValue: { color: "#fff", fontSize: 20, fontWeight: "900" },

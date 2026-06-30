@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { TappableAvatar } from "../components/Avatar";
 import { useAuth } from "../context/AuthContext";
 import {
   ApprovalRole,
@@ -39,6 +40,7 @@ type Member = {
   bowlingStyle?: string;
   playerType?: string;
   jerseyNumber?: number;
+  profileImageUrl?: string | null;
 };
 
 const ROLE_OPTIONS: ApprovalRole[] = ["PLAYER", "CAPTAIN", "ADMIN"];
@@ -270,6 +272,13 @@ const handleActivateMember = (memberId: number, fullName: string) => {
           }
         }}
       >
+        <TappableAvatar
+          name={item.fullName}
+          userId={memberId}
+          size="medium"
+          imageUrl={item.profileImageUrl}
+          onPress={memberId ? () => navigation.navigate("MemberProfile", { userId: memberId }) : undefined}
+        />
         <Text style={styles.name}>{item.fullName || "No Name"}</Text>
         <View
           style={[styles.roleIcon, roleStyle.icon]}

@@ -2,8 +2,10 @@ import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -12,15 +14,23 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import Avatar from "../components/Avatar";
+import ImageCropModal from "../components/ImageCropModal";
 import { useFocusEffect } from "@react-navigation/native";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
+import * as ImagePicker from "expo-image-picker";
 import { getMyProfile } from "../services/profileService";
 import { loginUser } from "../services/authService";
 import { useAuth } from "../context/AuthContext";
 import { formatEnumLabel } from "../utils/formatEnumLabel";
-
-import { registerForPushNotificationsAsync } from "../services/pushNotificationService";
+import {
+  getUploadUrl,
+  uploadToS3,
+  confirmImageUpload,
+  deleteProfileImage,
+  cacheProfileImageUrl,
+} from "../services/profileImageService";
 
 type Props = {
   navigation: any;
@@ -48,6 +58,9 @@ type ProfileData = {
   bowlingStyle?: string;
   playerType?: string;
   jerseyNumber?: number;
+
+  profileImageUrl?: string | null;
+  profileImageUpdatedAt?: string | null;
 };
 
 const ProfileScreen = ({ navigation }: Props) => {
@@ -56,6 +69,11 @@ const ProfileScreen = ({ navigation }: Props) => {
   // =========================
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [pendingImageUri, setPendingImageUri] = useState<string | null>(null);
+  // Raw URI from picker — passed to ImageCropModal; cleared after crop or cancel
+  const [cropUri, setCropUri] = useState<string | null>(null);
 
   // Biometric toggle state
   const [biometricEnabled, setBiometricEnabled] = useState(false);
@@ -66,46 +84,45 @@ const ProfileScreen = ({ navigation }: Props) => {
   const [showBioPassword, setShowBioPassword] = useState(false);
 
   // Auth logout from context
-  const { logout } = useAuth();
+  const { logout, updateUser } = useAuth();
 
   // =========================
   // FORMAT DATE NICELY
   // Example: April 20th, 2026
   // =========================
-  
 
   const formatPrettyDate = (date?: string) => {
-  if (!date) return "-";
+    if (!date) return "-";
 
-  try {
-    const [year, month, day] = date.split("-").map(Number);
+    try {
+      const [year, month, day] = date.split("-").map(Number);
 
-    if (!year || !month || !day) return date;
+      if (!year || !month || !day) return date;
 
-    const getSuffix = (num: number) => {
-      if (num >= 11 && num <= 13) return "th";
+      const getSuffix = (num: number) => {
+        if (num >= 11 && num <= 13) return "th";
 
-      switch (num % 10) {
-        case 1:
-          return "st";
-        case 2:
-          return "nd";
-        case 3:
-          return "rd";
-        default:
-          return "th";
-      }
-    };
+        switch (num % 10) {
+          case 1:
+            return "st";
+          case 2:
+            return "nd";
+          case 3:
+            return "rd";
+          default:
+            return "th";
+        }
+      };
 
-    const monthName = new Date(year, month - 1, day).toLocaleString("en-US", {
-      month: "long",
-    });
+      const monthName = new Date(year, month - 1, day).toLocaleString("en-US", {
+        month: "long",
+      });
 
-    return `📅 ${monthName} ${day}${getSuffix(day)}, ${year}`;
-  } catch {
-    return date;
-  }
-};
+      return `📅 ${monthName} ${day}${getSuffix(day)}, ${year}`;
+    } catch {
+      return date;
+    }
+  };
 
   // =========================
   // LOAD PROFILE FROM BACKEND
@@ -114,6 +131,8 @@ const ProfileScreen = ({ navigation }: Props) => {
     try {
       const data = await getMyProfile();
       setProfile(data);
+      // Sync cached image URL with latest from backend
+      await cacheProfileImageUrl(data.profileImageUrl ?? null);
     } catch {
       Alert.alert("Error", "Failed to load profile");
     } finally {
@@ -137,6 +156,124 @@ const ProfileScreen = ({ navigation }: Props) => {
       void checkBiometric();
     }, [])
   );
+
+  // =========================
+  // AVATAR TAP HANDLER
+  // =========================
+  const handleAvatarTap = () => {
+    const hasImage = !!(profile?.profileImageUrl);
+
+    if (hasImage) {
+      Alert.alert("Profile Picture", undefined, [
+        { text: "View Picture", onPress: () => setPreviewVisible(true) },
+        { text: "Change Picture", onPress: () => showPickerOptions() },
+        {
+          text: "Remove Picture",
+          style: "destructive",
+          onPress: () => void handleRemoveImage(),
+        },
+        { text: "Cancel", style: "cancel" },
+      ]);
+    } else {
+      showPickerOptions();
+    }
+  };
+
+  const showPickerOptions = () => {
+    Alert.alert("Upload Profile Picture", undefined, [
+      { text: "Choose from Library", onPress: () => void handlePickImage("library") },
+      { text: "Take Photo", onPress: () => void handlePickImage("camera") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  // =========================
+  // PICK & UPLOAD IMAGE
+  // =========================
+  const handlePickImage = async (source: "library" | "camera") => {
+    try {
+      // Request permissions
+      if (source === "camera") {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission Required", "Camera access is needed to take a photo.");
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission Required", "Photo library access is needed to choose a photo.");
+          return;
+        }
+      }
+
+      // Launch picker — no native crop; ImageCropModal handles crop + resize
+      const result =
+        source === "camera"
+          ? await ImagePicker.launchCameraAsync({ mediaTypes: "images", quality: 1 })
+          : await ImagePicker.launchImageLibraryAsync({ mediaTypes: "images", quality: 1 });
+
+      if (result.canceled || !result.assets?.[0]?.uri) return;
+
+      // Open circular crop UI; onComplete → setPendingImageUri → preview modal → upload
+      setCropUri(result.assets[0].uri);
+    } catch (err: any) {
+      Alert.alert("Upload Failed", err?.message || "Could not upload profile picture. Please try again.");
+    }
+  };
+
+  // =========================
+  // DO UPLOAD (called from preview modal)
+  // =========================
+  const doUpload = async (uri: string) => {
+    setPendingImageUri(null);
+    setUploadingImage(true);
+    try {
+      const { uploadUrl, imageKey, contentType } = await getUploadUrl();
+      await uploadToS3(uploadUrl, uri, contentType);
+      const data = await confirmImageUpload(imageKey);
+      const { profileImageUrl } = data;
+      setProfile((prev) => prev ? { ...prev, profileImageUrl } : prev);
+      await updateUser({ profileImageUrl, profileImageUpdatedAt: data.profileImageUpdatedAt });
+      await cacheProfileImageUrl(profileImageUrl);
+      Alert.alert("Success", "Profile picture updated successfully.");
+    } catch {
+      Alert.alert("Upload Failed", "Unable to upload profile picture. Please try again.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  // =========================
+  // REMOVE IMAGE
+  // =========================
+  const handleRemoveImage = async () => {
+    Alert.alert(
+      "Remove Profile Picture",
+      "Are you sure you want to remove your profile picture?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setUploadingImage(true);
+              await deleteProfileImage();
+              setProfile((prev) => prev ? { ...prev, profileImageUrl: null } : prev);
+              await updateUser({ profileImageUrl: null, profileImageUpdatedAt: new Date().toISOString() });
+              await cacheProfileImageUrl(null);
+              Alert.alert("Removed", "Profile picture removed.");
+            } catch {
+              Alert.alert("Error", "Unable to remove profile picture. Please try again.");
+            } finally {
+              setUploadingImage(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // =========================
   // BIOMETRIC TOGGLE HANDLERS
@@ -222,21 +359,95 @@ const ProfileScreen = ({ navigation }: Props) => {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      {/* Upload overlay */}
+      {uploadingImage && (
+        <View style={styles.uploadOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.uploadOverlayText}>Uploading...</Text>
+        </View>
+      )}
+
+      {/* Circular crop UI — shown immediately after picking a raw image */}
+      <ImageCropModal
+        visible={cropUri !== null}
+        imageUri={cropUri}
+        onComplete={(croppedUri) => {
+          setCropUri(null);
+          setPendingImageUri(croppedUri);
+        }}
+        onCancel={() => setCropUri(null)}
+      />
+
+      {/* Crop preview modal — shown after pick+crop, before upload */}
+      <Modal visible={pendingImageUri !== null} transparent animationType="fade">
+        <View style={styles.cropPreviewOverlay}>
+          <Text style={styles.cropPreviewTitle}>Preview</Text>
+          {pendingImageUri && (
+            <Avatar imageUrl={pendingImageUri} size={200} name={profile?.fullName} userId={profile?.userId} />
+          )}
+          <View style={styles.cropPreviewButtons}>
+            <TouchableOpacity style={styles.cropCancelBtn} onPress={() => setPendingImageUri(null)}>
+              <Text style={styles.cropCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.cropUploadBtn, uploadingImage && { opacity: 0.5 }]}
+              disabled={uploadingImage}
+              onPress={() => void doUpload(pendingImageUri!)}
+            >
+              <Text style={styles.cropUploadText}>Upload</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Large avatar preview modal */}
+      <Modal
+        visible={previewVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewVisible(false)}
+        statusBarTranslucent
+      >
+        <Pressable style={styles.previewOverlay} onPress={() => setPreviewVisible(false)}>
+          <Pressable style={styles.previewContent} onPress={() => undefined}>
+            <TouchableOpacity
+              style={styles.previewClose}
+              onPress={() => setPreviewVisible(false)}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Text style={styles.previewCloseText}>✕</Text>
+            </TouchableOpacity>
+            {profile?.profileImageUrl ? (
+              <Image
+                source={{ uri: profile.profileImageUrl }}
+                style={{ width: 260, height: 260, borderRadius: 130 }}
+                resizeMode="contain"
+              />
+            ) : (
+              <Avatar name={profile?.fullName} userId={profile?.userId} imageUrl={profile?.profileImageUrl} size={200} />
+            )}
+            <Text style={styles.previewName}>{profile?.fullName ?? "Member"}</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* ================= HEADER ================= */}
       <View style={styles.header}>
-        {/* Avatar */}
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {profile?.firstName
-              ? profile.firstName.charAt(0).toUpperCase()
-              : "U"}
-          </Text>
-        </View>
+        {/* Tap avatar to pick/view/remove image */}
+        <TouchableOpacity onPress={handleAvatarTap} activeOpacity={0.8} style={styles.avatarWrapper}>
+          <Avatar
+            name={profile?.fullName}
+            userId={profile?.userId}
+            imageUrl={profile?.profileImageUrl}
+            size={96}
+          />
+          <View style={styles.cameraIconBadge}>
+            <Text style={styles.cameraIconText}>📷</Text>
+          </View>
+        </TouchableOpacity>
 
-        {/* Name */}
-        <Text style={styles.name}>
-          {profile?.firstName || ""} {profile?.lastName || ""}
-        </Text>
+        {/* Name — uses fullName for consistency */}
+        <Text style={styles.name}>{profile?.fullName || "Member"}</Text>
 
         {/* Email under name */}
         <Text style={styles.subText}>📧 {profile?.email || "-"}</Text>
@@ -432,6 +643,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#f8f5fb",
+  },
+
+  // Upload overlay
+  uploadOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    zIndex: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  uploadOverlayText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 
   // Header area
@@ -700,5 +930,71 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "700",
     fontSize: 15,
+  },
+
+  // Avatar wrapper (makes it tappable, with camera badge)
+  avatarWrapper: {
+    marginBottom: 12,
+    position: "relative",
+  },
+
+  cameraIconBadge: {
+    position: "absolute",
+    bottom: 0,
+    right: -4,
+    backgroundColor: "#da9306",
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  cameraIconText: {
+    fontSize: 12,
+  },
+
+  // Crop preview modal (shown after native crop, before upload)
+  cropPreviewOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.88)", alignItems: "center", justifyContent: "center", gap: 24 },
+  cropPreviewTitle: { color: "#fff", fontSize: 20, fontWeight: "800" },
+  cropPreviewButtons: { flexDirection: "row", gap: 16, marginTop: 8 },
+  cropCancelBtn: { paddingHorizontal: 28, paddingVertical: 13, borderRadius: 14, backgroundColor: "#333" },
+  cropCancelText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  cropUploadBtn: { paddingHorizontal: 28, paddingVertical: 13, borderRadius: 14, backgroundColor: "#6d28d9" },
+  cropUploadText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+
+  // Preview modal
+  previewOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewContent: {
+    alignItems: "center",
+    gap: 20,
+  },
+  previewClose: {
+    position: "absolute",
+    top: -48,
+    right: -12,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewCloseText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  previewName: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 8,
   },
 });

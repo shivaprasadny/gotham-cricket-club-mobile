@@ -9,6 +9,7 @@ import {
 } from "../services/pushNotificationService";
 import { setSessionExpiredHandler } from "../api/axiosConfig";
 import { loginUser } from "../services/authService";
+import { getMyProfile } from "../services/profileService";
 import { chatStompClient } from "../chat/stompClient";
 
 type UserType = {
@@ -17,6 +18,8 @@ type UserType = {
   email: string;
   role: "ADMIN" | "CAPTAIN" | "PLAYER";
   status: "PENDING" | "APPROVED" | "REJECTED" | "INACTIVE";
+  profileImageUrl?: string | null;
+  profileImageUpdatedAt?: string | null;
 };
 
 /**
@@ -29,6 +32,7 @@ type AuthContextType = {
   logout: () => Promise<void>;
   loadUserFromStorage: () => Promise<boolean>;
   biometricLogin: () => Promise<{ success: boolean; message?: string }>;
+  updateUser: (updates: Partial<UserType>) => Promise<void>;
   loading: boolean;
 };
 
@@ -103,9 +107,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const storedUser = await SecureStore.getItemAsync("user");
 
       if (storedToken && storedUser) {
+        const parsedUser = JSON.parse(storedUser) as UserType;
         setToken(storedToken);
-        setUser(JSON.parse(storedUser) as UserType);
+        setUser(parsedUser);
         void chatStompClient.connect(storedToken);
+
+        // Refresh profileImageUrl in the background on every app start.
+        // Pre-signed S3 URLs expire, and old sessions may not have the field at all.
+        getMyProfile()
+          .then((profile: any) => {
+            if (profile?.profileImageUrl !== undefined) {
+              setUser((prev) =>
+                prev ? { ...prev, profileImageUrl: profile.profileImageUrl } : prev
+              );
+            }
+          })
+          .catch(() => {});
 
         // Re-register push token on every app start so a fresh install or
         // new build (which gets a new Expo token) always has the token saved.
@@ -217,6 +234,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         email: response.email,
         role: response.role,
         status: response.status,
+        profileImageUrl: response.profileImageUrl ?? null,
       });
 
       return { success: true };
@@ -227,6 +245,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         message: "Something went wrong during biometric login",
       };
     }
+  };
+
+  /**
+   * Patch in-memory user state and persist to SecureStore.
+   * Call after profile image upload/remove or profile edits.
+   */
+  const updateUser = async (updates: Partial<UserType>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates };
+      SecureStore.setItemAsync("user", JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
   };
 
   /**
@@ -265,6 +296,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         logout,
         loadUserFromStorage,
         biometricLogin,
+        updateUser,
         loading,
       }}
     >
