@@ -72,6 +72,7 @@ const LeaderboardScreen = ({ route, navigation }: any) => {
               leaderFilters
             )
           : await getClubLeaders(category, limit, leaderFilters);
+      // Backend returns entries already sorted correctly (wickets DESC, economy ASC tiebreaker)
       setEntries(Array.isArray(data) ? data : []);
     } catch (error: any) {
       Alert.alert(
@@ -173,6 +174,7 @@ const LeaderboardScreen = ({ route, navigation }: any) => {
       ) : entries.length ? (
         <LeaderboardList
           entries={entries}
+          secondaryLabel={category === "WICKETS" ? "Econ" : undefined}
           onPlayerPress={(playerId) =>
             navigation.navigate("PlayerStatistics", {
               playerId,

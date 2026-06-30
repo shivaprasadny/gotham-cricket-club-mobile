@@ -61,7 +61,8 @@ const MatchesScreen = ({ navigation }: Props) => {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pickerType, setPickerType] = useState<PickerType>(null);
 
-  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  const isAdmin = user?.role === "ADMIN";
+  const canManage = isAdmin || user?.role === "CAPTAIN";
 
   // Load matches
   const loadMatches = async () => {
@@ -126,13 +127,24 @@ const MatchesScreen = ({ navigation }: Props) => {
     return ["ALL_LEAGUES", ...Array.from(leagues)];
   }, [matches]);
 
+  // A match is "past" only after Sunday 23:59:59 of the week it falls in,
+  // so this week's matches stay visible until end of Sunday (issue 10).
+  const getEndOfWeekSunday = (date: Date) => {
+    const day = date.getDay(); // 0 = Sun
+    const diffToSunday = day === 0 ? 0 : 7 - day;
+    const sunday = new Date(date);
+    sunday.setDate(date.getDate() + diffToSunday);
+    sunday.setHours(23, 59, 59, 999);
+    return sunday;
+  };
+
   // Apply filters
   const filteredMatches = useMemo(() => {
     const now = new Date();
 
-    return matches.filter((match) => {
+    const filtered = matches.filter((match) => {
       const matchDate = new Date(match.matchDate);
-      const isPast = matchDate < now;
+      const isPast = now > getEndOfWeekSunday(matchDate);
       const isCancelled = match.status === "CANCELLED";
 
       if (filter === "UPCOMING" && (isPast || isCancelled)) return false;
@@ -152,6 +164,14 @@ const MatchesScreen = ({ navigation }: Props) => {
 
       return true;
     });
+
+    // Past matches: newest first
+    if (filter === "PAST") {
+      return filtered.sort(
+        (a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime()
+      );
+    }
+    return filtered;
   }, [matches, filter, teamFilter, leagueFilter]);
 
   // Availability color
@@ -319,12 +339,15 @@ const MatchesScreen = ({ navigation }: Props) => {
               <Text style={styles.smallActionText}>Edit</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.smallActionBtn, styles.deleteBtn]}
-              onPress={() => handleDelete(item.id)}
-            >
-              <Text style={styles.smallActionText}>Delete</Text>
-            </TouchableOpacity>
+            {/* Fix 5: only ADMIN may delete matches; Captain can edit but not delete */}
+            {isAdmin && (
+              <TouchableOpacity
+                style={[styles.smallActionBtn, styles.deleteBtn]}
+                onPress={() => handleDelete(item.id)}
+              >
+                <Text style={styles.smallActionText}>Delete</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </TouchableOpacity>

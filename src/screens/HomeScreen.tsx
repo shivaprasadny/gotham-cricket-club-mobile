@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
@@ -24,6 +25,9 @@ import {
 import { getEvents } from "../services/eventService";
 import { getMyFees } from "../services/feeService";
 import { getChatRooms } from "../chat/chatApi";
+// Fix 1: fetch published scorecard summaries for recent results
+import { getScorecard } from "../services/scorecardService";
+import { ScorecardResponse } from "../types/scorecard";
 import { chatStompClient } from "../chat/stompClient";
 
 // Home components
@@ -115,6 +119,9 @@ const HomeScreen = ({ navigation }: Props) => {
   // =========================
 
   const [upcomingMatches, setUpcomingMatches] = useState<Match[]>([]);
+  const [recentResults, setRecentResults] = useState<Match[]>([]);
+  // Fix 1: published scorecard summaries keyed by matchId
+  const [recentScorecards, setRecentScorecards] = useState<Record<number, ScorecardResponse>>({});
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [pinnedAnnouncement, setPinnedAnnouncement] =
     useState<Announcement | null>(null);
@@ -298,14 +305,49 @@ const HomeScreen = ({ navigation }: Props) => {
           ? results[7].value
           : [];
 
-      // Upcoming matches only
+      // Current week start (Monday 00:00) for match visibility — matches stay on the
+      // upcoming list until Sunday midnight even after their time passes (issue 10).
+      const nowDate = new Date();
+      const dayOfWeek = nowDate.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const currentWeekStart = new Date(nowDate);
+      currentWeekStart.setDate(nowDate.getDate() + diffToMonday);
+      currentWeekStart.setHours(0, 0, 0, 0);
+
+      // Last week start (Monday of the previous week)
+      const lastWeekStart = new Date(currentWeekStart);
+      lastWeekStart.setDate(currentWeekStart.getDate() - 7);
+
+      // Upcoming: UPCOMING status, plus COMPLETED matches from this week so they
+      // remain visible in weekly sections until Sunday 23:59 (issue 10).
       const upcomingMatchList = Array.isArray(matchesData)
         ? matchesData
-            .filter((match) => (match.status || "UPCOMING") === "UPCOMING")
+            .filter((match) => {
+              const status = match.status || "UPCOMING";
+              if (status === "CANCELLED") return false;
+              if (status === "UPCOMING") return true;
+              // Include COMPLETED matches still within the current week
+              return new Date(match.matchDate) >= currentWeekStart;
+            })
             .sort(
               (a, b) =>
                 new Date(a.matchDate).getTime() -
                 new Date(b.matchDate).getTime()
+            )
+        : [];
+
+      // Recent results: COMPLETED matches from this week or last week, newest first
+      const recentResultList = Array.isArray(matchesData)
+        ? matchesData
+            .filter((match) => {
+              if (match.status !== "COMPLETED") return false;
+              const matchDate = new Date(match.matchDate);
+              return matchDate >= lastWeekStart;
+            })
+            .sort(
+              (a, b) =>
+                new Date(b.matchDate).getTime() -
+                new Date(a.matchDate).getTime()
             )
         : [];
 
@@ -336,6 +378,29 @@ const HomeScreen = ({ navigation }: Props) => {
   : [];
 
       setUpcomingMatches(upcomingMatchList);
+      setRecentResults(recentResultList);
+
+      // Fix 1: fetch published scorecards for recent completed matches (fire-and-forget,
+      // silently skip matches whose scorecard is still a draft or doesn't exist yet)
+      if (recentResultList.length > 0) {
+        const scorecardEntries = await Promise.allSettled(
+          recentResultList.map((m) =>
+            getScorecard(m.id).then((sc) => ({ matchId: m.id, sc }))
+          )
+        );
+        const map: Record<number, ScorecardResponse> = {};
+        for (const result of scorecardEntries) {
+          if (
+            result.status === "fulfilled" &&
+            result.value.sc.status === "PUBLISHED"
+          ) {
+            map[result.value.matchId] = result.value.sc;
+          }
+        }
+        setRecentScorecards(map);
+      } else {
+        setRecentScorecards({});
+      }
       setAnnouncements(latestAnnouncements);
       setPinnedAnnouncement(pinnedData || null);
       setNotifications(
@@ -538,6 +603,59 @@ const HomeScreen = ({ navigation }: Props) => {
               announcements={announcements}
               navigation={navigation}
             />
+
+            {/* Recent Results — all completed matches this week + last week, most recent first.
+                Shows both team names, win/loss by runs or wickets, and date.
+                Green border = win, red = loss. Result text from published scorecard when available. */}
+            {recentResults.length > 0 && (
+              <View style={styles.recentResultsCard}>
+                <Text style={styles.recentResultsTitle}>Recent Results</Text>
+                {recentResults.map((match) => {
+                    const sc = recentScorecards[match.id];
+                    const home = match.homeTeamName || "Gotham CC";
+                    const opponent = match.awayTeamName || match.externalOpponentName || "Opponent";
+                    const dateStr = new Date(match.matchDate).toLocaleDateString(undefined, {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                    });
+
+                    const isWin = sc?.outcome === "WIN";
+                    const isLoss = sc?.outcome === "LOSS";
+                    const resultColor = isWin ? "#22c55e" : isLoss ? "#ef4444" : "#da9306";
+                    const cardBorder = isWin
+                      ? styles.recentResultRowWin
+                      : isLoss
+                      ? styles.recentResultRowLoss
+                      : undefined;
+
+                    // Full text e.g. "Won by 25 runs" / "Lost by 4 wickets"; fallback if no published scorecard
+                    const resultText = sc?.resultSummary ?? (sc ? sc.outcome : "Result pending");
+
+                    return (
+                      <TouchableOpacity
+                        key={match.id}
+                        style={[styles.recentResultRow, cardBorder]}
+                        onPress={() =>
+                          navigation.navigate("Scorecard", { matchId: match.id, match })
+                        }
+                      >
+                        <View style={styles.recentResultMain}>
+                          <Text style={styles.recentResultMatch} numberOfLines={1}>
+                            {home} vs {opponent}
+                          </Text>
+                          <Text style={styles.recentResultDate}>{dateStr}</Text>
+                          {/* Result on its own line below the date so it never overlaps the team names */}
+                          <Text style={[styles.recentResultOutcome, { color: resultColor }]} numberOfLines={2}>
+                            {resultText}
+                          </Text>
+                        </View>
+                        <Text style={styles.recentResultChevron}>›</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </View>
+            )}
           </>
         )}
       </ScrollView>
@@ -590,4 +708,34 @@ hideButton: {
   justifyContent: "center",
   marginRight: 8,
 },
+recentResultsCard: {
+  backgroundColor: "#3a0a57",
+  borderRadius: 16,
+  padding: 14,
+  marginBottom: 18,
+},
+recentResultsTitle: {
+  color: "#da9306",
+  fontSize: 14,
+  fontWeight: "800",
+  marginBottom: 10,
+  textTransform: "uppercase",
+  letterSpacing: 0.5,
+},
+recentResultRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  paddingVertical: 8,
+  borderTopWidth: 1,
+  borderTopColor: "#4a1568",
+},
+recentResultMain: { flex: 1 },
+recentResultMatch: { color: "#fff", fontSize: 14, fontWeight: "700" },
+recentResultDate: { color: "#b09bbf", fontSize: 12, marginTop: 2 },
+recentResultChevron: { color: "#da9306", fontSize: 20, marginLeft: 8 },
+// Fix 1: new styles for score, result text and win/loss row accents
+recentResultScore: { color: "#d8c9e8", fontSize: 12, marginTop: 3 },
+recentResultOutcome: { fontSize: 12, fontWeight: "700", marginTop: 2 },
+recentResultRowWin: { borderLeftWidth: 3, borderLeftColor: "#22c55e" },
+recentResultRowLoss: { borderLeftWidth: 3, borderLeftColor: "#ef4444" },
 });

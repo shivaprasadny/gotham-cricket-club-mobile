@@ -150,54 +150,63 @@ const [renameValue, setRenameValue] = useState(roomName);
           }
         };
 
+        // Fix 2: move Call/SMS/WhatsApp into a "More" overflow menu so the
+        // partner name is never obscured by icon buttons in the header.
         navigation.setOptions({
-          // Tappable avatar + name replaces the plain text title
           headerTitle: () => (
             <TouchableOpacity
               onPress={goToProfile}
-              style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}
             >
               <View style={{
                 width: 34, height: 34, borderRadius: 17,
                 backgroundColor: "#da9306",
                 alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
               }}>
                 <Text style={{ color: "#fff", fontWeight: "800", fontSize: 15 }}>
                   {(partner.fullName ?? roomName).charAt(0).toUpperCase()}
                 </Text>
               </View>
-              <View>
-                <Text style={{ color: "#2b0540", fontWeight: "700", fontSize: 15 }} numberOfLines={1}>
+              {/* flex:1 + numberOfLines=1 ensures the name truncates before reaching icons */}
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{ color: "#2b0540", fontWeight: "700", fontSize: 15 }}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
                   {partner.fullName ?? roomName}
                 </Text>
                 {partner.nickname ? (
-                  <Text style={{ color: "#7a5c9a", fontSize: 11 }}>"{partner.nickname}"</Text>
+                  <Text style={{ color: "#7a5c9a", fontSize: 11 }} numberOfLines={1} ellipsizeMode="tail">
+                    "{partner.nickname}"
+                  </Text>
                 ) : null}
               </View>
             </TouchableOpacity>
           ),
-          // Call / SMS / WhatsApp icons in the header right
-          headerRight: partnerPhone ? () => (
-            <View style={{ flexDirection: "row", gap: 2, marginRight: 4 }}>
-              <TouchableOpacity
-                style={{ padding: 6 }}
-                onPress={() => void Linking.openURL(`tel:${partnerPhone}`)}
-              >
-                <Ionicons name="call-outline" size={22} color="#4B1D6B" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={{ padding: 6 }}
-                onPress={() => void Linking.openURL(`sms:${partnerPhone}`)}
-              >
-                <Ionicons name="chatbubble-outline" size={22} color="#4B1D6B" />
-              </TouchableOpacity>
-              {partnerWhatsApp ? (
-                <TouchableOpacity style={{ padding: 6 }} onPress={() => void handleWA()}>
-                  <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          ) : undefined,
+          // Single ellipsis icon — tapping opens an action sheet with contact actions
+          headerRight: () => (
+            <TouchableOpacity
+              style={{ padding: 8, marginRight: 2 }}
+              onPress={() => {
+                const options: { text: string; onPress?: () => void; style?: "cancel" | "destructive" | "default" }[] = [
+                  { text: "View Profile", onPress: goToProfile },
+                ];
+                if (partnerPhone) {
+                  options.push({ text: "Call", onPress: () => void Linking.openURL(`tel:${partnerPhone}`) });
+                  options.push({ text: "SMS / Message", onPress: () => void Linking.openURL(`sms:${partnerPhone}`) });
+                }
+                if (partnerPhone && partnerWhatsApp) {
+                  options.push({ text: "WhatsApp", onPress: () => void handleWA() });
+                }
+                options.push({ text: "Cancel", style: "cancel" });
+                Alert.alert("Options", undefined, options);
+              }}
+            >
+              <Ionicons name="ellipsis-vertical" size={22} color="#4B1D6B" />
+            </TouchableOpacity>
+          ),
         });
       })
       .catch(() => {});

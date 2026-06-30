@@ -139,6 +139,14 @@ const HomeMenuModal = ({
             <Text style={styles.menuText}>Club Leaderboards</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => goTo("Scorecards")}
+          >
+            <Ionicons name="document-text-outline" size={20} color="#da9306" />
+            <Text style={styles.menuText}>Scorecards</Text>
+          </TouchableOpacity>
+
           {/* Logout button */}
           <TouchableOpacity
             style={styles.logoutItem}

@@ -62,7 +62,8 @@ const FeeListScreen = ({ navigation }: Props) => {
   const [sortType, setSortType] = useState<SortType>("DUE_DATE");
 
   const { user } = useAuth();
-  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  const isAdmin = user?.role === "ADMIN";
+  const canManage = isAdmin || user?.role === "CAPTAIN";
 
   // Load all fee definitions
   const loadFees = async () => {
@@ -265,12 +266,15 @@ const FeeListScreen = ({ navigation }: Props) => {
             <Text style={styles.actionText}>Edit</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.deleteBtn]}
-            onPress={() => handleDelete(item.id)}
-          >
-            <Text style={styles.actionText}>Delete</Text>
-          </TouchableOpacity>
+          {/* Fix 5: only ADMIN may delete fees */}
+          {isAdmin && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.deleteBtn]}
+              onPress={() => handleDelete(item.id)}
+            >
+              <Text style={styles.actionText}>Delete</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>

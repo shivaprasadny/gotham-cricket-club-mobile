@@ -66,15 +66,22 @@ const dismissalOptions = [
   ["Stumped", "STUMPED"],
   ["Hit Wicket", "HIT_WICKET"],
   ["Retired Hurt", "RETIRED_HURT"],
+  ["Retired Out", "RETIRED_OUT"],
   ["Other", "OTHER"],
 ] as const satisfies readonly (readonly [string, DismissalType])[];
 
 const numberValue = (value: string) => {
-  const parsed = Number(value);
+  // Fix 4: treat empty string as 0 so inputs can be cleared, but never discard an
+  // explicitly typed 0.  parseInt is used so "0" → 0 (not falsy-rejected).
+  if (value === "" || value === undefined) return 0;
+  const parsed = parseInt(value, 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 };
 
-const numberText = (value: number) => (value === 0 ? "" : String(value));
+// Fix 4: always show the numeric value including 0 so users can see what was entered.
+// Empty string is only used when the field hasn't been touched (value strictly undefined).
+const numberText = (value: number | undefined | null) =>
+  value === undefined || value === null ? "" : String(value);
 
 const emptyBatting = (position: number): BattingEntryRequest => ({
   playerId: null,
@@ -392,7 +399,7 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                   : innings.battingEntries,
               bowlingEntries:
                 !ours && innings.bowlingEntries.length === 0
-                  ? selected.slice(0, 11).map((player) => ({
+                  ? [...selected].slice(0, 11).reverse().map((player) => ({
                       ...emptyBowling(),
                       playerId: player.userId,
                     }))
@@ -534,6 +541,18 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
       return;
     }
 
+    // Retired Out: counts as out in the batting card but NOT as a dismissal for average purposes
+    if (dismissalType === "RETIRED_OUT") {
+      updateBatter(inningsIndex, rowIndex, {
+        dismissed: false,
+        dismissalType,
+        dismissalText: "Retired out",
+        didNotBat: false,
+        retiredHurt: false,
+      });
+      return;
+    }
+
     if (dismissalType === "NOT_OUT") {
       updateBatter(inningsIndex, rowIndex, {
         dismissed: false,
@@ -578,8 +597,8 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
   };
 
   const battingSummary = (row: BattingEntryRequest) => {
-    const hasInput =
-      row.runs > 0 || row.ballsFaced > 0 || row.fours > 0 || row.sixes > 0;
+    // Fix 4: a batter who scored 0 off 0 balls is still "played" if they are not DNB
+    const hasInput = !row.didNotBat;
     if (!hasInput) return "Did Not Bat";
     return `${row.runs} (${row.ballsFaced}) · ${
       currentDismissal(row) === "NOT_OUT"
@@ -589,14 +608,9 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
   };
 
   const bowlingSummary = (row: BowlingEntryRequest) => {
-    const hasInput =
-      row.legalBalls > 0 ||
-      row.maidens > 0 ||
-      row.runsConceded > 0 ||
-      row.wickets > 0 ||
-      row.wides > 0 ||
-      row.noBalls > 0 ||
-      row.dotBalls > 0;
+    // Fix 4: a bowler assigned to a row but with all-zero stats still "bowled" if a
+    // player is selected; only show "Did Not Bowl" when row is completely untouched.
+    const hasInput = row.playerId !== null || row.externalPlayerName !== null;
     return hasInput
       ? `${row.wickets}/${row.runsConceded} · ${legalBallsToOvers(
           row.legalBalls
@@ -1003,10 +1017,10 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
         </Text>
         <View style={styles.scoreFields}>
           {([
-            ["Wides", "wides"],
-            ["No Balls", "noBalls"],
             ["Byes", "byes"],
             ["Leg Byes", "legByes"],
+            ["Wides", "wides"],
+            ["No Balls", "noBalls"],
             ["Penalty", "penaltyRuns"],
           ] as const).map(([label, key]) => (
             <Field

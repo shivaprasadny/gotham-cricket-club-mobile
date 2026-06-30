@@ -10,6 +10,7 @@ export type DismissalType =
   | "STUMPED"
   | "HIT_WICKET"
   | "RETIRED_HURT"
+  | "RETIRED_OUT"
   | "DID_NOT_BAT"
   | "OTHER";
 
@@ -189,6 +190,7 @@ export type PlayerLeaderboardEntry = {
   fullName: string;
   value: number;
   secondaryValue: number | null;
+  matchesPlayed: number | null;
 };
 
 export type RecentMatchPerformance = {

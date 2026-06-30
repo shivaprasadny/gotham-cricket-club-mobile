@@ -40,7 +40,8 @@ const EventsScreen = ({ navigation }: Props) => {
   const [refreshing, setRefreshing] = useState(false);
   const [eventFilter, setEventFilter] = useState<"UPCOMING" | "PAST" | "ALL">("UPCOMING");
 
-  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  const isAdmin = user?.role === "ADMIN";
+  const canManage = isAdmin || user?.role === "CAPTAIN";
 
   const loadEvents = async () => {
     try {
@@ -125,13 +126,16 @@ const EventsScreen = ({ navigation }: Props) => {
             <Text style={styles.actionText}>Edit</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.deleteBtn]}
-            onPress={() => handleDeleteEvent(item.id)}
-          >
-            <Ionicons name="trash-outline" size={16} color="#fff" />
-            <Text style={styles.actionText}>Delete</Text>
-          </TouchableOpacity>
+          {/* Fix 5: only ADMIN may delete events */}
+          {isAdmin && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.deleteBtn]}
+              onPress={() => handleDeleteEvent(item.id)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#fff" />
+              <Text style={styles.actionText}>Delete</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </TouchableOpacity>

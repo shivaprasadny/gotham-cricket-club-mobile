@@ -32,9 +32,11 @@ export const StatGrid = ({
 export const LeaderboardList = ({
   entries,
   onPlayerPress,
+  secondaryLabel,
 }: {
   entries: PlayerLeaderboardEntry[];
   onPlayerPress: (playerId: number) => void;
+  secondaryLabel?: string; // e.g. "Econ" for WICKETS tab
 }) => (
   <View style={styles.list}>
     {entries.map((entry) => (
@@ -44,11 +46,19 @@ export const LeaderboardList = ({
         onPress={() => onPlayerPress(entry.playerId)}
       >
         <Text style={styles.rank}>{entry.rank}</Text>
-        <Text style={styles.name}>{entry.fullName}</Text>
-        <View>
+        {/* Matches count inline after name: "Shiva (2)" — number is small and light */}
+        <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
+          {entry.fullName}
+          {entry.matchesPlayed != null
+            ? <Text style={styles.matchesBadge}>{` (${entry.matchesPlayed})`}</Text>
+            : null}
+        </Text>
+        <View style={{ alignItems: "flex-end" }}>
           <Text style={styles.leaderValue}>{entry.value}</Text>
           {entry.secondaryValue != null ? (
-            <Text style={styles.secondary}>{entry.secondaryValue}</Text>
+            <Text style={styles.secondary}>
+              {secondaryLabel ? `${secondaryLabel} ` : ""}{entry.secondaryValue}
+            </Text>
           ) : null}
         </View>
       </TouchableOpacity>
@@ -218,6 +228,7 @@ const styles = StyleSheet.create({
   leaderRow: { flexDirection: "row", alignItems: "center", padding: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#e4dae7" },
   rank: { width: 30, color: "#da9306", fontWeight: "900", fontSize: 16 },
   name: { flex: 1, color: "#2b0540", fontWeight: "800" },
+  matchesBadge: { color: "#b0a0b8", fontSize: 10, fontWeight: "400" },
   leaderValue: { color: "#2b0540", fontWeight: "900", textAlign: "right" },
   secondary: { color: "#827487", fontSize: 10, textAlign: "right" },
   compactFilters: {

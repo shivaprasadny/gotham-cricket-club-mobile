@@ -67,7 +67,8 @@ const ScorecardScreen = ({ route, navigation }: Props) => {
   const [refreshing, setRefreshing] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [resolvedMatch, setResolvedMatch] = useState(match || null);
-  const canManage = user?.role === "ADMIN" || user?.role === "CAPTAIN";
+  const isAdmin = user?.role === "ADMIN";
+  const canManage = isAdmin || user?.role === "CAPTAIN";
   const tossWinnerName =
     scorecard?.tossWinnerName ||
     (scorecard?.tossWinnerTeamId === resolvedMatch?.homeTeamId
@@ -261,12 +262,6 @@ const ScorecardScreen = ({ route, navigation }: Props) => {
             </Text>
           </View>
 
-          <Text style={styles.inningsSub}>
-            Extras {innings.totalExtras}: WD {innings.wides || 0}, NB{" "}
-            {innings.noBalls || 0}, B {innings.byes || 0}, LB{" "}
-            {innings.legByes || 0}, P {innings.penaltyRuns || 0}
-          </Text>
-
           <Text style={styles.tableTitle}>Batting</Text>
           <BattingTable
             rows={battingRows}
@@ -311,8 +306,8 @@ const ScorecardScreen = ({ route, navigation }: Props) => {
           <View style={styles.extras}>
             <Text style={styles.extrasTitle}>Extras: {innings.totalExtras}</Text>
             <Text style={styles.extrasText}>
-              WD {innings.wides} • NB {innings.noBalls} • B {innings.byes} •
-              LB {innings.legByes} • P {innings.penaltyRuns}
+              B {innings.byes} • LB {innings.legByes} • WD {innings.wides} •
+              NB {innings.noBalls} • P {innings.penaltyRuns}
             </Text>
           </View>
         </View>
@@ -352,20 +347,23 @@ const ScorecardScreen = ({ route, navigation }: Props) => {
               >
                 <Text style={styles.publishText}>Publish Scorecard</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() =>
-                  confirmAction(
-                    "Delete Draft",
-                    "This draft and all entered performances will be removed.",
-                    "Delete",
-                    () => deleteScorecardDraft(matchId),
-                    true
-                  )
-                }
-              >
-                <Text style={styles.deleteText}>Delete Draft</Text>
-              </TouchableOpacity>
+              {/* Fix 5: only ADMIN may delete a scorecard draft */}
+              {isAdmin && (
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() =>
+                    confirmAction(
+                      "Delete Draft",
+                      "This draft and all entered performances will be removed.",
+                      "Delete",
+                      () => deleteScorecardDraft(matchId),
+                      true
+                    )
+                  }
+                >
+                  <Text style={styles.deleteText}>Delete Draft</Text>
+                </TouchableOpacity>
+              )}
             </>
           ) : (
             <TouchableOpacity

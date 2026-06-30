@@ -52,6 +52,7 @@ import ChatListScreen from "../chat/ChatListScreen";
 import ChatRoomScreen from "../chat/ChatRoomScreen";
 import MatchSquadHubScreen from "../screens/MatchSquadHubScreen";
 import NotificationSettingsScreen from "../screens/NotificationSettingsScreen";
+import ScorecardsScreen from "../screens/ScorecardsScreen";
 
 
 
@@ -134,6 +135,11 @@ const AppNavigator = ({ onNavigationReady }: Props) => {
   options={{ title: "Player Profile" }}
 />
 <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+<Stack.Screen
+  name="Scorecards"
+  component={ScorecardsScreen}
+  options={{ title: "Scorecards" }}
+/>
 <Stack.Screen name="Scorecard" component={ScorecardScreen} />
 <Stack.Screen
   name="ScorecardEditor"

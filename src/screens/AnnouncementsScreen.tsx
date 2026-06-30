@@ -261,7 +261,8 @@ const AnnouncementsScreen = ({ navigation }: Props) => {
             <Text style={styles.actionText}>Copy</Text>
           </TouchableOpacity>
 
-          {canManage && (
+          {/* Fix 5: only ADMIN may delete announcements */}
+          {isAdmin && (
             <TouchableOpacity
               style={[styles.actionBtn, styles.deleteBtn]}
               onPress={() => handleDelete(item.id)}
