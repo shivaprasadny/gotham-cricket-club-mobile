@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -145,6 +146,11 @@ const MatchSquadHubScreen = ({ route, navigation }: any) => {
           {params.matchDate ? new Date(params.matchDate).toLocaleString() : "Date not set"}
         </Text>
         <Text style={styles.heroText}>{params.venue || "Venue not set"}</Text>
+        {params.locationLink ? (
+          <TouchableOpacity onPress={() => Linking.openURL(params.locationLink)}>
+            <Text style={[styles.heroText, styles.heroLink]}>📍 View location</Text>
+          </TouchableOpacity>
+        ) : null}
         <Text style={styles.heroText}>
           {params.homeAway === "AWAY" ? "Away match" : "Home match"}
         </Text>
@@ -198,6 +204,7 @@ const MatchSquadHubScreen = ({ route, navigation }: any) => {
                 params.externalOpponentName || params.opponentName,
               matchDate: params.matchDate,
               venue: params.venue,
+              locationLink: params.locationLink,
               homeAway: params.homeAway,
               matchFormat: params.matchFormat,
             },
@@ -405,6 +412,7 @@ const styles = StyleSheet.create({
   eyebrow: { color: "#da9306", fontSize: 11, fontWeight: "900", letterSpacing: 1 },
   heroTitle: { color: "#fff", fontSize: 22, fontWeight: "900", marginVertical: 8 },
   heroText: { color: "#ddd2e3", marginTop: 3 },
+  heroLink: { color: "#da9306", fontWeight: "800", textDecorationLine: "underline" },
   grid: { flexDirection: "row", gap: 10, marginBottom: 14 },
   metric: { flex: 1, backgroundColor: "#fff", borderRadius: 14, padding: 14, alignItems: "center" },
   metricValue: { color: "#4B1D6B", fontSize: 21, fontWeight: "900" },

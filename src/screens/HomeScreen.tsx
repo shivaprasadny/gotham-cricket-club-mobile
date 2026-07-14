@@ -61,6 +61,7 @@ type Match = {
   leagueId?: number | null;
   leagueName?: string | null;
   venue: string;
+  locationLink?: string | null;
   matchDate: string;
   homeAway?: "HOME" | "AWAY";
   matchFormat?: string | null;

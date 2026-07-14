@@ -23,6 +23,7 @@ type Match = {
   leagueName?: string | null;
   matchDate: string;
   venue?: string;
+  locationLink?: string | null;
   status?: "UPCOMING" | "COMPLETED" | "CANCELLED";
 };
 

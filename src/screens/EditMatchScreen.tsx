@@ -76,6 +76,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
   const [externalOpponentName, setExternalOpponentName] = useState("");
   const [leagueId, setLeagueId] = useState<number | null>(null);
   const [venue, setVenue] = useState("");
+  const [locationLink, setLocationLink] = useState("");
   const [notes, setNotes] = useState("");
   const [matchDate, setMatchDate] = useState<Date | null>(null);
   const [tempMatchDate, setTempMatchDate] = useState<Date>(new Date());
@@ -127,6 +128,7 @@ const EditMatchScreen = ({ route, navigation }: Props) => {
       setExternalOpponentName(matchData?.externalOpponentName || "");
       setLeagueId(matchData?.leagueId ?? null);
       setVenue(matchData?.venue || "");
+      setLocationLink(matchData?.locationLink || "");
       setNotes(matchData?.notes || "");
 setMatchDate(
   matchData?.matchDate
@@ -331,6 +333,7 @@ const formatLocalDateTime = (date: Date) => {
         leagueId,
        matchDate: formatLocalDateTime(matchDate),
         venue: venue.trim(),
+        locationLink: locationLink.trim() ? locationLink.trim() : null,
         homeAway,
         matchFormat: finalMatchFormat,
         matchFee: null,
@@ -588,6 +591,17 @@ matchFeeDueDate: matchFeeDueDate
             placeholderTextColor="#7a7a7a"
             value={venue}
             onChangeText={setVenue}
+          />
+
+          <Text style={styles.label}>Location Link (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Paste Google Maps link (can add later)"
+            placeholderTextColor="#7a7a7a"
+            value={locationLink}
+            onChangeText={setLocationLink}
+            autoCapitalize="none"
+            keyboardType="url"
           />
 
           <Text style={styles.label}>Match Fee Per Player $ (Optional)</Text>

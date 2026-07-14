@@ -75,6 +75,7 @@ const CreateMatchScreen = ({ navigation }: Props) => {
   const [externalOpponentName, setExternalOpponentName] = useState("");
   const [leagueId, setLeagueId] = useState<number | null>(null);
   const [venue, setVenue] = useState("");
+  const [locationLink, setLocationLink] = useState("");
   const [notes, setNotes] = useState("");
   const [matchFee, setMatchFee] = useState("");
   const [matchDate, setMatchDate] = useState<Date | null>(null);
@@ -236,6 +237,7 @@ const formatLocalDateTime = (date: Date) => {
         leagueId,
       matchDate: formatLocalDateTime(matchDate),
         venue: venue.trim(),
+        locationLink: locationLink.trim() ? locationLink.trim() : null,
         homeAway,
         matchFormat: finalMatchFormat,
         matchFee: matchFee.trim() ? Number(matchFee) : null,
@@ -528,6 +530,17 @@ const openAndroidDateTimePicker = (
             placeholderTextColor="#7a7a7a"
             value={venue}
             onChangeText={setVenue}
+          />
+
+          <Text style={styles.label}>Location Link (Optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Paste Google Maps link (can add later)"
+            placeholderTextColor="#7a7a7a"
+            value={locationLink}
+            onChangeText={setLocationLink}
+            autoCapitalize="none"
+            keyboardType="url"
           />
 
           <Text style={styles.label}>Match Fee Per Player $(Optional)</Text>

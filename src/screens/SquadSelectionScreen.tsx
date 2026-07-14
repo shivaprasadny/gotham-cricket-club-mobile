@@ -18,6 +18,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { getAllMembers } from "../services/memberService";
 import { getAvailabilityByMatch } from "../services/availabilityService";
 import { createAnnouncement } from "../services/announcementService";
+import { getMatchById, updateMatch } from "../services/matchService";
 import {
   addOrUpdateSquadMember,
   getSquadByMatch,
@@ -80,7 +81,7 @@ const SquadSelectionScreen = ({ route, navigation }: any) => {
     opponentName,
     teamName,
     matchDate,
-    venue,
+    venue: initialVenue,
     homeAway,
     matchFormat,
   } = route.params || {};
@@ -93,6 +94,25 @@ const SquadSelectionScreen = ({ route, navigation }: any) => {
   const [announcing, setAnnouncing] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget | null>(null);
   const [announcementMessage, setAnnouncementMessage] = useState("");
+
+  // Full match record from the backend, used as the source of truth when
+  // saving venue/location (venue/location often arrive after squad selection
+  // has already started, so this screen needs to be able to edit them).
+  const [matchRecord, setMatchRecord] = useState<any>(null);
+  const [venue, setVenue] = useState(initialVenue || "");
+  const [locationLink, setLocationLink] = useState("");
+  const [savingVenue, setSavingVenue] = useState(false);
+
+  const loadMatchDetails = useCallback(async () => {
+    try {
+      const matchData = await getMatchById(matchId);
+      setMatchRecord(matchData);
+      setVenue(matchData?.venue || "");
+      setLocationLink(matchData?.locationLink || "");
+    } catch (error) {
+      // Non-fatal: squad editing can continue with the venue passed via navigation.
+    }
+  }, [matchId]);
 
   const loadData = useCallback(async () => {
     try {
@@ -175,8 +195,53 @@ const SquadSelectionScreen = ({ route, navigation }: any) => {
   useFocusEffect(
     useCallback(() => {
       void loadData();
-    }, [loadData])
+      void loadMatchDetails();
+    }, [loadData, loadMatchDetails])
   );
+
+  const saveVenueAndLocation = async () => {
+    if (!venue.trim()) {
+      Alert.alert("Venue", "Please enter a venue before saving.");
+      return;
+    }
+    if (!matchRecord) {
+      Alert.alert(
+        "Venue",
+        "Match details are still loading. Please try again in a moment."
+      );
+      return;
+    }
+
+    setSavingVenue(true);
+    try {
+      await updateMatch(matchId, {
+        homeTeamId: matchRecord.homeTeamId,
+        awayTeamId: matchRecord.awayTeamId,
+        externalOpponentName: matchRecord.externalOpponentName || "",
+        leagueId: matchRecord.leagueId,
+        matchDate: matchRecord.matchDate,
+        venue: venue.trim(),
+        locationLink: locationLink.trim() ? locationLink.trim() : null,
+        homeAway: matchRecord.homeAway === "AWAY" ? "AWAY" : "HOME",
+        matchFormat: matchRecord.matchFormat,
+        matchFee: matchRecord.matchFee,
+        matchFeeAmount: matchRecord.matchFeeAmount,
+        matchFeeDueDate: matchRecord.matchFeeDueDate,
+        matchFeeDescription: matchRecord.matchFeeDescription || "",
+        notes: matchRecord.notes || "",
+        status: matchRecord.status,
+      });
+      await loadMatchDetails();
+      Alert.alert("Saved", "Venue and location link updated for this match.");
+    } catch (error: any) {
+      Alert.alert(
+        "Could not save venue",
+        error?.response?.data?.message || "Please try again."
+      );
+    } finally {
+      setSavingVenue(false);
+    }
+  };
 
   const selectedUserIds = useMemo(
     () => squad.map((member) => member.userId),
@@ -360,7 +425,9 @@ const SquadSelectionScreen = ({ route, navigation }: any) => {
           `Date: ${schedule.date}\n` +
           `Time: ${schedule.time}\n` +
           `Format: ${matchFormat || "Not set"}\n` +
-          `Venue: ${venue || "Not set"}\n\n` +
+          `Venue: ${venue || "Not set"}\n` +
+          `${locationLink.trim() ? `Location: ${locationLink.trim()}\n` : ""}` +
+          `\n` +
           `Playing XI:\n${xiText || "Not completed"}\n\n` +
           `Impact Player: ${
             impactPlayer
@@ -561,6 +628,38 @@ const SquadSelectionScreen = ({ route, navigation }: any) => {
           </View>
         )}
 
+        <Text style={styles.sectionTitle}>Venue &amp; Location</Text>
+        <Text style={styles.sectionHelp}>
+          Optional — add or update these even if they weren't ready when the
+          match was created. This will show on the squad announcement.
+        </Text>
+        <TextInput
+          value={venue}
+          onChangeText={setVenue}
+          placeholder="Venue (optional)"
+          style={styles.input}
+        />
+        <TextInput
+          value={locationLink}
+          onChangeText={setLocationLink}
+          placeholder="Location link, e.g. Google Maps URL (optional)"
+          autoCapitalize="none"
+          keyboardType="url"
+          style={styles.input}
+        />
+        <TouchableOpacity
+          disabled={savingVenue}
+          style={[styles.saveVenueButton, savingVenue && styles.disabled]}
+          onPress={() => void saveVenueAndLocation()}
+        >
+          {savingVenue ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Ionicons name="location-outline" size={18} color="#fff" />
+          )}
+          <Text style={styles.saveVenueText}>Save Venue &amp; Location</Text>
+        </TouchableOpacity>
+
         <Text style={styles.sectionTitle}>Squad announcement</Text>
         <TextInput
           value={announcementMessage}
@@ -619,6 +718,23 @@ export default SquadSelectionScreen;
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#f7f4f9" },
   content: { padding: 14, paddingBottom: 160 },
+  input: {
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    padding: 13,
+    marginBottom: 10,
+  },
+  saveVenueButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#4B1D6B",
+    borderRadius: 14,
+    padding: 13,
+    marginBottom: 8,
+  },
+  saveVenueText: { color: "#fff", fontWeight: "800" },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   loadingText: { color: "#4B1D6B", fontWeight: "800", marginTop: 10 },
   hero: { backgroundColor: "#2b0540", borderRadius: 20, padding: 20, marginBottom: 14 },

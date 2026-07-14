@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   StyleSheet,
   Text,
   TextInput,
@@ -41,6 +42,7 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
   awayTeamName,
   externalOpponentName,
   venue,
+  locationLink,
   matchDate,
   homeAway,
   matchFormat,
@@ -193,6 +195,11 @@ const AvailabilityScreen = ({ route, navigation }: Props) => {
   </Text>
   <Text style={styles.matchText}>Format: {matchFormat || "N/A"}</Text>
   <Text style={styles.matchText}>Venue: {venue}</Text>
+  {locationLink ? (
+    <TouchableOpacity onPress={() => Linking.openURL(locationLink)}>
+      <Text style={[styles.matchText, styles.linkText]}>📍 View location</Text>
+    </TouchableOpacity>
+  ) : null}
 
   <Text style={styles.matchText}>
     Match Fee:{" "}
@@ -323,6 +330,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: "#e8deed",
     lineHeight: 20,
+  },
+  linkText: {
+    color: "#da9306",
+    fontWeight: "800",
+    textDecorationLine: "underline",
   },
 
   sectionTitle: {

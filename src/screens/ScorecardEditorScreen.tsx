@@ -1335,11 +1335,11 @@ const ScorecardEditorScreen = ({ route, navigation }: Props) => {
                   />
                   {([
                     ["M", "maidens"],
+                    ["Dot", "dotBalls"],
                     ["Runs", "runsConceded"],
                     ["W", "wickets"],
                     ["WD", "wides"],
                     ["NB", "noBalls"],
-                    ["Dot", "dotBalls"],
                   ] as const).map(([label, key]) => (
                     <Field
                       key={key}

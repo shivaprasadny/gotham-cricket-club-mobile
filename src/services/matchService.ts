@@ -20,6 +20,7 @@ export const createMatch = async (payload: {
   leagueId: number | null;
   matchDate: string;
   venue: string;
+  locationLink?: string | null;
   homeAway: "HOME" | "AWAY";
   matchFormat: string;
   matchFee: number | null;
@@ -43,6 +44,7 @@ export const updateMatch = async (
     leagueId: number | null;
     matchDate: string;
     venue: string;
+    locationLink?: string | null;
     homeAway: "HOME" | "AWAY";
     matchFormat: string;
     matchFee: number | null;

@@ -2,6 +2,7 @@ import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -33,6 +34,7 @@ type MatchDetails = {
   leagueName?: string | null;
   matchDate: string;
   venue: string;
+  locationLink?: string | null;
   homeAway?: "HOME" | "AWAY";
   matchFee?: number | null;
   matchFeeAmount?: number | null;
@@ -179,6 +181,15 @@ const canManageSquad = isAdmin || isCaptain;
         ) : null}
 
         <Text style={styles.detail}>Venue: {match.venue}</Text>
+        {match.locationLink ? (
+          <TouchableOpacity
+            onPress={() => Linking.openURL(match.locationLink as string)}
+          >
+            <Text style={[styles.detail, styles.linkText]}>
+              📍 View location
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
 <Text style={styles.detail}>
   Match Fee:{" "}
@@ -240,6 +251,7 @@ const canManageSquad = isAdmin || isCaptain;
   awayTeamName: match.awayTeamName,
   externalOpponentName: match.externalOpponentName,
   venue: match.venue,
+  locationLink: match.locationLink,
   matchDate: match.matchDate,
   homeAway: match.homeAway,
   matchFormat: match.matchFormat,
@@ -275,6 +287,7 @@ const canManageSquad = isAdmin || isCaptain;
   teamName: match.homeTeamName,
   matchDate: match.matchDate,
   venue: match.venue,
+  locationLink: match.locationLink,
   homeAway: match.homeAway,
   matchFormat: match.matchFormat,
   matchFeeAmount: match.matchFeeAmount,
@@ -441,6 +454,11 @@ const styles = StyleSheet.create({
     marginBottom: 7,
     color: "#5e5065",
     lineHeight: 20,
+  },
+  linkText: {
+    color: "#4B1D6B",
+    fontWeight: "700",
+    textDecorationLine: "underline",
   },
   sectionTitle: {
     fontSize: 22,

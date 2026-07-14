@@ -62,6 +62,7 @@ const WeeklyMatchesSection = ({
       awayTeamName: match.awayTeamName,
       externalOpponentName: match.externalOpponentName,
       venue: match.venue,
+      locationLink: match.locationLink,
       matchDate: match.matchDate,
       homeAway: match.homeAway,
       matchFormat: match.matchFormat,
